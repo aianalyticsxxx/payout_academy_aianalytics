@@ -104,14 +104,85 @@ interface PredictionStats {
 // CONSTANTS
 // ==========================================
 
-const SPORTS = [
-  { key: 'basketball_nba', name: 'NBA', emoji: '🏀' },
-  { key: 'americanfootball_nfl', name: 'NFL', emoji: '🏈' },
-  { key: 'baseball_mlb', name: 'MLB', emoji: '⚾' },
-  { key: 'icehockey_nhl', name: 'NHL', emoji: '🏒' },
-  { key: 'soccer_epl', name: 'Premier League', emoji: '⚽' },
-  { key: 'soccer_spain_la_liga', name: 'La Liga', emoji: '⚽' },
-  { key: 'mma_mixed_martial_arts', name: 'UFC', emoji: '🥊' },
+// Sports Categories with Leagues
+interface League {
+  key: string;
+  name: string;
+}
+
+interface SportCategory {
+  id: string;
+  name: string;
+  emoji: string;
+  leagues: League[];
+}
+
+const SPORTS_CATEGORIES: SportCategory[] = [
+  {
+    id: 'basketball',
+    name: 'Basketball',
+    emoji: '🏀',
+    leagues: [
+      { key: 'basketball_nba', name: 'NBA' },
+      { key: 'basketball_ncaab', name: 'NCAA' },
+      { key: 'basketball_euroleague', name: 'EuroLeague' },
+    ],
+  },
+  {
+    id: 'football',
+    name: 'Football',
+    emoji: '🏈',
+    leagues: [
+      { key: 'americanfootball_nfl', name: 'NFL' },
+      { key: 'americanfootball_ncaaf', name: 'NCAA' },
+    ],
+  },
+  {
+    id: 'soccer',
+    name: 'Soccer',
+    emoji: '⚽',
+    leagues: [
+      { key: 'soccer_epl', name: 'Premier League' },
+      { key: 'soccer_spain_la_liga', name: 'La Liga' },
+      { key: 'soccer_italy_serie_a', name: 'Serie A' },
+      { key: 'soccer_germany_bundesliga', name: 'Bundesliga' },
+      { key: 'soccer_france_ligue_one', name: 'Ligue 1' },
+      { key: 'soccer_uefa_champs_league', name: 'Champions League' },
+    ],
+  },
+  {
+    id: 'hockey',
+    name: 'Hockey',
+    emoji: '🏒',
+    leagues: [
+      { key: 'icehockey_nhl', name: 'NHL' },
+    ],
+  },
+  {
+    id: 'baseball',
+    name: 'Baseball',
+    emoji: '⚾',
+    leagues: [
+      { key: 'baseball_mlb', name: 'MLB' },
+    ],
+  },
+  {
+    id: 'mma',
+    name: 'MMA',
+    emoji: '🥊',
+    leagues: [
+      { key: 'mma_mixed_martial_arts', name: 'UFC' },
+    ],
+  },
+  {
+    id: 'tennis',
+    name: 'Tennis',
+    emoji: '🎾',
+    leagues: [
+      { key: 'tennis_atp_aus_open', name: 'ATP' },
+      { key: 'tennis_wta_aus_open', name: 'WTA' },
+    ],
+  },
 ];
 
 const AI_AGENTS = [
@@ -134,7 +205,8 @@ export default function Dashboard() {
 
   // State
   const [activeTab, setActiveTab] = useState<'events' | 'ai' | 'bets' | 'competition'>('events');
-  const [selectedSport, setSelectedSport] = useState(SPORTS[0]);
+  const [selectedCategory, setSelectedCategory] = useState<SportCategory>(SPORTS_CATEGORIES[0]);
+  const [selectedLeague, setSelectedLeague] = useState<League>(SPORTS_CATEGORIES[0].leagues[0]);
   const [events, setEvents] = useState<SportEvent[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<SportEvent | null>(null);
@@ -158,10 +230,10 @@ export default function Dashboard() {
     }
   }, [status, router]);
 
-  // Fetch events when sport changes
+  // Fetch events when league changes
   useEffect(() => {
     fetchEvents();
-  }, [selectedSport]);
+  }, [selectedLeague]);
 
   // Fetch bets on mount
   useEffect(() => {
@@ -186,7 +258,7 @@ export default function Dashboard() {
   const fetchEvents = async () => {
     setLoadingEvents(true);
     try {
-      const res = await fetch(`/api/sports/events?sport=${selectedSport.key}`);
+      const res = await fetch(`/api/sports/events?sport=${selectedLeague.key}`);
       const data = await res.json();
       setEvents(data.events || []);
     } catch (error) {
@@ -194,6 +266,12 @@ export default function Dashboard() {
     } finally {
       setLoadingEvents(false);
     }
+  };
+
+  // Handle sport category selection
+  const handleCategorySelect = (category: SportCategory) => {
+    setSelectedCategory(category);
+    setSelectedLeague(category.leagues[0]); // Default to first league
   };
 
   const fetchBets = async () => {
@@ -373,21 +451,42 @@ export default function Dashboard() {
         {/* EVENTS TAB */}
         {activeTab === 'events' && (
           <div className="space-y-6">
-            {/* Sport Selector */}
-            <div className="flex gap-2 overflow-x-auto pb-2">
-              {SPORTS.map(sport => (
-                <button
-                  key={sport.key}
-                  onClick={() => setSelectedSport(sport)}
-                  className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
-                    selectedSport.key === sport.key
-                      ? 'bg-yellow-500 text-black'
-                      : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
-                  }`}
-                >
-                  {sport.emoji} {sport.name}
-                </button>
-              ))}
+            {/* Sport Category Selector */}
+            <div className="space-y-3">
+              {/* Sports Row */}
+              <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                {SPORTS_CATEGORIES.map(category => (
+                  <button
+                    key={category.id}
+                    onClick={() => handleCategorySelect(category)}
+                    className={`px-5 py-2.5 rounded-xl font-medium whitespace-nowrap transition-all duration-300 flex items-center gap-2 ${
+                      selectedCategory.id === category.id
+                        ? 'bg-gradient-to-r from-yellow-500 to-orange-500 text-black shadow-lg shadow-yellow-500/25'
+                        : 'bg-zinc-800/80 text-zinc-300 hover:bg-zinc-700 border border-zinc-700/50 hover:border-zinc-600'
+                    }`}
+                  >
+                    <span className="text-lg">{category.emoji}</span>
+                    <span>{category.name}</span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Leagues Row - Show leagues for selected sport */}
+              <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                {selectedCategory.leagues.map(league => (
+                  <button
+                    key={league.key}
+                    onClick={() => setSelectedLeague(league)}
+                    className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-all duration-300 text-sm ${
+                      selectedLeague.key === league.key
+                        ? 'bg-zinc-700 text-white border border-zinc-500'
+                        : 'bg-zinc-800/50 text-zinc-400 hover:bg-zinc-700/50 border border-zinc-700/30 hover:text-zinc-200'
+                    }`}
+                  >
+                    {league.name}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Events Grid */}
@@ -396,52 +495,115 @@ export default function Dashboard() {
             ) : events.length === 0 ? (
               <div className="text-center py-12 text-zinc-400">No upcoming events found</div>
             ) : (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {events.map(event => (
-                  <div key={event.id} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-                    <div className="text-xs text-zinc-500 mb-2">
-                      {new Date(event.commenceTime).toLocaleString()}
-                    </div>
-                    <div className="font-semibold mb-3">
-                      {event.awayTeam} @ {event.homeTeam}
-                    </div>
-                    
-                    {/* Best Odds - European 1-X-2 Format */}
-                    {event.bestOdds && (
-                      <div className="mb-3">
-                        <div className="text-xs text-zinc-500 mb-1">Best Odds (1-X-2)</div>
-                        <div className="flex gap-2 text-sm flex-wrap">
-                          <span className="bg-zinc-800 px-2 py-1 rounded flex items-center gap-1">
-                            <span className="text-zinc-400">1</span>
-                            <span className="text-yellow-400 font-mono">{event.bestOdds.home?.price?.toFixed(2)}</span>
-                          </span>
-                          {event.bestOdds.draw?.price > 0 && (
-                            <span className="bg-zinc-800 px-2 py-1 rounded flex items-center gap-1">
-                              <span className="text-zinc-400">X</span>
-                              <span className="text-yellow-400 font-mono">{event.bestOdds.draw?.price?.toFixed(2)}</span>
+              <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+                {events.map(event => {
+                  const eventDate = new Date(event.commenceTime);
+                  const isToday = new Date().toDateString() === eventDate.toDateString();
+                  const isTomorrow = new Date(Date.now() + 86400000).toDateString() === eventDate.toDateString();
+                  const timeLabel = isToday ? 'Today' : isTomorrow ? 'Tomorrow' : eventDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+
+                  return (
+                    <div
+                      key={event.id}
+                      className="group relative bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-800 border border-zinc-700/50 rounded-2xl overflow-hidden hover:border-purple-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/10"
+                    >
+                      {/* Top Gradient Accent */}
+                      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500 opacity-60 group-hover:opacity-100 transition-opacity" />
+
+                      {/* Card Content */}
+                      <div className="p-5">
+                        {/* Header - Date & Time */}
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="flex items-center gap-2">
+                            <div className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+                              isToday ? 'bg-green-500/20 text-green-400 border border-green-500/30' :
+                              isTomorrow ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' :
+                              'bg-zinc-800 text-zinc-400 border border-zinc-700'
+                            }`}>
+                              {timeLabel}
+                            </div>
+                            <span className="text-zinc-500 text-sm">
+                              {eventDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
                             </span>
-                          )}
-                          <span className="bg-zinc-800 px-2 py-1 rounded flex items-center gap-1">
-                            <span className="text-zinc-400">2</span>
-                            <span className="text-yellow-400 font-mono">{event.bestOdds.away?.price?.toFixed(2)}</span>
-                          </span>
+                          </div>
+                          <div className="text-2xl">{selectedCategory.emoji}</div>
                         </div>
-                        {event.bestOdds.home?.bookmaker && (
-                          <div className="text-xs text-zinc-600 mt-1">
-                            via {event.bestOdds.home.bookmaker}
+
+                        {/* Teams */}
+                        <div className="space-y-3 mb-5">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-xs font-bold text-zinc-400 border border-zinc-700">
+                              A
+                            </div>
+                            <span className="font-medium text-zinc-200 flex-1 truncate">{event.awayTeam}</span>
+                          </div>
+                          <div className="flex items-center gap-3 pl-4">
+                            <span className="text-zinc-600 text-sm">@</span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-yellow-500/20 to-orange-500/20 flex items-center justify-center text-xs font-bold text-yellow-400 border border-yellow-500/30">
+                              H
+                            </div>
+                            <span className="font-medium text-zinc-200 flex-1 truncate">{event.homeTeam}</span>
+                          </div>
+                        </div>
+
+                        {/* Best Odds - Premium Design */}
+                        {event.bestOdds && (
+                          <div className="mb-5">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Best Odds</span>
+                              {event.bestOdds.home?.bookmaker && (
+                                <span className="text-xs text-zinc-600">via {event.bestOdds.home.bookmaker}</span>
+                              )}
+                            </div>
+                            <div className="grid grid-cols-3 gap-2">
+                              <div className="bg-zinc-800/80 backdrop-blur rounded-xl p-3 text-center border border-zinc-700/50 hover:border-zinc-600 transition-colors">
+                                <div className="text-[10px] text-zinc-500 font-medium mb-1">HOME</div>
+                                <div className="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-400">
+                                  {event.bestOdds.home?.price?.toFixed(2)}
+                                </div>
+                              </div>
+                              {event.bestOdds.draw?.price > 0 ? (
+                                <div className="bg-zinc-800/80 backdrop-blur rounded-xl p-3 text-center border border-zinc-700/50 hover:border-zinc-600 transition-colors">
+                                  <div className="text-[10px] text-zinc-500 font-medium mb-1">DRAW</div>
+                                  <div className="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-400">
+                                    {event.bestOdds.draw?.price?.toFixed(2)}
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="bg-zinc-800/30 rounded-xl p-3 text-center border border-zinc-800">
+                                  <div className="text-[10px] text-zinc-600 font-medium mb-1">DRAW</div>
+                                  <div className="text-lg font-bold text-zinc-700">—</div>
+                                </div>
+                              )}
+                              <div className="bg-zinc-800/80 backdrop-blur rounded-xl p-3 text-center border border-zinc-700/50 hover:border-zinc-600 transition-colors">
+                                <div className="text-[10px] text-zinc-500 font-medium mb-1">AWAY</div>
+                                <div className="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-400">
+                                  {event.bestOdds.away?.price?.toFixed(2)}
+                                </div>
+                              </div>
+                            </div>
                           </div>
                         )}
-                      </div>
-                    )}
 
-                    <button
-                      onClick={() => runSwarmAnalysis(event)}
-                      className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-medium py-2 rounded-lg transition-all"
-                    >
-                      🤖 Ask 7 AIs
-                    </button>
-                  </div>
-                ))}
+                        {/* CTA Button - Teal/Cyan Gradient */}
+                        <button
+                          onClick={() => runSwarmAnalysis(event)}
+                          className="w-full relative overflow-hidden bg-gradient-to-r from-teal-500 via-cyan-500 to-teal-500 bg-[length:200%_100%] hover:bg-right text-white font-semibold py-3.5 rounded-xl transition-all duration-500 shadow-lg shadow-teal-500/20 hover:shadow-cyan-500/40 flex items-center justify-center gap-2 group/btn"
+                        >
+                          <span className="relative z-10 flex items-center gap-2">
+                            <span className="text-lg">🤖</span>
+                            <span>Ask 7 AIs</span>
+                            <svg className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                            </svg>
+                          </span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
