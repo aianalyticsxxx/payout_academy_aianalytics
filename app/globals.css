@@ -1,0 +1,83 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --brand-yellow: #FFD608;
+  --brand-black: #000000;
+}
+
+body {
+  @apply bg-black text-white;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-zinc-900;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-zinc-700 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-zinc-600;
+}
+
+/* Brand button */
+.btn-brand {
+  @apply bg-yellow-500 text-black font-semibold px-4 py-2 rounded-lg 
+         hover:bg-yellow-400 transition-colors;
+}
+
+.btn-brand:disabled {
+  @apply opacity-50 cursor-not-allowed;
+}
+
+/* Card styles */
+.card {
+  @apply bg-zinc-900 border border-zinc-800 rounded-xl;
+}
+
+.card-header {
+  @apply p-4 border-b border-zinc-800;
+}
+
+.card-body {
+  @apply p-4;
+}
+
+/* AI Agent colors */
+.ai-claude { @apply text-orange-400 bg-orange-900/30 border-orange-700; }
+.ai-chatgpt { @apply text-green-400 bg-green-900/30 border-green-700; }
+.ai-gemini { @apply text-blue-400 bg-blue-900/30 border-blue-700; }
+.ai-grok { @apply text-purple-400 bg-purple-900/30 border-purple-700; }
+.ai-llama { @apply text-indigo-400 bg-indigo-900/30 border-indigo-700; }
+.ai-copilot { @apply text-cyan-400 bg-cyan-900/30 border-cyan-700; }
+.ai-perplexity { @apply text-teal-400 bg-teal-900/30 border-teal-700; }
+
+/* Verdict colors */
+.verdict-strong-bet { @apply text-green-400 bg-green-900/30; }
+.verdict-slight-edge { @apply text-yellow-400 bg-yellow-900/30; }
+.verdict-risky { @apply text-orange-400 bg-orange-900/30; }
+.verdict-avoid { @apply text-red-400 bg-red-900/30; }
+
+/* Animations */
+@keyframes pulse-yellow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 214, 8, 0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(255, 214, 8, 0); }
+}
+
+.pulse-brand {
+  animation: pulse-yellow 2s infinite;
+}
+
+/* Gradient text */
+.text-gradient-brand {
+  @apply bg-gradient-to-r from-yellow-400 to-yellow-600 bg-clip-text text-transparent;
+}
