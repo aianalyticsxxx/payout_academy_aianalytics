@@ -259,14 +259,20 @@ export async function getAIPredictions(options: {
   limit?: number;
   result?: string;
   sport?: string;
+  days?: number;
 }): Promise<any[]> {
-  const { limit = 50, result, sport } = options;
+  const { limit = 50, result, sport, days = 7 } = options;
+
+  // Calculate date range
+  const since = new Date();
+  since.setDate(since.getDate() - days);
 
   try {
     const predictions = await prisma.aIPrediction.findMany({
       where: {
-        ...(result && { result }),
-        ...(sport && { sport }),
+        ...(result && result !== 'all' && { result }),
+        ...(sport && sport !== 'all' && { sport }),
+        createdAt: { gte: since },
       },
       orderBy: { createdAt: 'desc' },
       take: limit,

@@ -69,6 +69,37 @@ interface Bet {
   createdAt: string;
 }
 
+interface AIPrediction {
+  id: string;
+  eventId: string;
+  eventName: string;
+  sport?: string;
+  league?: string;
+  homeTeam?: string;
+  awayTeam?: string;
+  commenceTime?: string;
+  consensusVerdict?: string;
+  consensusScore?: number;
+  betVotes: number;
+  passVotes: number;
+  aiVotes: any[];
+  betSelection?: string;
+  betOdds?: number;
+  result: string;
+  actualScore?: string;
+  createdAt: string;
+  settledAt?: string;
+}
+
+interface PredictionStats {
+  total: number;
+  won: number;
+  lost: number;
+  pending: number;
+  winRate: string;
+  currentStreak: number;
+}
+
 // ==========================================
 // CONSTANTS
 // ==========================================
@@ -114,6 +145,11 @@ export default function Dashboard() {
   const [userStats, setUserStats] = useState<any>(null);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [aiSubTab, setAiSubTab] = useState<'swarm' | 'predictions' | 'rankings'>('swarm');
+  const [predictions, setPredictions] = useState<AIPrediction[]>([]);
+  const [predictionStats, setPredictionStats] = useState<PredictionStats | null>(null);
+  const [predictionFilter, setPredictionFilter] = useState<'all' | 'pending' | 'won' | 'lost'>('all');
+  const [loadingPredictions, setLoadingPredictions] = useState(false);
+  const [selectedPrediction, setSelectedPrediction] = useState<AIPrediction | null>(null);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -135,6 +171,13 @@ export default function Dashboard() {
       fetchLeaderboard();
     }
   }, [session]);
+
+  // Fetch predictions when tab changes or filter changes
+  useEffect(() => {
+    if (aiSubTab === 'predictions') {
+      fetchPredictions();
+    }
+  }, [aiSubTab, predictionFilter]);
 
   // ==========================================
   // API CALLS
@@ -183,6 +226,20 @@ export default function Dashboard() {
       setLeaderboard(data.leaderboard || []);
     } catch (error) {
       console.error('Failed to fetch leaderboard:', error);
+    }
+  };
+
+  const fetchPredictions = async () => {
+    setLoadingPredictions(true);
+    try {
+      const res = await fetch(`/api/ai/predictions?result=${predictionFilter}&days=7`);
+      const data = await res.json();
+      setPredictions(data.predictions || []);
+      setPredictionStats(data.stats || null);
+    } catch (error) {
+      console.error('Failed to fetch predictions:', error);
+    } finally {
+      setLoadingPredictions(false);
     }
   };
 
@@ -625,6 +682,272 @@ export default function Dashboard() {
                     </button>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Predictions */}
+            {aiSubTab === 'predictions' && (
+              <div className="space-y-6">
+                {/* Filter Bar */}
+                <div className="flex flex-wrap gap-2 items-center justify-between">
+                  <div className="flex gap-2">
+                    {(['all', 'pending', 'won', 'lost'] as const).map(filter => (
+                      <button
+                        key={filter}
+                        onClick={() => setPredictionFilter(filter)}
+                        className={`px-4 py-2 rounded-lg font-medium capitalize ${
+                          predictionFilter === filter
+                            ? filter === 'won' ? 'bg-green-600 text-white' :
+                              filter === 'lost' ? 'bg-red-600 text-white' :
+                              filter === 'pending' ? 'bg-yellow-600 text-black' :
+                              'bg-purple-600 text-white'
+                            : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                        }`}
+                      >
+                        {filter}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="text-sm text-zinc-500">Last 7 days</div>
+                </div>
+
+                {/* Stats Summary */}
+                {predictionStats && (
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 text-center">
+                      <div className="text-2xl font-bold">{predictionStats.total}</div>
+                      <div className="text-xs text-zinc-500">Total</div>
+                    </div>
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 text-center">
+                      <div className="text-2xl font-bold text-green-400">{predictionStats.won}</div>
+                      <div className="text-xs text-zinc-500">Won</div>
+                    </div>
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 text-center">
+                      <div className="text-2xl font-bold text-red-400">{predictionStats.lost}</div>
+                      <div className="text-xs text-zinc-500">Lost</div>
+                    </div>
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 text-center">
+                      <div className="text-2xl font-bold text-yellow-400">{predictionStats.pending}</div>
+                      <div className="text-xs text-zinc-500">Pending</div>
+                    </div>
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 text-center">
+                      <div className={`text-2xl font-bold ${parseFloat(predictionStats.winRate) >= 50 ? 'text-green-400' : 'text-red-400'}`}>
+                        {predictionStats.winRate}%
+                      </div>
+                      <div className="text-xs text-zinc-500">
+                        Win Rate {predictionStats.currentStreak !== 0 && (
+                          <span className="ml-1">
+                            {predictionStats.currentStreak > 0 ? `🔥${predictionStats.currentStreak}` : `❄️${Math.abs(predictionStats.currentStreak)}`}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Predictions List */}
+                {loadingPredictions ? (
+                  <div className="text-center py-12 text-zinc-400">Loading predictions...</div>
+                ) : predictions.length === 0 ? (
+                  <div className="text-center py-12">
+                    <div className="text-6xl mb-4">🔮</div>
+                    <div className="text-xl font-semibold mb-2">No Predictions Yet</div>
+                    <div className="text-zinc-400">Run swarm analysis on events to generate predictions</div>
+                    <button
+                      onClick={() => { setActiveTab('events'); }}
+                      className="mt-4 bg-purple-600 hover:bg-purple-500 text-white px-6 py-2 rounded-lg font-medium"
+                    >
+                      Browse Events →
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {predictions.map(prediction => (
+                      <div
+                        key={prediction.id}
+                        className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden cursor-pointer hover:border-zinc-600 transition-colors"
+                        onClick={() => setSelectedPrediction(prediction)}
+                      >
+                        {/* Header */}
+                        <div className="p-4 flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                                prediction.result === 'won' ? 'bg-green-600 text-white' :
+                                prediction.result === 'lost' ? 'bg-red-600 text-white' :
+                                'bg-yellow-600 text-black'
+                              }`}>
+                                {prediction.result === 'won' ? '🟢 WON' :
+                                 prediction.result === 'lost' ? '🔴 LOST' : '🟡 PENDING'}
+                              </span>
+                              <span className="text-xs text-zinc-500">
+                                {new Date(prediction.createdAt).toLocaleDateString()}
+                              </span>
+                            </div>
+                            <div className="font-semibold text-lg">{prediction.eventName}</div>
+                            <div className="text-sm text-zinc-400">
+                              {prediction.sport} {prediction.league && `• ${prediction.league}`}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Consensus */}
+                        <div className={`px-4 py-3 ${getVerdictColor(prediction.consensusVerdict || '')}`}>
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <span className="text-sm opacity-75">AI Consensus: </span>
+                              <span className="font-bold">{prediction.consensusVerdict}</span>
+                              <span className="ml-2 text-sm">({prediction.betVotes}/{prediction.betVotes + prediction.passVotes} AIs)</span>
+                            </div>
+                            {prediction.betSelection && (
+                              <div className="text-right">
+                                <span className="font-medium">{prediction.betSelection}</span>
+                                {prediction.betOdds && (
+                                  <span className="ml-2 text-yellow-400 font-mono">@{prediction.betOdds.toFixed(2)}</span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* AI Votes Summary */}
+                        <div className="px-4 py-3 border-t border-zinc-800">
+                          <div className="flex flex-wrap gap-2">
+                            {(prediction.aiVotes || []).map((vote: any) => {
+                              const agent = AI_AGENTS.find(a => a.id === vote.agentId);
+                              const isBet = ['STRONG BET', 'SLIGHT EDGE'].includes(vote.verdict);
+                              const wasCorrect = prediction.result === 'pending' ? null :
+                                (prediction.result === 'won' && isBet) || (prediction.result === 'lost' && !isBet);
+
+                              return (
+                                <span
+                                  key={vote.agentId}
+                                  className={`px-2 py-1 rounded text-xs flex items-center gap-1 ${agent?.bg} border border-zinc-700`}
+                                >
+                                  <span>{agent?.emoji}</span>
+                                  <span className={agent?.color}>{agent?.name}</span>
+                                  {prediction.result !== 'pending' && (
+                                    <span className={wasCorrect ? 'text-green-400' : 'text-red-400'}>
+                                      {wasCorrect ? '✓' : '✗'}
+                                    </span>
+                                  )}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Prediction Detail Modal */}
+            {selectedPrediction && (
+              <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50" onClick={() => setSelectedPrediction(null)}>
+                <div className="bg-zinc-900 border border-zinc-700 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                  {/* Modal Header */}
+                  <div className="p-6 border-b border-zinc-800">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                            selectedPrediction.result === 'won' ? 'bg-green-600 text-white' :
+                            selectedPrediction.result === 'lost' ? 'bg-red-600 text-white' :
+                            'bg-yellow-600 text-black'
+                          }`}>
+                            {selectedPrediction.result.toUpperCase()}
+                          </span>
+                          {selectedPrediction.actualScore && (
+                            <span className="text-sm text-zinc-400">Final: {selectedPrediction.actualScore}</span>
+                          )}
+                        </div>
+                        <h3 className="text-xl font-bold">{selectedPrediction.eventName}</h3>
+                        <p className="text-sm text-zinc-400">
+                          {selectedPrediction.sport} {selectedPrediction.league && `• ${selectedPrediction.league}`}
+                        </p>
+                        <p className="text-xs text-zinc-500 mt-1">
+                          Predicted: {new Date(selectedPrediction.createdAt).toLocaleString()}
+                          {selectedPrediction.settledAt && ` • Settled: ${new Date(selectedPrediction.settledAt).toLocaleString()}`}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setSelectedPrediction(null)}
+                        className="text-zinc-400 hover:text-white text-2xl"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Consensus */}
+                  <div className={`p-4 ${getVerdictColor(selectedPrediction.consensusVerdict || '')}`}>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-sm opacity-75">AI Consensus</div>
+                        <div className="text-2xl font-bold">{selectedPrediction.consensusVerdict}</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-3xl font-bold">{selectedPrediction.consensusScore?.toFixed(1)}</div>
+                        <div className="text-sm opacity-75">Score</div>
+                      </div>
+                    </div>
+                    {selectedPrediction.betSelection && (
+                      <div className="mt-3 p-2 bg-black/20 rounded">
+                        <span className="text-sm">Recommended: </span>
+                        <span className="font-medium">{selectedPrediction.betSelection}</span>
+                        {selectedPrediction.betOdds && (
+                          <span className="ml-2 text-yellow-400 font-mono">@{selectedPrediction.betOdds.toFixed(2)}</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Individual AI Votes */}
+                  <div className="p-4">
+                    <h4 className="text-sm font-semibold text-zinc-400 mb-3">INDIVIDUAL AI VOTES</h4>
+                    <div className="space-y-3">
+                      {(selectedPrediction.aiVotes || []).map((vote: any) => {
+                        const agent = AI_AGENTS.find(a => a.id === vote.agentId);
+                        const isBet = ['STRONG BET', 'SLIGHT EDGE'].includes(vote.verdict);
+                        const wasCorrect = selectedPrediction.result === 'pending' ? null :
+                          (selectedPrediction.result === 'won' && isBet) || (selectedPrediction.result === 'lost' && !isBet);
+
+                        return (
+                          <div key={vote.agentId} className={`p-3 rounded-lg border ${agent?.bg} border-zinc-700`}>
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xl">{agent?.emoji}</span>
+                                <span className={`font-semibold ${agent?.color}`}>{agent?.name}</span>
+                                {selectedPrediction.result !== 'pending' && (
+                                  <span className={`text-sm ${wasCorrect ? 'text-green-400' : 'text-red-400'}`}>
+                                    {wasCorrect ? '✓ Correct' : '✗ Wrong'}
+                                  </span>
+                                )}
+                              </div>
+                              <span className={`px-2 py-1 rounded text-sm ${getVerdictColor(vote.verdict)}`}>
+                                {vote.verdict}
+                              </span>
+                            </div>
+                            {vote.betType && (
+                              <div className="text-sm mb-1">
+                                <span className="bg-purple-900/50 text-purple-300 px-1.5 py-0.5 rounded text-xs mr-2">
+                                  {vote.betType}
+                                </span>
+                                {vote.betSelection && <span>{vote.betSelection}</span>}
+                                {vote.betOdds && <span className="text-yellow-400 ml-1">@{vote.betOdds.toFixed(2)}</span>}
+                              </div>
+                            )}
+                            {vote.betExplanation && (
+                              <p className="text-xs text-zinc-400 italic">{vote.betExplanation}</p>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 
