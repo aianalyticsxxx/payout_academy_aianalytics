@@ -37,8 +37,17 @@ export async function GET(req: NextRequest) {
 
     console.log(`[Events API] Got ${events?.length ?? 0} raw events for ${sport}`);
 
+    // Filter to only show upcoming events (not started yet)
+    const now = new Date();
+    const upcomingEvents = (events || []).filter(event => {
+      const commenceTime = new Date(event.commence_time);
+      return commenceTime > now;
+    });
+
+    console.log(`[Events API] ${upcomingEvents.length} upcoming events after filtering past events`);
+
     // Transform and enrich events
-    const enrichedEvents = (events || []).map(event => {
+    const enrichedEvents = upcomingEvents.map(event => {
       const sportEvent = convertToSportEvent(event);
       const bestOdds = findBestOdds(event);
 
