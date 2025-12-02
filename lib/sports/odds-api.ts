@@ -354,5 +354,66 @@ export const SPORT_KEYS = {
 };
 
 export function getSportKey(sportName: string): string | undefined {
-  return SPORT_KEYS[sportName as keyof typeof SPORT_KEYS];
+  // First try exact match
+  if (SPORT_KEYS[sportName as keyof typeof SPORT_KEYS]) {
+    return SPORT_KEYS[sportName as keyof typeof SPORT_KEYS];
+  }
+
+  // Then try partial matching for common variations
+  const normalizedName = sportName.toLowerCase();
+
+  // American sports
+  if (normalizedName.includes('nba') || normalizedName.includes('basketball')) {
+    return 'basketball_nba';
+  }
+  if (normalizedName.includes('nfl') || (normalizedName.includes('football') && normalizedName.includes('american'))) {
+    return 'americanfootball_nfl';
+  }
+  if (normalizedName.includes('mlb') || normalizedName.includes('baseball')) {
+    return 'baseball_mlb';
+  }
+  if (normalizedName.includes('nhl') || normalizedName.includes('hockey')) {
+    return 'icehockey_nhl';
+  }
+
+  // Soccer leagues
+  if (normalizedName.includes('premier league') || normalizedName.includes('epl')) {
+    return 'soccer_epl';
+  }
+  if (normalizedName.includes('la liga') || normalizedName.includes('spain')) {
+    return 'soccer_spain_la_liga';
+  }
+  if (normalizedName.includes('serie a') || normalizedName.includes('italy')) {
+    return 'soccer_italy_serie_a';
+  }
+  if (normalizedName.includes('bundesliga') || normalizedName.includes('germany')) {
+    return 'soccer_germany_bundesliga';
+  }
+  if (normalizedName.includes('ligue 1') || normalizedName.includes('france')) {
+    return 'soccer_france_ligue_one';
+  }
+  if (normalizedName.includes('champions league') || normalizedName.includes('uefa')) {
+    return 'soccer_uefa_champs_league';
+  }
+  if (normalizedName.includes('mls')) {
+    return 'soccer_usa_mls';
+  }
+
+  // Combat sports
+  if (normalizedName.includes('ufc') || normalizedName.includes('mma')) {
+    return 'mma_mixed_martial_arts';
+  }
+  if (normalizedName.includes('boxing')) {
+    return 'boxing_boxing';
+  }
+
+  // Tennis
+  if (normalizedName.includes('atp')) {
+    return 'tennis_atp';
+  }
+  if (normalizedName.includes('wta')) {
+    return 'tennis_wta';
+  }
+
+  return undefined;
 }

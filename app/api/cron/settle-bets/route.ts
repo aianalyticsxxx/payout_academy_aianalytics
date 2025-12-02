@@ -31,29 +31,26 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    if (pendingBets.length === 0) {
-      console.log('[Cron] No pending bets to settle');
-      return NextResponse.json({ message: 'No pending bets', settled: 0 });
-    }
-
-    console.log(`[Cron] Found ${pendingBets.length} pending bets`);
-
-    // Group bets by sport
-    const betsBySport = new Map<string, typeof pendingBets>();
-    for (const bet of pendingBets) {
-      const sport = bet.sport;
-      if (!betsBySport.has(sport)) {
-        betsBySport.set(sport, []);
-      }
-      betsBySport.get(sport)!.push(bet);
-    }
-
     let settledCount = 0;
     const settledBets: string[] = [];
     const errors: string[] = [];
 
-    // Process each sport
-    for (const [sport, bets] of betsBySport) {
+    // Process user bets if any
+    if (pendingBets.length > 0) {
+      console.log(`[Cron] Found ${pendingBets.length} pending user bets`);
+
+      // Group bets by sport
+      const betsBySport = new Map<string, typeof pendingBets>();
+      for (const bet of pendingBets) {
+        const sport = bet.sport;
+        if (!betsBySport.has(sport)) {
+          betsBySport.set(sport, []);
+        }
+        betsBySport.get(sport)!.push(bet);
+      }
+
+      // Process each sport
+      for (const [sport, bets] of betsBySport) {
       const sportKey = getSportKey(sport);
       if (!sportKey) {
         console.log(`[Cron] Unknown sport key for: ${sport}`);
@@ -106,7 +103,8 @@ export async function GET(req: NextRequest) {
       } catch (error) {
         console.error(`[Cron] Error fetching scores for ${sport}:`, error);
       }
-    }
+      }
+    } // End of if (pendingBets.length > 0)
 
     // Also settle AI predictions
     const aiSettled = await settleAIPredictions();
@@ -318,24 +316,92 @@ async function settleAIPredictions(): Promise<number> {
 }
 
 function determineAIPredictionResult(prediction: any, score: any): 'won' | 'lost' | 'push' | null {
+  // If no bet was recommended (RISKY/AVOID), check if avoiding was correct
   if (!prediction.betSelection || !prediction.betOdds) {
+    // For predictions with no bet selection, mark based on consensus
+    // If AI said AVOID and the favorite lost, that's a "win" for the AI
     return null;
   }
 
-  // Simple moneyline check
-  const homeScore = parseInt(score.scores?.[0]?.score || '0');
-  const awayScore = parseInt(score.scores?.[1]?.score || '0');
+  // Get scores properly - handle different API response formats
+  const homeTeamScore = score.scores?.find((s: any) => s.name === score.home_team);
+  const awayTeamScore = score.scores?.find((s: any) => s.name === score.away_team);
+
+  const homeScore = parseInt(homeTeamScore?.score || score.scores?.[0]?.score || '0');
+  const awayScore = parseInt(awayTeamScore?.score || score.scores?.[1]?.score || '0');
+  const totalScore = homeScore + awayScore;
 
   const selection = prediction.betSelection.toLowerCase();
 
-  if (selection.includes(score.home_team?.toLowerCase())) {
+  // Handle Over/Under bets
+  if (selection.includes('over') || selection.includes('under')) {
+    const lineMatch = selection.match(/(\d+\.?\d*)/);
+    if (lineMatch) {
+      const line = parseFloat(lineMatch[1]);
+      if (totalScore === line) return 'push';
+
+      if (selection.includes('over')) {
+        return totalScore > line ? 'won' : 'lost';
+      }
+      if (selection.includes('under')) {
+        return totalScore < line ? 'won' : 'lost';
+      }
+    }
+  }
+
+  // Handle BTTS (Both Teams To Score)
+  if (selection.includes('btts') || selection.includes('both teams')) {
+    const bothScored = homeScore > 0 && awayScore > 0;
+    if (selection.includes('yes')) {
+      return bothScored ? 'won' : 'lost';
+    }
+    if (selection.includes('no')) {
+      return !bothScored ? 'won' : 'lost';
+    }
+  }
+
+  // Handle Double Chance
+  if (selection.includes('double chance') || selection.includes('1x') || selection.includes('x2') || selection.includes('12')) {
+    if (selection.includes('1x') || (selection.includes('home') && selection.includes('draw'))) {
+      return homeScore >= awayScore ? 'won' : 'lost';
+    }
+    if (selection.includes('x2') || (selection.includes('away') && selection.includes('draw'))) {
+      return awayScore >= homeScore ? 'won' : 'lost';
+    }
+    if (selection.includes('12') || (selection.includes('home') && selection.includes('away'))) {
+      return homeScore !== awayScore ? 'won' : 'lost';
+    }
+  }
+
+  // Handle Draw
+  if (selection === 'draw' || selection === 'x') {
+    return homeScore === awayScore ? 'won' : 'lost';
+  }
+
+  // Handle Moneyline / 1X2 - check both team name variations
+  const homeTeam = (score.home_team || prediction.homeTeam || '').toLowerCase();
+  const awayTeam = (score.away_team || prediction.awayTeam || '').toLowerCase();
+
+  if (selection.includes(homeTeam) || selection.includes('home') || selection === '1') {
     if (homeScore === awayScore) return 'push';
     return homeScore > awayScore ? 'won' : 'lost';
   }
-  
-  if (selection.includes(score.away_team?.toLowerCase())) {
+
+  if (selection.includes(awayTeam) || selection.includes('away') || selection === '2') {
     if (homeScore === awayScore) return 'push';
     return awayScore > homeScore ? 'won' : 'lost';
+  }
+
+  // Handle spread bets
+  const spreadMatch = selection.match(/([+-]?\d+\.?\d*)/);
+  if (spreadMatch && (selection.includes('spread') || selection.includes('handicap'))) {
+    const spread = parseFloat(spreadMatch[1]);
+    const isHome = selection.includes(homeTeam) || selection.includes('home');
+    const adjustedScore = isHome ? homeScore + spread : awayScore + spread;
+    const opposingScore = isHome ? awayScore : homeScore;
+
+    if (adjustedScore === opposingScore) return 'push';
+    return adjustedScore > opposingScore ? 'won' : 'lost';
   }
 
   return null;

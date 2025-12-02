@@ -3,81 +3,150 @@
 @tailwind utilities;
 
 :root {
-  --brand-yellow: #FFD608;
-  --brand-black: #000000;
+  --brand-teal: #14B8A6;
+  --brand-teal-light: #2DD4BF;
+  --brand-dark: #0A0A0A;
+  --brand-surface: #111111;
+  --brand-gold: #D4AF37;
 }
 
 body {
-  @apply bg-black text-white;
+  @apply bg-dark text-white;
 }
 
-/* Custom scrollbar */
+/* Custom scrollbar - teal accent */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-zinc-900;
+  @apply bg-dark;
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-zinc-700 rounded-full;
+  @apply bg-teal-800 rounded-full;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-zinc-600;
+  @apply bg-teal-700;
 }
 
-/* Brand button */
+/* Gradient border wrapper - PlayerProfit style */
+.gradient-border {
+  position: relative;
+  background: linear-gradient(180deg, #2DD4BF 0%, #14B8A6 100%);
+  padding: 1px;
+  border-radius: 12px;
+}
+
+.gradient-border-inner {
+  background: #0A0A0A;
+  border-radius: 11px;
+  width: 100%;
+  height: 100%;
+}
+
+/* Brand button - teal gradient */
 .btn-brand {
-  @apply bg-yellow-500 text-black font-semibold px-4 py-2 rounded-lg 
-         hover:bg-yellow-400 transition-colors;
+  @apply relative font-semibold px-6 py-3 rounded-xl transition-all duration-300;
+  background: linear-gradient(180deg, #2DD4BF 0%, #14B8A6 100%);
+  color: #0A0A0A;
+}
+
+.btn-brand:hover {
+  @apply shadow-lg;
+  box-shadow: 0 0 20px rgba(20, 184, 166, 0.4);
 }
 
 .btn-brand:disabled {
   @apply opacity-50 cursor-not-allowed;
 }
 
-/* Card styles */
+/* Secondary button */
+.btn-secondary {
+  @apply bg-surface text-teal-400 font-medium px-4 py-2 rounded-xl
+         border border-teal-800/50 hover:border-teal-500/50 hover:bg-surface-light transition-all duration-300;
+}
+
+/* Card styles - dark premium */
 .card {
-  @apply bg-zinc-900 border border-zinc-800 rounded-xl;
+  @apply bg-surface border border-zinc-800/50 rounded-2xl;
 }
 
 .card-header {
-  @apply p-4 border-b border-zinc-800;
+  @apply p-6 border-b border-zinc-800/50;
 }
 
 .card-body {
-  @apply p-4;
+  @apply p-6;
 }
 
-/* AI Agent colors */
-.ai-claude { @apply text-orange-400 bg-orange-900/30 border-orange-700; }
-.ai-chatgpt { @apply text-green-400 bg-green-900/30 border-green-700; }
-.ai-gemini { @apply text-blue-400 bg-blue-900/30 border-blue-700; }
-.ai-grok { @apply text-purple-400 bg-purple-900/30 border-purple-700; }
-.ai-llama { @apply text-indigo-400 bg-indigo-900/30 border-indigo-700; }
-.ai-copilot { @apply text-cyan-400 bg-cyan-900/30 border-cyan-700; }
-.ai-perplexity { @apply text-teal-400 bg-teal-900/30 border-teal-700; }
+/* Gradient border card */
+.card-gradient {
+  position: relative;
+  border-radius: 16px;
+  padding: 1px;
+  background: linear-gradient(180deg, rgba(45, 212, 191, 0.5) 0%, rgba(20, 184, 166, 0.2) 100%);
+}
+
+.card-gradient-inner {
+  background: #111111;
+  border-radius: 15px;
+  height: 100%;
+}
+
+/* AI Agent colors - keep distinct */
+.ai-claude { @apply text-orange-400 bg-orange-950/40 border-orange-800/50; }
+.ai-chatgpt { @apply text-green-400 bg-green-950/40 border-green-800/50; }
+.ai-gemini { @apply text-blue-400 bg-blue-950/40 border-blue-800/50; }
+.ai-grok { @apply text-purple-400 bg-purple-950/40 border-purple-800/50; }
+.ai-llama { @apply text-indigo-400 bg-indigo-950/40 border-indigo-800/50; }
+.ai-copilot { @apply text-cyan-400 bg-cyan-950/40 border-cyan-800/50; }
+.ai-perplexity { @apply text-teal-400 bg-teal-950/40 border-teal-800/50; }
 
 /* Verdict colors */
-.verdict-strong-bet { @apply text-green-400 bg-green-900/30; }
-.verdict-slight-edge { @apply text-yellow-400 bg-yellow-900/30; }
+.verdict-strong-bet { @apply text-teal-400 bg-teal-900/40; }
+.verdict-slight-edge { @apply text-teal-300 bg-teal-900/30; }
 .verdict-risky { @apply text-orange-400 bg-orange-900/30; }
 .verdict-avoid { @apply text-red-400 bg-red-900/30; }
 
-/* Animations */
-@keyframes pulse-yellow {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 214, 8, 0.4); }
-  50% { box-shadow: 0 0 0 8px rgba(255, 214, 8, 0); }
+/* Animations - teal glow */
+@keyframes pulse-teal {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(20, 184, 166, 0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(20, 184, 166, 0); }
 }
 
 .pulse-brand {
-  animation: pulse-yellow 2s infinite;
+  animation: pulse-teal 2s infinite;
 }
 
-/* Gradient text */
+/* Gradient text - teal */
 .text-gradient-brand {
-  @apply bg-gradient-to-r from-yellow-400 to-yellow-600 bg-clip-text text-transparent;
+  @apply bg-gradient-to-r from-teal-400 to-teal-300 bg-clip-text text-transparent;
+}
+
+/* Gold accent text */
+.text-gold {
+  color: #D4AF37;
+}
+
+/* Premium hover glow */
+.hover-glow {
+  @apply transition-all duration-300;
+}
+
+.hover-glow:hover {
+  box-shadow: 0 0 30px rgba(20, 184, 166, 0.2);
+}
+
+/* Gradient line accent */
+.gradient-line {
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #14B8A6, transparent);
+}
+
+/* Glass effect */
+.glass {
+  @apply bg-surface/80 backdrop-blur-sm border border-zinc-800/50;
 }

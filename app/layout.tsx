@@ -3,20 +3,24 @@
 // ==========================================
 
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+import { DM_Sans } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/components/providers/AuthProvider';
 
-const inter = Inter({ subsets: ['latin'] });
+const dmSans = DM_Sans({
+  subsets: ['latin'],
+  variable: '--font-dm-sans',
+  weight: ['400', '500', '600', '700'],
+});
 
 export const metadata: Metadata = {
   title: 'Payout Academy Analytics',
-  description: 'AI-powered sports betting analysis with 7-model swarm intelligence',
-  keywords: ['sports betting', 'AI', 'analytics', 'predictions'],
-  authors: [{ name: 'Payout Academy' }],
+  description: 'Premium AI-powered sports betting analysis with 7-model swarm intelligence',
+  keywords: ['sports betting', 'AI', 'analytics', 'predictions', 'professional betting'],
+  authors: [{ name: 'Payout Academy Analytics' }],
   openGraph: {
     title: 'Payout Academy Analytics',
-    description: 'AI-powered sports betting analysis',
+    description: 'Premium AI-powered sports betting analysis',
     type: 'website',
   },
 };
@@ -27,8 +31,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className={inter.className}>
+    <html lang="en" className={dmSans.variable}>
+      <body className={dmSans.className}>
         <AuthProvider>
           {children}
         </AuthProvider>

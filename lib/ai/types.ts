@@ -27,7 +27,9 @@ export interface AIAnalysis {
   opinion: string;
   verdict: Verdict;
   confidence: Confidence;
-  probability?: number;
+  probability?: number;        // True probability estimate
+  impliedProbability?: number; // Implied probability from odds
+  edge?: number;               // Edge = true prob - implied prob
   reasoning?: string;
   betType?: BetType;
   betSelection?: string;
@@ -200,7 +202,7 @@ export const CONFIDENCE_WEIGHTS: Record<Confidence, number> = {
 };
 
 // ==========================================
-// PROMPT TEMPLATES
+// PROMPT TEMPLATES - PROFESSIONAL SHARP BETTING
 // ==========================================
 
 export function getAnalysisPrompt(event: SportEvent, context: string, agent: AIAgent): string {
@@ -212,43 +214,112 @@ export function getAnalysisPrompt(event: SportEvent, context: string, agent: AIA
                    event.league?.toLowerCase().includes('serie') ||
                    event.league?.toLowerCase().includes('bundesliga');
 
+  const isNBA = event.sportTitle?.toLowerCase().includes('nba') ||
+                event.sportTitle?.toLowerCase().includes('basketball');
+
+  const isNFL = event.sportTitle?.toLowerCase().includes('nfl') ||
+                event.sportTitle?.toLowerCase().includes('football');
+
+  const isNHL = event.sportTitle?.toLowerCase().includes('nhl') ||
+                event.sportTitle?.toLowerCase().includes('hockey');
+
   const betTypeOptions = isSoccer
     ? '1X2 (Home/Draw/Away), OVER/UNDER (Goals), BTTS (Both Teams To Score), DOUBLE CHANCE'
-    : '1X2 (Home/Away), OVER/UNDER (Points/Goals)';
+    : '1X2 (Home/Away), OVER/UNDER (Points/Goals), SPREAD';
 
-  return `You are ${agent.name}, a European sports betting analyst. ${agent.personality}
+  // Sport-specific factors
+  const sportFactors = isSoccer
+    ? `
+SOCCER-SPECIFIC FACTORS TO ANALYZE:
+- Home advantage (typically worth 0.3-0.5 goals)
+- Recent form (last 5 matches, home/away splits)
+- Head-to-head history
+- Goal scoring/conceding trends
+- Key player injuries/suspensions
+- Fixture congestion (Champions League, cup games)
+- Motivation (relegation battle, title race, nothing to play for)
+- Weather conditions for totals`
+    : isNBA
+    ? `
+NBA-SPECIFIC FACTORS TO ANALYZE:
+- Back-to-back games (fatigue = lower scoring, worse defense)
+- Home/road splits and altitude (Denver, Utah)
+- Pace of play matchups (fast vs slow teams)
+- Rest days advantage
+- Key player injuries (star players = 3-7 point swing)
+- Travel schedule (coast-to-coast, 4-in-5 nights)
+- Motivation (playoff seeding, tank mode)
+- Offensive/Defensive ratings and efficiency`
+    : isNFL
+    ? `
+NFL-SPECIFIC FACTORS TO ANALYZE:
+- Home field advantage (worth ~3 points)
+- Weather impact on totals (wind, cold, rain)
+- Divisional rivalry intensity
+- Bye week rest advantage
+- Key injuries (QB = 3-7 points, other positions)
+- Travel distance and time zone changes
+- Motivation (playoff implications, draft positioning)
+- Offensive/Defensive DVOA rankings`
+    : isNHL
+    ? `
+NHL-SPECIFIC FACTORS TO ANALYZE:
+- Back-to-back situations
+- Home ice advantage
+- Goalie matchups and recent performance
+- Power play/Penalty kill efficiency
+- Travel schedule
+- Divisional games intensity
+- Injury report (goalies especially critical)`
+    : `
+KEY FACTORS TO ANALYZE:
+- Home advantage
+- Recent form and momentum
+- Head-to-head history
+- Key injuries
+- Motivation and stakes`;
 
-ANALYZE THIS MATCHUP:
+  return `You are ${agent.name}, a professional sharp sports bettor with a proven edge. ${agent.personality}
+
+YOUR METHODOLOGY:
+You find VALUE by identifying when bookmaker odds UNDERVALUE the true probability of an outcome. You ONLY bet when you have a mathematical edge (positive Expected Value). You think like a professional who needs to beat the closing line.
+
+=== MATCHUP ===
 ${event.awayTeam} @ ${event.homeTeam}
 Sport: ${event.sportTitle}
 League: ${event.league || 'N/A'}
 Game Time: ${new Date(event.commenceTime).toLocaleString()}
 
-${context ? `ADDITIONAL CONTEXT:\n${context}\n` : ''}
+${context ? `=== MARKET DATA ===\n${context}\n` : ''}
+${sportFactors}
 
-AVAILABLE BET TYPES: ${betTypeOptions}
+=== YOUR ANALYSIS PROCESS ===
+1. ESTIMATE TRUE PROBABILITY: Based on all factors, what is your estimated true probability for each outcome?
+2. COMPARE TO ODDS: Convert the bookmaker odds to implied probability. Where is the value?
+3. CALCULATE EDGE: Your probability minus implied probability = edge. Only bet with 3%+ edge.
+4. IDENTIFY BEST BET: Which market offers the highest expected value?
 
-PROVIDE YOUR ANALYSIS:
-1. Key insight (1-2 sentences about what matters most)
-2. Win probability for the favorite (as a percentage)
-3. Your verdict: STRONG BET / SLIGHT EDGE / RISKY / AVOID
-4. Confidence level: HIGH / MEDIUM / LOW
-5. Recommended bet type: ${isSoccer ? '1X2 / OVER/UNDER / BTTS / DOUBLE CHANCE' : '1X2 / OVER/UNDER'}
-6. Your specific bet selection (e.g., "Home Win", "Over 2.5", "BTTS Yes")
-7. Recommended odds (decimal format, e.g., 1.85, 2.10)
-8. Brief explanation of WHY you chose this specific bet
+AVAILABLE MARKETS: ${betTypeOptions}
+
+=== VERDICT CRITERIA ===
+- STRONG BET: 5%+ edge, high confidence in your probability estimate
+- SLIGHT EDGE: 3-5% edge, moderate confidence
+- RISKY: <3% edge or high uncertainty in estimate
+- AVOID: No value, or negative EV
 
 FORMAT YOUR RESPONSE EXACTLY LIKE THIS:
-Key Insight: [your insight]
-Win Probability: [X]%
+Key Insight: [The main factor driving your edge - what the market is missing]
+True Probability: [X]%
+Implied Probability: [Y]%
+Edge: [X-Y]%
 Verdict: [STRONG BET/SLIGHT EDGE/RISKY/AVOID]
 Confidence: [HIGH/MEDIUM/LOW]
-Bet Type: [1X2/OVER/UNDER/BTTS/DOUBLE CHANCE]
-Selection: [Your specific pick, e.g., "Home Win" or "Over 2.5 Goals"]
+Bet Type: [1X2/OVER/UNDER/BTTS/DOUBLE CHANCE/SPREAD]
+Selection: [Your specific pick]
 Odds: [X.XX]
-Explanation: [Why this bet offers value - 1-2 sentences]
+Explanation: [Why you have an edge - what factor is the market underweighting?]
 
-Keep your total response under 150 words. Be decisive. Use European decimal odds format.`;
+Be disciplined. If there's no edge, say AVOID. Professional bettors pass on most games.`;
 }
 
 export function parseAIResponse(agentId: string, response: string): Partial<AIAnalysis> {
@@ -260,9 +331,17 @@ export function parseAIResponse(agentId: string, response: string): Partial<AIAn
     ? verdictMatch[1].toUpperCase() as Verdict
     : 'UNKNOWN';
 
-  // Extract probability
-  const probMatch = response.match(/(\d{1,2}(?:\.\d+)?)\s*%/);
-  const probability = probMatch ? parseFloat(probMatch[1]) : undefined;
+  // Extract true probability
+  const trueProbMatch = response.match(/true\s*probability[:\s]*(\d{1,3}(?:\.\d+)?)\s*%/i);
+  const probability = trueProbMatch ? parseFloat(trueProbMatch[1]) : undefined;
+
+  // Extract implied probability
+  const impliedProbMatch = response.match(/implied\s*probability[:\s]*(\d{1,3}(?:\.\d+)?)\s*%/i);
+  const impliedProbability = impliedProbMatch ? parseFloat(impliedProbMatch[1]) : undefined;
+
+  // Extract edge
+  const edgeMatch = response.match(/edge[:\s]*([+-]?\d{1,2}(?:\.\d+)?)\s*%/i);
+  const edge = edgeMatch ? parseFloat(edgeMatch[1]) : undefined;
 
   // Extract confidence
   const confMatch = response.match(/confidence[:\s]*(HIGH|MEDIUM|LOW)/i);
@@ -271,7 +350,7 @@ export function parseAIResponse(agentId: string, response: string): Partial<AIAn
     : 'MEDIUM';
 
   // Extract bet type
-  const betTypeMatch = response.match(/bet\s*type[:\s]*(1X2|OVER\/?UNDER|BTTS|DOUBLE CHANCE|PLAYER PROP)/i);
+  const betTypeMatch = response.match(/bet\s*type[:\s]*(1X2|OVER\/?UNDER|BTTS|DOUBLE CHANCE|PLAYER PROP|SPREAD)/i);
   const betType = betTypeMatch
     ? betTypeMatch[1].toUpperCase().replace('/', '/') as BetType
     : undefined;
@@ -284,9 +363,11 @@ export function parseAIResponse(agentId: string, response: string): Partial<AIAn
   const oddsMatch = response.match(/odds[:\s]*(\d+\.\d{1,2})/i);
   const betOdds = oddsMatch ? parseFloat(oddsMatch[1]) : undefined;
 
-  // Extract explanation
+  // Extract explanation (key insight)
   const explanationMatch = response.match(/explanation[:\s]*(.+?)(?:\n|$)/i);
-  const betExplanation = explanationMatch ? explanationMatch[1].trim() : undefined;
+  const keyInsightMatch = response.match(/key\s*insight[:\s]*(.+?)(?:\n|$)/i);
+  const betExplanation = explanationMatch ? explanationMatch[1].trim() :
+                         keyInsightMatch ? keyInsightMatch[1].trim() : undefined;
 
   return {
     agentId,
@@ -296,6 +377,8 @@ export function parseAIResponse(agentId: string, response: string): Partial<AIAn
     verdict,
     confidence,
     probability,
+    impliedProbability,
+    edge,
     betType,
     betSelection,
     betOdds,

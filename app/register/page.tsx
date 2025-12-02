@@ -1,7 +1,7 @@
 'use client';
 
 // ==========================================
-// REGISTER PAGE
+// REGISTER PAGE - PlayerProfit-inspired Teal Theme
 // ==========================================
 
 import { useState } from 'react';
@@ -10,7 +10,7 @@ import Link from 'next/link';
 
 export default function RegisterPage() {
   const router = useRouter();
-  
+
   const [formData, setFormData] = useState({
     email: '',
     username: '',
@@ -77,123 +77,126 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center p-4">
+    <div className="min-h-screen bg-dark flex items-center justify-center p-6">
       <div className="w-full max-w-md">
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-yellow-400">🎓</h1>
-          <h2 className="text-2xl font-bold mt-2">Join Payout Academy</h2>
-          <p className="text-zinc-400 mt-1">Create your free account</p>
+        {/* Logo - Text Wordmark */}
+        <div className="text-center mb-10">
+          <h1 className="text-3xl font-bold text-teal-400 tracking-tight">PAYOUT ACADEMY</h1>
+          <p className="text-zinc-500 text-sm tracking-widest mt-1">Analytics</p>
+          <p className="text-zinc-400 mt-4">Create your free account</p>
         </div>
 
-        {/* Register Card */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-          {error && (
-            <div className="bg-red-900/30 border border-red-700 text-red-400 px-4 py-3 rounded-lg mb-4">
-              {error}
-            </div>
-          )}
+        {/* Register Card with gradient border */}
+        <div className="relative p-[1px] rounded-2xl bg-gradient-to-b from-teal-500/50 to-teal-600/20">
+          <div className="bg-surface rounded-2xl p-8">
+            {error && (
+              <div className="bg-red-900/30 border border-red-800/50 text-red-400 px-4 py-3 rounded-xl mb-6">
+                {error}
+              </div>
+            )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-zinc-300 mb-1">
-                Email
-              </label>
-              <input
-                type="email"
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                placeholder="you@example.com"
-                required
-              />
-            </div>
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div>
+                <label className="block text-sm font-medium text-zinc-300 mb-2">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  className="w-full bg-dark border border-zinc-800 rounded-xl px-4 py-3 text-white placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
+                  placeholder="you@example.com"
+                  required
+                />
+              </div>
 
-            <div>
-              <label className="block text-sm font-medium text-zinc-300 mb-1">
-                Username
-              </label>
-              <input
-                type="text"
-                name="username"
-                value={formData.username}
-                onChange={handleChange}
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                placeholder="coolbettor123"
-                minLength={3}
-                maxLength={20}
-                required
-              />
-              <p className="text-xs text-zinc-500 mt-1">3-20 characters, shown on leaderboard</p>
-            </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-300 mb-2">
+                  Username
+                </label>
+                <input
+                  type="text"
+                  name="username"
+                  value={formData.username}
+                  onChange={handleChange}
+                  className="w-full bg-dark border border-zinc-800 rounded-xl px-4 py-3 text-white placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
+                  placeholder="your_username"
+                  minLength={3}
+                  maxLength={20}
+                  required
+                />
+                <p className="text-xs text-zinc-600 mt-2">3-20 characters, shown on leaderboard</p>
+              </div>
 
-            <div>
-              <label className="block text-sm font-medium text-zinc-300 mb-1">
-                Password
-              </label>
-              <input
-                type="password"
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                placeholder="••••••••"
-                minLength={8}
-                required
-              />
-            </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-300 mb-2">
+                  Password
+                </label>
+                <input
+                  type="password"
+                  name="password"
+                  value={formData.password}
+                  onChange={handleChange}
+                  className="w-full bg-dark border border-zinc-800 rounded-xl px-4 py-3 text-white placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
+                  placeholder="••••••••"
+                  minLength={8}
+                  required
+                />
+              </div>
 
-            <div>
-              <label className="block text-sm font-medium text-zinc-300 mb-1">
-                Confirm Password
-              </label>
-              <input
-                type="password"
-                name="confirmPassword"
-                value={formData.confirmPassword}
-                onChange={handleChange}
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                placeholder="••••••••"
-                required
-              />
-            </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-300 mb-2">
+                  Confirm Password
+                </label>
+                <input
+                  type="password"
+                  name="confirmPassword"
+                  value={formData.confirmPassword}
+                  onChange={handleChange}
+                  className="w-full bg-dark border border-zinc-800 rounded-xl px-4 py-3 text-white placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
+                  placeholder="••••••••"
+                  required
+                />
+              </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-semibold py-2 rounded-lg transition-colors disabled:opacity-50"
-            >
-              {loading ? 'Creating account...' : 'Create Account'}
-            </button>
-          </form>
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full font-semibold py-3 rounded-xl transition-all duration-300 disabled:opacity-50 text-dark"
+                style={{ background: 'linear-gradient(180deg, #2DD4BF 0%, #14B8A6 100%)' }}
+              >
+                {loading ? 'Creating account...' : 'Create Account'}
+              </button>
+            </form>
 
-          <p className="mt-6 text-center text-sm text-zinc-400">
-            Already have an account?{' '}
-            <Link href="/login" className="text-yellow-400 hover:text-yellow-300 font-medium">
-              Sign in
-            </Link>
-          </p>
+            <p className="mt-8 text-center text-sm text-zinc-500">
+              Already have an account?{' '}
+              <Link href="/login" className="text-teal-400 hover:text-teal-300 font-medium transition-colors">
+                Sign in
+              </Link>
+            </p>
+          </div>
         </div>
 
-        {/* Benefits */}
-        <div className="mt-6 grid grid-cols-3 gap-4 text-center text-xs text-zinc-400">
-          <div>
-            <div className="text-2xl mb-1">🤖</div>
-            <div>7 AI Analysts</div>
+        {/* Benefits - Premium Style */}
+        <div className="mt-8 grid grid-cols-3 gap-4 text-center">
+          <div className="bg-surface border border-zinc-800/50 rounded-xl p-4">
+            <div className="text-2xl mb-2 text-teal-400 font-bold">7</div>
+            <div className="text-xs text-zinc-500">AI Analysts</div>
           </div>
-          <div>
-            <div className="text-2xl mb-1">📊</div>
-            <div>Track Your Bets</div>
+          <div className="bg-surface border border-zinc-800/50 rounded-xl p-4">
+            <div className="text-2xl mb-2 text-teal-400 font-bold">Live</div>
+            <div className="text-xs text-zinc-500">Tracking</div>
           </div>
-          <div>
-            <div className="text-2xl mb-1">🏆</div>
-            <div>Compete Globally</div>
+          <div className="bg-surface border border-zinc-800/50 rounded-xl p-4">
+            <div className="text-2xl mb-2 text-gold font-bold">Pro</div>
+            <div className="text-xs text-zinc-500">Analytics</div>
           </div>
         </div>
 
         {/* Disclaimer */}
-        <p className="mt-6 text-center text-xs text-zinc-500">
+        <p className="mt-8 text-center text-xs text-zinc-600">
           By creating an account, you confirm you are 18+ and agree this is for entertainment only.
         </p>
       </div>

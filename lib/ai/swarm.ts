@@ -208,18 +208,30 @@ function calculateConsensus(
 
   const avgScore = totalWeight > 0 ? weightedSum / totalWeight : 0;
 
-  // Determine final verdict based on weighted score
+  // Determine final verdict based on weighted score AND vote majority
+  // Need strong consensus for STRONG BET
   let verdict: Verdict;
-  if (avgScore >= 1.2) verdict = 'STRONG BET';
-  else if (avgScore >= 0.5) verdict = 'STRONG BET';
-  else if (avgScore >= 0) verdict = 'SLIGHT EDGE';
-  else if (avgScore >= -0.5) verdict = 'RISKY';
-  else verdict = 'AVOID';
+  const totalVotes = betVotes + passVotes;
+  const betRatio = totalVotes > 0 ? betVotes / totalVotes : 0;
+  const validCount = validAnalyses.length;
 
-  // Determine confidence
-  const confidence = Math.abs(avgScore) >= 1.2 ? 'HIGH' 
-    : Math.abs(avgScore) >= 0.5 ? 'MEDIUM' 
-    : 'LOW';
+  if (avgScore >= 1.5 && betRatio >= 0.7 && validCount >= 4) {
+    verdict = 'STRONG BET';
+  } else if (avgScore >= 0.8 && betRatio >= 0.6 && validCount >= 3) {
+    verdict = 'SLIGHT EDGE';
+  } else if (avgScore >= 0 || betRatio >= 0.4) {
+    verdict = 'RISKY';
+  } else {
+    verdict = 'AVOID';
+  }
+
+  // Determine confidence based on agreement level and number of responses
+  const agreementRatio = Math.max(betRatio, 1 - betRatio);
+
+  const confidence =
+    (validCount >= 5 && agreementRatio >= 0.8) ? 'HIGH' :
+    (validCount >= 3 && agreementRatio >= 0.6) ? 'MEDIUM' :
+    'LOW';
 
   // Generate reasoning
   const reasoning = generateConsensusReasoning(validAnalyses, verdict, betVotes, passVotes);
@@ -303,33 +315,121 @@ function determineBetSelection(
 }
 
 // ==========================================
-// CONTEXT BUILDER
+// CONTEXT BUILDER - PROFESSIONAL MARKET DATA
 // ==========================================
 
 function buildEventContext(event: SportEvent): string {
   const parts: string[] = [];
-  
-  if (event.bookmakers?.length) {
-    const book = event.bookmakers[0];
-    const h2h = book.markets.find(m => m.key === 'h2h');
-    
-    if (h2h) {
-      parts.push('CURRENT ODDS:');
-      h2h.outcomes.forEach(o => {
-        parts.push(`  ${o.name}: ${o.price.toFixed(2)}`);
-      });
-    }
-    
-    const spread = book.markets.find(m => m.key === 'spreads');
-    if (spread) {
-      parts.push('SPREAD:');
-      spread.outcomes.forEach(o => {
-        const point = (o as any).point;
-        parts.push(`  ${o.name} ${point > 0 ? '+' : ''}${point}: ${o.price.toFixed(2)}`);
-      });
-    }
+
+  if (!event.bookmakers?.length) {
+    return 'No odds data available.';
   }
-  
+
+  // Collect best odds across all bookmakers
+  const h2hOdds: Record<string, { price: number; bookmaker: string }[]> = {};
+  const totalOdds: Record<string, { price: number; bookmaker: string; point?: number }[]> = {};
+  const spreadOdds: Record<string, { price: number; bookmaker: string; point?: number }[]> = {};
+
+  event.bookmakers.forEach(book => {
+    // H2H (Moneyline) odds
+    const h2h = book.markets.find(m => m.key === 'h2h');
+    if (h2h) {
+      h2h.outcomes.forEach(o => {
+        if (!h2hOdds[o.name]) h2hOdds[o.name] = [];
+        h2hOdds[o.name].push({ price: o.price, bookmaker: book.title });
+      });
+    }
+
+    // Totals (Over/Under) odds
+    const totals = book.markets.find(m => m.key === 'totals');
+    if (totals) {
+      totals.outcomes.forEach(o => {
+        const key = `${o.name} ${(o as any).point}`;
+        if (!totalOdds[key]) totalOdds[key] = [];
+        totalOdds[key].push({
+          price: o.price,
+          bookmaker: book.title,
+          point: (o as any).point
+        });
+      });
+    }
+
+    // Spreads odds
+    const spreads = book.markets.find(m => m.key === 'spreads');
+    if (spreads) {
+      spreads.outcomes.forEach(o => {
+        const point = (o as any).point;
+        const key = `${o.name} ${point > 0 ? '+' : ''}${point}`;
+        if (!spreadOdds[key]) spreadOdds[key] = [];
+        spreadOdds[key].push({
+          price: o.price,
+          bookmaker: book.title,
+          point
+        });
+      });
+    }
+  });
+
+  // Helper to convert decimal odds to implied probability
+  const toImpliedProb = (odds: number) => ((1 / odds) * 100).toFixed(1);
+
+  // Helper to find best odds
+  const getBestOdds = (odds: { price: number; bookmaker: string }[]) => {
+    if (!odds.length) return null;
+    return odds.reduce((best, curr) => curr.price > best.price ? curr : best, odds[0]);
+  };
+
+  // MONEYLINE / 1X2 MARKET
+  parts.push('MONEYLINE ODDS (Best Available):');
+  Object.entries(h2hOdds).forEach(([outcome, odds]) => {
+    const best = getBestOdds(odds);
+    if (best) {
+      const impliedProb = toImpliedProb(best.price);
+      parts.push(`  ${outcome}: ${best.price.toFixed(2)} (${impliedProb}% implied) via ${best.bookmaker}`);
+    }
+  });
+
+  // Calculate vig/juice
+  const totalImplied = Object.values(h2hOdds).reduce((sum, odds) => {
+    const best = getBestOdds(odds);
+    return sum + (best ? (1 / best.price) : 0);
+  }, 0);
+  const vig = ((totalImplied - 1) * 100).toFixed(1);
+  parts.push(`  Market Vig: ${vig}%`);
+
+  // TOTALS MARKET
+  if (Object.keys(totalOdds).length > 0) {
+    parts.push('\nTOTALS (Over/Under):');
+    const sortedTotals = Object.entries(totalOdds).sort((a, b) => {
+      const pointA = a[1][0]?.point || 0;
+      const pointB = b[1][0]?.point || 0;
+      return pointA - pointB;
+    });
+
+    sortedTotals.forEach(([outcome, odds]) => {
+      const best = getBestOdds(odds);
+      if (best) {
+        const impliedProb = toImpliedProb(best.price);
+        parts.push(`  ${outcome}: ${best.price.toFixed(2)} (${impliedProb}% implied)`);
+      }
+    });
+  }
+
+  // SPREADS MARKET
+  if (Object.keys(spreadOdds).length > 0) {
+    parts.push('\nSPREADS:');
+    Object.entries(spreadOdds).forEach(([outcome, odds]) => {
+      const best = getBestOdds(odds);
+      if (best) {
+        const impliedProb = toImpliedProb(best.price);
+        parts.push(`  ${outcome}: ${best.price.toFixed(2)} (${impliedProb}% implied)`);
+      }
+    });
+  }
+
+  // Number of bookmakers for market depth indicator
+  parts.push(`\nMarket Depth: ${event.bookmakers.length} bookmakers`);
+
   return parts.join('\n');
 }
 

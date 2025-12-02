@@ -252,6 +252,45 @@ export async function saveAIPrediction(data: {
 }
 
 // ==========================================
+// GET PREDICTION BY EVENT ID
+// ==========================================
+
+export async function getPredictionByEventId(eventId: string): Promise<any | null> {
+  try {
+    // Find the most recent prediction for this event
+    const prediction = await prisma.aIPrediction.findFirst({
+      where: { eventId },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!prediction) return null;
+
+    // Return in swarm result format
+    return {
+      eventId: prediction.eventId,
+      eventName: prediction.eventName,
+      sport: prediction.sport,
+      analyses: prediction.aiVotes,
+      consensus: {
+        verdict: prediction.consensusVerdict,
+        score: prediction.consensusScore?.toString() || '0',
+        betVotes: prediction.betVotes,
+        passVotes: prediction.passVotes,
+        confidence: prediction.betVotes >= 5 ? 'HIGH' : prediction.betVotes >= 3 ? 'MEDIUM' : 'LOW',
+        reasoning: '',
+      },
+      betSelection: prediction.betSelection,
+      betOdds: prediction.betOdds,
+      timestamp: prediction.createdAt.toISOString(),
+      cached: true, // Flag to indicate this is a cached result
+    };
+  } catch (error) {
+    console.error('Failed to get prediction by event ID:', error);
+    return null;
+  }
+}
+
+// ==========================================
 // GET AI PREDICTIONS
 // ==========================================
 

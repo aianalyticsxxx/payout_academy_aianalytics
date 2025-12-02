@@ -2,10 +2,11 @@
 // AI SWARM API ROUTE
 // ==========================================
 // POST /api/ai/swarm - Run full swarm analysis
+// Returns cached predictions if available for the same event
 
 import { NextRequest, NextResponse } from 'next/server';
 import { runSwarmAnalysis, streamSwarmAnalysis } from '@/lib/ai/swarm';
-import { saveAIPrediction } from '@/lib/db/ai-leaderboard';
+import { saveAIPrediction, getPredictionByEventId } from '@/lib/db/ai-leaderboard';
 import { ratelimit } from '@/lib/redis';
 import { z } from 'zod';
 
@@ -32,15 +33,28 @@ const RequestSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
-    // Rate limiting
+    // Parse and validate request
+    const body = await req.json();
+    const { event, options } = RequestSchema.parse(body);
+
+    // Check if we already have a prediction for this event
+    // This ensures all users see the same AI analysis
+    const existingPrediction = await getPredictionByEventId(event.id);
+
+    if (existingPrediction) {
+      console.log(`[Swarm API] Returning cached prediction for ${event.id}`);
+      return NextResponse.json(existingPrediction);
+    }
+
+    // Rate limiting (only for new analyses, not cached ones)
     if (ratelimit) {
       const identifier = req.headers.get('x-user-id') || req.ip || 'anonymous';
       const { success, limit, reset, remaining } = await ratelimit.limit(identifier);
-      
+
       if (!success) {
         return NextResponse.json(
           { error: 'Rate limit exceeded', retryAfter: reset },
-          { 
+          {
             status: 429,
             headers: {
               'X-RateLimit-Limit': limit.toString(),
@@ -52,9 +66,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Parse and validate request
-    const body = await req.json();
-    const { event, options } = RequestSchema.parse(body);
+    console.log(`[Swarm API] Running new analysis for ${event.id}`);
 
     // Run swarm analysis
     const result = await runSwarmAnalysis(event, {
@@ -64,26 +76,25 @@ export async function POST(req: NextRequest) {
       includeContext: options?.includeContext ?? true,
     });
 
-    // Save prediction to database if requested
-    if (options?.savePrediction !== false) {
-      try {
-        await saveAIPrediction({
-          eventId: event.id,
-          eventName: `${event.awayTeam} @ ${event.homeTeam}`,
-          sport: event.sportTitle,
-          league: event.league,
-          homeTeam: event.homeTeam,
-          awayTeam: event.awayTeam,
-          commenceTime: new Date(event.commenceTime),
-          consensus: result.consensus,
-          aiVotes: result.analyses,
-          betSelection: result.betSelection,
-          betOdds: result.betOdds,
-        });
-      } catch (saveError) {
-        console.error('Failed to save prediction:', saveError);
-        // Don't fail the request, just log
-      }
+    // Save prediction to database so all users see the same result
+    try {
+      await saveAIPrediction({
+        eventId: event.id,
+        eventName: `${event.awayTeam} @ ${event.homeTeam}`,
+        sport: event.sportTitle,
+        league: event.league,
+        homeTeam: event.homeTeam,
+        awayTeam: event.awayTeam,
+        commenceTime: new Date(event.commenceTime),
+        consensus: result.consensus,
+        aiVotes: result.analyses,
+        betSelection: result.betSelection,
+        betOdds: result.betOdds,
+      });
+      console.log(`[Swarm API] Saved prediction for ${event.id}`);
+    } catch (saveError) {
+      console.error('Failed to save prediction:', saveError);
+      // Don't fail the request, just log
     }
 
     return NextResponse.json(result);
