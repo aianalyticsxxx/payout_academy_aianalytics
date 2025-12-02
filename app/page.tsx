@@ -402,11 +402,11 @@ export default function Dashboard() {
 
   const getVerdictColor = (verdict: string) => {
     switch (verdict) {
-      case 'STRONG BET': return 'text-green-400 bg-green-900/40';
-      case 'SLIGHT EDGE': return 'text-yellow-400 bg-yellow-900/30';
-      case 'RISKY': return 'text-orange-400 bg-orange-900/30';
-      case 'AVOID': return 'text-red-400 bg-red-900/30';
-      default: return 'text-zinc-400 bg-zinc-900/30';
+      case 'STRONG BET': return 'text-emerald-400 bg-emerald-950/60';
+      case 'SLIGHT EDGE': return 'text-amber-400 bg-amber-950/40';
+      case 'RISKY': return 'text-orange-400 bg-zinc-900/60';
+      case 'AVOID': return 'text-red-400 bg-red-950/40';
+      default: return 'text-zinc-400 bg-zinc-900/40';
     }
   };
 
@@ -730,64 +730,67 @@ export default function Dashboard() {
                       </div>
                     </div>
 
-                    {/* Consensus Card - Premium Design */}
-                    <div className="relative p-[1px] rounded-2xl bg-gradient-to-b from-teal-500/50 to-teal-600/20">
-                      <div className="bg-surface rounded-2xl overflow-hidden">
-                        {/* Header with Verdict - Enhanced */}
-                        <div className={`p-8 ${getVerdictColor(swarmResult.consensus.verdict)}`}>
+                    {/* Consensus Card - Premium Emerald Design */}
+                    <div className="relative rounded-2xl overflow-hidden border border-emerald-900/30 bg-gradient-to-b from-emerald-950/40 to-zinc-950/80">
+                      {/* Subtle glow effect */}
+                      <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 via-transparent to-transparent pointer-events-none" />
+
+                      <div className="relative">
+                        {/* Header with Verdict - Clean Modern */}
+                        <div className={`p-6 border-b border-emerald-900/20 ${getVerdictColor(swarmResult.consensus.verdict)}`}>
                           <div className="flex items-center justify-between">
                             <div>
-                              <div className="text-xs font-medium opacity-75 uppercase tracking-widest mb-2">AI Consensus</div>
-                              <div className="text-4xl font-bold tracking-tight">{swarmResult.consensus.verdict}</div>
+                              <div className="text-[10px] font-semibold text-emerald-500/80 uppercase tracking-[0.2em] mb-1">AI Consensus</div>
+                              <div className="text-3xl font-bold tracking-tight">{swarmResult.consensus.verdict}</div>
                             </div>
                             <div className="text-right">
-                              <div className="text-5xl font-bold">{swarmResult.consensus.score}</div>
-                              <div className="text-xs font-medium opacity-75 uppercase tracking-widest mt-1">Score</div>
+                              <div className="text-4xl font-bold font-mono">{swarmResult.consensus.score}</div>
+                              <div className="text-[10px] font-semibold text-zinc-500 uppercase tracking-[0.2em] mt-1">Score</div>
                             </div>
                           </div>
                         </div>
 
-                        {/* Stats Grid - Refined */}
+                        {/* Stats Grid - Modern Clean */}
                         {(() => {
                           // Calculate average edge from analyses
                           const edges = swarmResult.analyses.filter(a => a.edge != null).map(a => a.edge!);
                           const avgEdge = edges.length > 0 ? edges.reduce((a, b) => a + b, 0) / edges.length : null;
 
                           return (
-                            <div className="grid grid-cols-4 divide-x divide-zinc-800/50">
-                              <div className="p-5 text-center">
-                                <div className="text-3xl font-bold text-green-400">{swarmResult.consensus.betVotes}</div>
-                                <div className="text-xs font-medium text-zinc-500 uppercase tracking-wider mt-1">BET</div>
+                            <div className="grid grid-cols-4 gap-px bg-emerald-900/10">
+                              <div className="bg-zinc-950/50 p-4 text-center">
+                                <div className="text-2xl font-bold text-emerald-400">{swarmResult.consensus.betVotes}</div>
+                                <div className="text-[10px] font-semibold text-zinc-600 uppercase tracking-[0.15em] mt-1">Bet</div>
                               </div>
-                              <div className="p-5 text-center">
-                                <div className="text-3xl font-bold text-red-400">{swarmResult.consensus.passVotes}</div>
-                                <div className="text-xs font-medium text-zinc-500 uppercase tracking-wider mt-1">PASS</div>
+                              <div className="bg-zinc-950/50 p-4 text-center">
+                                <div className="text-2xl font-bold text-rose-400">{swarmResult.consensus.passVotes}</div>
+                                <div className="text-[10px] font-semibold text-zinc-600 uppercase tracking-[0.15em] mt-1">Pass</div>
                               </div>
-                              <div className="p-5 text-center">
-                                <div className={`text-3xl font-bold ${
-                                  swarmResult.consensus.confidence === 'HIGH' ? 'text-green-400' :
-                                  swarmResult.consensus.confidence === 'MEDIUM' ? 'text-yellow-400' : 'text-red-400'
+                              <div className="bg-zinc-950/50 p-4 text-center">
+                                <div className={`text-2xl font-bold ${
+                                  swarmResult.consensus.confidence === 'HIGH' ? 'text-emerald-400' :
+                                  swarmResult.consensus.confidence === 'MEDIUM' ? 'text-amber-400' : 'text-rose-400'
                                 }`}>
                                   {swarmResult.consensus.confidence}
                                 </div>
-                                <div className="text-xs font-medium text-zinc-500 uppercase tracking-wider mt-1">Confidence</div>
+                                <div className="text-[10px] font-semibold text-zinc-600 uppercase tracking-[0.15em] mt-1">Confidence</div>
                               </div>
-                              <div className="p-5 text-center">
+                              <div className="bg-zinc-950/50 p-4 text-center">
                                 {avgEdge !== null ? (
                                   <>
-                                    <div className={`text-3xl font-bold ${
-                                      avgEdge >= 5 ? 'text-green-400' :
-                                      avgEdge >= 3 ? 'text-yellow-400' :
-                                      avgEdge > 0 ? 'text-orange-400' : 'text-red-400'
+                                    <div className={`text-2xl font-bold font-mono ${
+                                      avgEdge >= 5 ? 'text-emerald-400' :
+                                      avgEdge >= 3 ? 'text-amber-400' :
+                                      avgEdge > 0 ? 'text-orange-400' : 'text-rose-400'
                                     }`}>
                                       {avgEdge > 0 ? '+' : ''}{avgEdge.toFixed(1)}%
                                     </div>
-                                    <div className="text-xs font-medium text-zinc-500 uppercase tracking-wider mt-1">Avg Edge</div>
+                                    <div className="text-[10px] font-semibold text-zinc-600 uppercase tracking-[0.15em] mt-1">Avg Edge</div>
                                   </>
                                 ) : (
                                   <>
-                                    <div className="text-3xl font-bold text-zinc-600">—</div>
-                                    <div className="text-xs font-medium text-zinc-500 uppercase tracking-wider mt-1">Avg Edge</div>
+                                    <div className="text-2xl font-bold text-zinc-700">—</div>
+                                    <div className="text-[10px] font-semibold text-zinc-600 uppercase tracking-[0.15em] mt-1">Avg Edge</div>
                                   </>
                                 )}
                               </div>
@@ -822,29 +825,29 @@ export default function Dashboard() {
                           if (!topBetType && !topSelection) return null;
 
                           return (
-                            <div className="p-6 border-t border-zinc-800/50 bg-gradient-to-r from-teal-950/50 to-teal-900/30">
-                              <div className="text-xs font-medium text-teal-400 uppercase tracking-widest mb-3">Recommended Bet</div>
+                            <div className="p-5 border-t border-emerald-900/20 bg-emerald-950/30">
+                              <div className="text-[10px] font-semibold text-emerald-500/80 uppercase tracking-[0.2em] mb-3">Recommended Bet</div>
                               <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-4">
+                                <div className="flex items-center gap-3">
                                   {topBetType && (
-                                    <span className="bg-teal-500/20 text-teal-300 px-3 py-1.5 rounded-xl text-sm font-semibold border border-teal-500/30">
+                                    <span className="bg-emerald-500/10 text-emerald-400 px-3 py-1.5 rounded-lg text-xs font-semibold border border-emerald-500/20">
                                       {topBetType[0]}
                                     </span>
                                   )}
                                   {topSelection && (
-                                    <span className="text-xl font-bold text-white">
+                                    <span className="text-lg font-bold text-white">
                                       {topSelection[0]}
                                     </span>
                                   )}
                                 </div>
                                 <div className="text-right">
                                   {avgOdds && (
-                                    <div className="text-3xl font-bold text-gold font-mono">
+                                    <div className="text-2xl font-bold text-amber-400 font-mono">
                                       @{avgOdds.toFixed(2)}
                                     </div>
                                   )}
                                   {topSelection && (
-                                    <div className="text-xs font-medium text-zinc-500 mt-1">
+                                    <div className="text-[10px] font-semibold text-zinc-600 uppercase tracking-wide mt-1">
                                       {topSelection[1].count}/{swarmResult.analyses.length} AIs agree
                                     </div>
                                   )}
@@ -854,28 +857,28 @@ export default function Dashboard() {
                           );
                         })()}
 
-                        {/* Vote Distribution Bar - Refined */}
-                        <div className="p-6 border-t border-zinc-800/50">
-                          <div className="text-xs font-medium text-zinc-500 uppercase tracking-widest mb-3">Vote Distribution</div>
-                          <div className="h-3 bg-zinc-900 rounded-full overflow-hidden flex">
+                        {/* Vote Distribution Bar - Modern */}
+                        <div className="p-5 border-t border-emerald-900/20">
+                          <div className="text-[10px] font-semibold text-zinc-600 uppercase tracking-[0.2em] mb-3">Vote Distribution</div>
+                          <div className="h-2 bg-zinc-900/80 rounded-full overflow-hidden flex">
                             <div
-                              className="bg-gradient-to-r from-green-500 to-green-400 transition-all"
+                              className="bg-gradient-to-r from-emerald-600 to-emerald-400 transition-all"
                               style={{
                                 width: `${(swarmResult.consensus.betVotes / (swarmResult.consensus.betVotes + swarmResult.consensus.passVotes)) * 100}%`
                               }}
                             />
                             <div
-                              className="bg-gradient-to-r from-red-500 to-red-400 transition-all"
+                              className="bg-gradient-to-r from-rose-600 to-rose-400 transition-all"
                               style={{
                                 width: `${(swarmResult.consensus.passVotes / (swarmResult.consensus.betVotes + swarmResult.consensus.passVotes)) * 100}%`
                               }}
                             />
                           </div>
-                          <div className="flex justify-between mt-2 text-sm font-medium">
-                            <span className="text-green-400">
+                          <div className="flex justify-between mt-2 text-xs font-semibold">
+                            <span className="text-emerald-400">
                               {Math.round((swarmResult.consensus.betVotes / (swarmResult.consensus.betVotes + swarmResult.consensus.passVotes)) * 100)}% Bet
                             </span>
-                            <span className="text-red-400">
+                            <span className="text-rose-400">
                               {Math.round((swarmResult.consensus.passVotes / (swarmResult.consensus.betVotes + swarmResult.consensus.passVotes)) * 100)}% Pass
                             </span>
                           </div>
