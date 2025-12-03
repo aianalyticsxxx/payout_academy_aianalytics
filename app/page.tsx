@@ -236,7 +236,7 @@ export default function Dashboard() {
   // State
   const [activeTab, setActiveTab] = useState<'events' | 'challenges' | 'ai' | 'bets' | 'rewards' | 'competition'>('events');
   const [purchaseModalOpen, setPurchaseModalOpen] = useState(false);
-  const [selectedChallenge, setSelectedChallenge] = useState<{ size: number; cost: number; label: string; profit: number; target: number } | null>(null);
+  const [selectedChallenge, setSelectedChallenge] = useState<{ size: number; cost: number; label: string; profit: number; target: number; resetFee: number } | null>(null);
   const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
   const [claimedRewards, setClaimedRewards] = useState<number[]>([]);
   const [rewardModalOpen, setRewardModalOpen] = useState(false);
