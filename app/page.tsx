@@ -2019,84 +2019,160 @@ export default function Dashboard() {
         {/* BETS TAB - PlayerProfit Style Dashboard */}
         {activeTab === 'bets' && (
           <div className="space-y-6">
-            {/* Top Row: Balance Card + Balance History */}
+            {/* Top Row: Win Streak Challenge */}
             <div className="grid gap-6 lg:grid-cols-2">
-              {/* Balance / Equity Card */}
-              <div className="bg-gradient-to-br from-[#1a3a3a] via-[#153030] to-[#102828] border border-[#2a5555]/50 rounded-2xl p-6 relative overflow-hidden">
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(45,180,180,0.12),transparent_50%)]"></div>
-                <div className="relative">
-                  <div className="flex items-center justify-between mb-4">
-                    <span className="text-[#7cc4c4] text-sm font-medium">Balance / Equity</span>
-                    <span className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
-                      (userStats?.roi || 0) >= 0
-                        ? 'bg-emerald-500/20 text-emerald-400'
-                        : 'bg-red-500/20 text-red-400'
-                    }`}>
-                      {(userStats?.roi || 0) >= 0 ? '+' : ''}{(userStats?.roi || 0).toFixed(1)}%
-                    </span>
-                  </div>
-                  <div className="text-4xl font-bold text-white mb-2">
-                    ${(1000 + (userStats?.totalProfit || 0)).toFixed(2)}
-                  </div>
-                  <div className="text-[#5a9090] text-sm">Starting Balance: $1,000.00</div>
-                  <div className="mt-4 pt-4 border-t border-[#2a5555]/40 grid grid-cols-3 gap-4">
-                    <div>
-                      <div className="text-[#5a9090] text-xs mb-1">Record</div>
-                      <div className="text-white font-semibold">{userStats?.wins || 0}-{userStats?.losses || 0}</div>
-                    </div>
-                    <div>
-                      <div className="text-[#5a9090] text-xs mb-1">Win Rate</div>
-                      <div className={`font-semibold ${(userStats?.winRate || 0) >= 55 ? 'text-emerald-400' : (userStats?.winRate || 0) >= 50 ? 'text-amber-400' : 'text-red-400'}`}>
-                        {(userStats?.winRate || 0).toFixed(1)}%
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-[#5a9090] text-xs mb-1">Profit/Loss</div>
-                      <div className={`font-semibold ${(userStats?.totalProfit || 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                        {(userStats?.totalProfit || 0) >= 0 ? '+' : ''}${(userStats?.totalProfit || 0).toFixed(2)}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              {/* Win Streak Challenge Card */}
+              {(() => {
+                // Calculate current win streak from settled bets
+                const settledBets = bets.filter(b => b.result !== 'pending').sort((a, b) =>
+                  new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+                );
+                let currentStreak = 0;
+                for (const bet of settledBets) {
+                  if (bet.result === 'won') {
+                    currentStreak++;
+                  } else {
+                    break;
+                  }
+                }
+                // Find best streak ever
+                let bestStreak = 0;
+                let tempStreak = 0;
+                for (const bet of [...settledBets].reverse()) {
+                  if (bet.result === 'won') {
+                    tempStreak++;
+                    bestStreak = Math.max(bestStreak, tempStreak);
+                  } else {
+                    tempStreak = 0;
+                  }
+                }
+                const targetStreak = 20;
+                const levels = [5, 10, 15, 20];
+                const currentLevel = levels.filter(l => currentStreak >= l).length;
+                const nextLevel = levels.find(l => currentStreak < l) || 20;
+                const progressToNext = currentLevel === 4 ? 100 : ((currentStreak % 5) / 5) * 100;
 
-              {/* Balance History Chart */}
+                return (
+                  <div className="bg-gradient-to-br from-[#1a3a3a] via-[#153030] to-[#102828] border border-[#2a5555]/50 rounded-2xl p-6 relative overflow-hidden">
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(45,180,180,0.12),transparent_50%)]"></div>
+                    <div className="relative">
+                      <div className="flex items-center justify-between mb-4">
+                        <span className="text-[#7cc4c4] text-sm font-medium">Win Streak Challenge</span>
+                        <span className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
+                          currentStreak >= 20 ? 'bg-amber-500/20 text-amber-400' :
+                          currentStreak >= 15 ? 'bg-purple-500/20 text-purple-400' :
+                          currentStreak >= 10 ? 'bg-blue-500/20 text-blue-400' :
+                          currentStreak >= 5 ? 'bg-emerald-500/20 text-emerald-400' :
+                          'bg-zinc-500/20 text-zinc-400'
+                        }`}>
+                          Level {currentLevel}/4
+                        </span>
+                      </div>
+                      <div className="text-5xl font-bold text-white mb-1 flex items-baseline gap-2">
+                        {currentStreak}
+                        <span className="text-lg text-[#5a9090] font-normal">/ {targetStreak}</span>
+                      </div>
+                      <div className="text-[#5a9090] text-sm mb-4">Consecutive Wins</div>
+
+                      {/* Progress bar to target */}
+                      <div className="h-3 bg-[#0d1f1f] rounded-full overflow-hidden mb-4">
+                        <div
+                          className={`h-full rounded-full transition-all duration-500 ${
+                            currentStreak >= 20 ? 'bg-gradient-to-r from-amber-500 to-yellow-400' :
+                            currentStreak >= 15 ? 'bg-gradient-to-r from-purple-500 to-purple-400' :
+                            currentStreak >= 10 ? 'bg-gradient-to-r from-blue-500 to-blue-400' :
+                            currentStreak >= 5 ? 'bg-gradient-to-r from-emerald-500 to-emerald-400' :
+                            'bg-gradient-to-r from-[#2d9090] to-[#3db5b5]'
+                          }`}
+                          style={{ width: `${(currentStreak / targetStreak) * 100}%` }}
+                        ></div>
+                      </div>
+
+                      {/* Level markers */}
+                      <div className="flex justify-between mb-4">
+                        {levels.map((level) => (
+                          <div key={level} className="flex flex-col items-center">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all ${
+                              currentStreak >= level
+                                ? level === 20 ? 'bg-amber-500 border-amber-400 text-black' :
+                                  level === 15 ? 'bg-purple-500 border-purple-400 text-white' :
+                                  level === 10 ? 'bg-blue-500 border-blue-400 text-white' :
+                                  'bg-emerald-500 border-emerald-400 text-white'
+                                : 'bg-[#0d1f1f] border-[#2a5555] text-[#5a9090]'
+                            }`}>
+                              {currentStreak >= level ? '✓' : level}
+                            </div>
+                            <span className={`text-[10px] mt-1 ${currentStreak >= level ? 'text-[#7cc4c4]' : 'text-[#5a9090]'}`}>
+                              {level === 5 ? 'Bronze' : level === 10 ? 'Silver' : level === 15 ? 'Gold' : 'Elite'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="pt-4 border-t border-[#2a5555]/40 grid grid-cols-3 gap-4">
+                        <div>
+                          <div className="text-[#5a9090] text-xs mb-1">Best Streak</div>
+                          <div className="text-white font-semibold">{bestStreak}</div>
+                        </div>
+                        <div>
+                          <div className="text-[#5a9090] text-xs mb-1">Next Level</div>
+                          <div className="text-[#7cc4c4] font-semibold">{currentStreak >= 20 ? 'Completed!' : `${nextLevel - currentStreak} more`}</div>
+                        </div>
+                        <div>
+                          <div className="text-[#5a9090] text-xs mb-1">Record</div>
+                          <div className="text-white font-semibold">{userStats?.wins || 0}-{userStats?.losses || 0}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Streak History / Recent Results */}
               <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <span className="text-zinc-300 font-medium">Balance History</span>
-                  <span className="text-xs text-zinc-500">Last 7 days</span>
+                  <span className="text-zinc-300 font-medium">Recent Results</span>
+                  <span className="text-xs text-zinc-500">Last 20 bets</span>
                 </div>
-                <div className="h-[140px] flex items-end gap-2">
+                <div className="flex flex-wrap gap-2 mb-4">
                   {(() => {
-                    const last7Days = [];
-                    for (let i = 6; i >= 0; i--) {
-                      const date = new Date();
-                      date.setDate(date.getDate() - i);
-                      const dateStr = date.toDateString();
-                      const dayBets = bets.filter(b =>
-                        b.result !== 'pending' &&
-                        new Date(b.createdAt).toDateString() === dateStr
-                      );
-                      const dayPL = dayBets.reduce((sum, b) => {
-                        return sum + (b.result === 'won'
-                          ? (b.stake * parseFloat(b.odds)) - b.stake
-                          : -b.stake);
-                      }, 0);
-                      last7Days.push({ day: date.toLocaleDateString('en', { weekday: 'short' }), pl: dayPL });
+                    const recentBets = bets
+                      .filter(b => b.result !== 'pending')
+                      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                      .slice(0, 20);
+                    if (recentBets.length === 0) {
+                      return <div className="text-zinc-500 text-sm">No settled bets yet</div>;
                     }
-                    const maxAbs = Math.max(...last7Days.map(d => Math.abs(d.pl)), 10);
-                    return last7Days.map((d, i) => (
-                      <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                        <div className="w-full h-[100px] flex flex-col justify-end items-center">
-                          <div
-                            className={`w-full rounded-t transition-all ${d.pl >= 0 ? 'bg-emerald-500/60' : 'bg-red-500/60'}`}
-                            style={{ height: `${Math.max((Math.abs(d.pl) / maxAbs) * 100, d.pl !== 0 ? 10 : 0)}%` }}
-                          ></div>
-                        </div>
-                        <span className="text-[10px] text-zinc-500">{d.day}</span>
+                    return recentBets.map((bet, i) => (
+                      <div
+                        key={i}
+                        className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold ${
+                          bet.result === 'won'
+                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                            : bet.result === 'lost'
+                            ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                            : 'bg-zinc-500/20 text-zinc-400 border border-zinc-500/30'
+                        }`}
+                        title={`${bet.matchup} - ${bet.result}`}
+                      >
+                        {bet.result === 'won' ? 'W' : bet.result === 'lost' ? 'L' : 'P'}
                       </div>
                     ));
                   })()}
+                </div>
+                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-zinc-800">
+                  <div>
+                    <div className="text-xs text-zinc-500 mb-1">Win Rate</div>
+                    <div className={`font-semibold ${(userStats?.winRate || 0) >= 55 ? 'text-emerald-400' : (userStats?.winRate || 0) >= 50 ? 'text-amber-400' : 'text-red-400'}`}>
+                      {(userStats?.winRate || 0).toFixed(1)}%
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-zinc-500 mb-1">Profit/Loss</div>
+                    <div className={`font-semibold ${(userStats?.totalProfit || 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {(userStats?.totalProfit || 0) >= 0 ? '+' : ''}${(userStats?.totalProfit || 0).toFixed(2)}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -2134,64 +2210,83 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* Trading Objectives */}
+              {/* Streak Objectives */}
               <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-5">
-                <h3 className="text-zinc-300 font-medium mb-4">Trading Objective</h3>
-                <div className="space-y-3">
-                  {/* # of Picks */}
-                  <div>
-                    <div className="flex justify-between text-xs mb-1">
-                      <span className="text-zinc-500"># of Picks</span>
-                      <span className="text-zinc-400">{bets.filter(b => new Date(b.createdAt).getMonth() === new Date().getMonth()).length}/50</span>
+                <h3 className="text-zinc-300 font-medium mb-4">Streak Objectives</h3>
+                {(() => {
+                  const settledBets = bets.filter(b => b.result !== 'pending').sort((a, b) =>
+                    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+                  );
+                  let currentStreak = 0;
+                  for (const bet of settledBets) {
+                    if (bet.result === 'won') currentStreak++;
+                    else break;
+                  }
+                  return (
+                    <div className="space-y-3">
+                      {/* Level 1: Bronze (5 wins) */}
+                      <div>
+                        <div className="flex justify-between text-xs mb-1">
+                          <span className="text-zinc-500">Level 1: Bronze (5)</span>
+                          <span className={currentStreak >= 5 ? 'text-emerald-400' : 'text-zinc-400'}>
+                            {Math.min(currentStreak, 5)}/5
+                          </span>
+                        </div>
+                        <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all ${currentStreak >= 5 ? 'bg-emerald-500' : 'bg-[#2d9090]'}`}
+                            style={{ width: `${Math.min((currentStreak / 5) * 100, 100)}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                      {/* Level 2: Silver (10 wins) */}
+                      <div>
+                        <div className="flex justify-between text-xs mb-1">
+                          <span className="text-zinc-500">Level 2: Silver (10)</span>
+                          <span className={currentStreak >= 10 ? 'text-blue-400' : 'text-zinc-400'}>
+                            {Math.min(currentStreak, 10)}/10
+                          </span>
+                        </div>
+                        <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all ${currentStreak >= 10 ? 'bg-blue-500' : 'bg-[#2d9090]'}`}
+                            style={{ width: `${Math.min((currentStreak / 10) * 100, 100)}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                      {/* Level 3: Gold (15 wins) */}
+                      <div>
+                        <div className="flex justify-between text-xs mb-1">
+                          <span className="text-zinc-500">Level 3: Gold (15)</span>
+                          <span className={currentStreak >= 15 ? 'text-purple-400' : 'text-zinc-400'}>
+                            {Math.min(currentStreak, 15)}/15
+                          </span>
+                        </div>
+                        <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all ${currentStreak >= 15 ? 'bg-purple-500' : 'bg-[#2d9090]'}`}
+                            style={{ width: `${Math.min((currentStreak / 15) * 100, 100)}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                      {/* Level 4: Elite (20 wins) */}
+                      <div>
+                        <div className="flex justify-between text-xs mb-1">
+                          <span className="text-zinc-500">Level 4: Elite (20)</span>
+                          <span className={currentStreak >= 20 ? 'text-amber-400' : 'text-zinc-400'}>
+                            {Math.min(currentStreak, 20)}/20
+                          </span>
+                        </div>
+                        <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all ${currentStreak >= 20 ? 'bg-gradient-to-r from-amber-500 to-yellow-400' : 'bg-[#2d9090]'}`}
+                            style={{ width: `${Math.min((currentStreak / 20) * 100, 100)}%` }}
+                          ></div>
+                        </div>
+                      </div>
                     </div>
-                    <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-[#2d9090] rounded-full transition-all"
-                        style={{ width: `${Math.min((bets.filter(b => new Date(b.createdAt).getMonth() === new Date().getMonth()).length / 50) * 100, 100)}%` }}
-                      ></div>
-                    </div>
-                  </div>
-                  {/* Profit Target */}
-                  <div>
-                    <div className="flex justify-between text-xs mb-1">
-                      <span className="text-zinc-500">Profit Target (10%)</span>
-                      <span className={`${(userStats?.roi || 0) >= 10 ? 'text-emerald-400' : 'text-zinc-400'}`}>
-                        {(userStats?.roi || 0).toFixed(1)}%
-                      </span>
-                    </div>
-                    <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all ${(userStats?.roi || 0) >= 10 ? 'bg-emerald-500' : 'bg-[#2d9090]'}`}
-                        style={{ width: `${Math.min(Math.max((userStats?.roi || 0) / 10 * 100, 0), 100)}%` }}
-                      ></div>
-                    </div>
-                  </div>
-                  {/* Max Daily Loss */}
-                  <div>
-                    <div className="flex justify-between text-xs mb-1">
-                      <span className="text-zinc-500">Max Daily Loss (-5%)</span>
-                      <span className="text-emerald-400">OK</span>
-                    </div>
-                    <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
-                      <div className="h-full bg-emerald-500 rounded-full" style={{ width: '100%' }}></div>
-                    </div>
-                  </div>
-                  {/* Max Loss */}
-                  <div>
-                    <div className="flex justify-between text-xs mb-1">
-                      <span className="text-zinc-500">Max Loss (-10%)</span>
-                      <span className={`${(userStats?.roi || 0) > -10 ? 'text-emerald-400' : 'text-red-400'}`}>
-                        {(userStats?.roi || 0) > -10 ? 'OK' : 'EXCEEDED'}
-                      </span>
-                    </div>
-                    <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all ${(userStats?.roi || 0) > -10 ? 'bg-emerald-500' : 'bg-red-500'}`}
-                        style={{ width: `${Math.min(Math.max(100 + ((userStats?.roi || 0) / 10 * 100), 0), 100)}%` }}
-                      ></div>
-                    </div>
-                  </div>
-                </div>
+                  );
+                })()}
               </div>
 
               {/* Calendar */}
