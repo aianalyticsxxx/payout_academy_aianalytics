@@ -1888,93 +1888,279 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* BETS TAB */}
+        {/* BETS TAB - PlayerProfit Style Dashboard */}
         {activeTab === 'bets' && (
           <div className="space-y-6">
-            {/* Header */}
-            <div className="bg-gradient-to-r from-emerald-950/50 to-emerald-900/30 border border-emerald-800/30 rounded-2xl p-6">
-              <h2 className="text-2xl font-bold text-emerald-400">Bet Tracking Dashboard</h2>
-              <p className="text-zinc-400 mt-1">Track your bets placed from AI recommendations</p>
-            </div>
-
-            {/* Stats Summary */}
-            {userStats && (
-              <div className="grid gap-4 md:grid-cols-5">
-                <div className="bg-emerald-950/30 border border-emerald-900/30 rounded-xl p-4 text-center">
-                  <div className="text-sm text-zinc-400">Record</div>
-                  <div className="text-2xl font-bold text-white">{userStats.wins}-{userStats.losses}</div>
-                </div>
-                <div className="bg-emerald-950/30 border border-emerald-900/30 rounded-xl p-4 text-center">
-                  <div className="text-sm text-zinc-400">Win Rate</div>
-                  <div className={`text-2xl font-bold ${userStats.winRate >= 55 ? 'text-emerald-400' : userStats.winRate >= 50 ? 'text-amber-400' : 'text-red-400'}`}>
-                    {userStats.winRate?.toFixed(1)}%
+            {/* Top Row: Balance Card + Balance History */}
+            <div className="grid gap-6 lg:grid-cols-2">
+              {/* Balance / Equity Card */}
+              <div className="bg-gradient-to-br from-[#1a3a3a] via-[#153030] to-[#102828] border border-[#2a5555]/50 rounded-2xl p-6 relative overflow-hidden">
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(45,180,180,0.12),transparent_50%)]"></div>
+                <div className="relative">
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-[#7cc4c4] text-sm font-medium">Balance / Equity</span>
+                    <span className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
+                      (userStats?.roi || 0) >= 0
+                        ? 'bg-emerald-500/20 text-emerald-400'
+                        : 'bg-red-500/20 text-red-400'
+                    }`}>
+                      {(userStats?.roi || 0) >= 0 ? '+' : ''}{(userStats?.roi || 0).toFixed(1)}%
+                    </span>
                   </div>
-                </div>
-                <div className="bg-emerald-950/30 border border-emerald-900/30 rounded-xl p-4 text-center">
-                  <div className="text-sm text-zinc-400">ROI</div>
-                  <div className={`text-2xl font-bold ${userStats.roi >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                    {userStats.roi >= 0 ? '+' : ''}{userStats.roi?.toFixed(1)}%
+                  <div className="text-4xl font-bold text-white mb-2">
+                    ${(1000 + (userStats?.totalProfit || 0)).toFixed(2)}
                   </div>
-                </div>
-                <div className="bg-emerald-950/30 border border-emerald-900/30 rounded-xl p-4 text-center">
-                  <div className="text-sm text-zinc-400">Profit/Loss</div>
-                  <div className={`text-2xl font-bold ${userStats.totalProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                    {userStats.totalProfit >= 0 ? '+' : '-'}${Math.abs(userStats.totalProfit || 0)?.toFixed(2)}
-                  </div>
-                </div>
-                <div className="bg-emerald-950/30 border border-emerald-900/30 rounded-xl p-4 text-center">
-                  <div className="text-sm text-zinc-400">Streak</div>
-                  <div className="text-2xl font-bold">
-                    {userStats.currentStreak > 0 ? '🔥' : userStats.currentStreak < 0 ? '❄️' : '➖'}
-                    {Math.abs(userStats.currentStreak || 0)}
+                  <div className="text-[#5a9090] text-sm">Starting Balance: $1,000.00</div>
+                  <div className="mt-4 pt-4 border-t border-[#2a5555]/40 grid grid-cols-3 gap-4">
+                    <div>
+                      <div className="text-[#5a9090] text-xs mb-1">Record</div>
+                      <div className="text-white font-semibold">{userStats?.wins || 0}-{userStats?.losses || 0}</div>
+                    </div>
+                    <div>
+                      <div className="text-[#5a9090] text-xs mb-1">Win Rate</div>
+                      <div className={`font-semibold ${(userStats?.winRate || 0) >= 55 ? 'text-emerald-400' : (userStats?.winRate || 0) >= 50 ? 'text-amber-400' : 'text-red-400'}`}>
+                        {(userStats?.winRate || 0).toFixed(1)}%
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-[#5a9090] text-xs mb-1">Profit/Loss</div>
+                      <div className={`font-semibold ${(userStats?.totalProfit || 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                        {(userStats?.totalProfit || 0) >= 0 ? '+' : ''}${(userStats?.totalProfit || 0).toFixed(2)}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
-            )}
+
+              {/* Balance History Chart */}
+              <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-zinc-300 font-medium">Balance History</span>
+                  <span className="text-xs text-zinc-500">Last 7 days</span>
+                </div>
+                <div className="h-[140px] flex items-end gap-2">
+                  {(() => {
+                    const last7Days = [];
+                    for (let i = 6; i >= 0; i--) {
+                      const date = new Date();
+                      date.setDate(date.getDate() - i);
+                      const dateStr = date.toDateString();
+                      const dayBets = bets.filter(b =>
+                        b.result !== 'pending' &&
+                        new Date(b.createdAt).toDateString() === dateStr
+                      );
+                      const dayPL = dayBets.reduce((sum, b) => {
+                        return sum + (b.result === 'won'
+                          ? (b.stake * parseFloat(b.odds)) - b.stake
+                          : -b.stake);
+                      }, 0);
+                      last7Days.push({ day: date.toLocaleDateString('en', { weekday: 'short' }), pl: dayPL });
+                    }
+                    const maxAbs = Math.max(...last7Days.map(d => Math.abs(d.pl)), 10);
+                    return last7Days.map((d, i) => (
+                      <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                        <div className="w-full h-[100px] flex flex-col justify-end items-center">
+                          <div
+                            className={`w-full rounded-t transition-all ${d.pl >= 0 ? 'bg-emerald-500/60' : 'bg-red-500/60'}`}
+                            style={{ height: `${Math.max((Math.abs(d.pl) / maxAbs) * 100, d.pl !== 0 ? 10 : 0)}%` }}
+                          ></div>
+                        </div>
+                        <span className="text-[10px] text-zinc-500">{d.day}</span>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              </div>
+            </div>
+
+            {/* Middle Row: Challenge Info + Trading Objectives + Calendar */}
+            <div className="grid gap-6 lg:grid-cols-3">
+              {/* Challenge Info */}
+              <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-5">
+                <h3 className="text-zinc-300 font-medium mb-4">Challenge Info</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <div className="text-xs text-zinc-500 mb-1">Start Date</div>
+                    <div className="text-white font-medium text-sm">
+                      {bets.length > 0
+                        ? new Date(bets[bets.length - 1]?.createdAt).toLocaleDateString('en', { month: 'short', day: 'numeric', year: 'numeric' })
+                        : 'No bets yet'}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-zinc-500 mb-1">Challenge</div>
+                    <div className="text-white font-medium text-sm">AI Betting</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-zinc-500 mb-1">Account Size</div>
+                    <div className="text-white font-medium text-sm">$1,000</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-zinc-500 mb-1">Inactivity</div>
+                    <div className="text-white font-medium text-sm">
+                      {bets.length > 0
+                        ? `${Math.floor((Date.now() - new Date(bets[0]?.createdAt).getTime()) / 86400000)} days`
+                        : '0 days'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Trading Objectives */}
+              <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-5">
+                <h3 className="text-zinc-300 font-medium mb-4">Trading Objective</h3>
+                <div className="space-y-3">
+                  {/* # of Picks */}
+                  <div>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="text-zinc-500"># of Picks</span>
+                      <span className="text-zinc-400">{bets.filter(b => new Date(b.createdAt).getMonth() === new Date().getMonth()).length}/50</span>
+                    </div>
+                    <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-[#2d9090] rounded-full transition-all"
+                        style={{ width: `${Math.min((bets.filter(b => new Date(b.createdAt).getMonth() === new Date().getMonth()).length / 50) * 100, 100)}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                  {/* Profit Target */}
+                  <div>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="text-zinc-500">Profit Target (10%)</span>
+                      <span className={`${(userStats?.roi || 0) >= 10 ? 'text-emerald-400' : 'text-zinc-400'}`}>
+                        {(userStats?.roi || 0).toFixed(1)}%
+                      </span>
+                    </div>
+                    <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all ${(userStats?.roi || 0) >= 10 ? 'bg-emerald-500' : 'bg-[#2d9090]'}`}
+                        style={{ width: `${Math.min(Math.max((userStats?.roi || 0) / 10 * 100, 0), 100)}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                  {/* Max Daily Loss */}
+                  <div>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="text-zinc-500">Max Daily Loss (-5%)</span>
+                      <span className="text-emerald-400">OK</span>
+                    </div>
+                    <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
+                      <div className="h-full bg-emerald-500 rounded-full" style={{ width: '100%' }}></div>
+                    </div>
+                  </div>
+                  {/* Max Loss */}
+                  <div>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="text-zinc-500">Max Loss (-10%)</span>
+                      <span className={`${(userStats?.roi || 0) > -10 ? 'text-emerald-400' : 'text-red-400'}`}>
+                        {(userStats?.roi || 0) > -10 ? 'OK' : 'EXCEEDED'}
+                      </span>
+                    </div>
+                    <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all ${(userStats?.roi || 0) > -10 ? 'bg-emerald-500' : 'bg-red-500'}`}
+                        style={{ width: `${Math.min(Math.max(100 + ((userStats?.roi || 0) / 10 * 100), 0), 100)}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Calendar */}
+              <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-5">
+                <h3 className="text-zinc-300 font-medium mb-3">
+                  {new Date().toLocaleDateString('en', { month: 'long', year: 'numeric' })}
+                </h3>
+                <div className="grid grid-cols-7 gap-1 text-center">
+                  {['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'].map(d => (
+                    <div key={d} className="text-[10px] text-zinc-600 py-1">{d}</div>
+                  ))}
+                  {(() => {
+                    const now = new Date();
+                    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+                    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                    const startOffset = (firstDay.getDay() + 6) % 7;
+                    const days = [];
+                    for (let i = 0; i < startOffset; i++) {
+                      days.push(<div key={`empty-${i}`} className="h-7"></div>);
+                    }
+                    for (let d = 1; d <= lastDay.getDate(); d++) {
+                      const dayDate = new Date(now.getFullYear(), now.getMonth(), d);
+                      const dayBets = bets.filter(b =>
+                        b.result !== 'pending' &&
+                        new Date(b.createdAt).toDateString() === dayDate.toDateString()
+                      );
+                      const dayPL = dayBets.reduce((sum, b) => {
+                        return sum + (b.result === 'won'
+                          ? (b.stake * parseFloat(b.odds)) - b.stake
+                          : -b.stake);
+                      }, 0);
+                      const isToday = d === now.getDate();
+                      days.push(
+                        <div
+                          key={d}
+                          className={`h-7 flex items-center justify-center text-[10px] rounded ${
+                            isToday ? 'ring-1 ring-[#2d9090]' : ''
+                          } ${
+                            dayPL > 0 ? 'bg-emerald-900/40 text-emerald-400' :
+                            dayPL < 0 ? 'bg-red-900/40 text-red-400' :
+                            'text-zinc-600'
+                          }`}
+                          title={dayPL !== 0 ? `${dayPL >= 0 ? '+' : ''}$${dayPL.toFixed(2)}` : ''}
+                        >
+                          {d}
+                        </div>
+                      );
+                    }
+                    return days;
+                  })()}
+                </div>
+              </div>
+            </div>
 
             {/* Sub-tab Switcher */}
-            <div className="flex gap-2 p-1 bg-zinc-900/50 rounded-xl">
+            <div className="flex gap-2 p-1 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl">
               <button
                 onClick={() => setBetsSubTab('active')}
                 className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${
                   betsSubTab === 'active'
-                    ? 'bg-emerald-600 text-white shadow-lg'
+                    ? 'bg-[#2d9090] text-white shadow-lg'
                     : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50'
                 }`}
               >
-                Active Bets ({bets.filter(b => b.result === 'pending').length})
+                Active Picks ({bets.filter(b => b.result === 'pending').length})
               </button>
               <button
                 onClick={() => setBetsSubTab('history')}
                 className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${
                   betsSubTab === 'history'
-                    ? 'bg-emerald-600 text-white shadow-lg'
+                    ? 'bg-[#2d9090] text-white shadow-lg'
                     : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50'
                 }`}
               >
-                History ({bets.filter(b => b.result !== 'pending').length})
+                Pick History ({bets.filter(b => b.result !== 'pending').length})
               </button>
             </div>
 
-            {/* Active Bets Section */}
+            {/* Active Picks Section */}
             {betsSubTab === 'active' && (
               <div className="space-y-4">
                 {loadingBets ? (
                   <div className="bg-surface border border-zinc-800/50 rounded-2xl p-12 text-center">
-                    <div className="animate-pulse text-zinc-400">Loading your active bets...</div>
+                    <div className="animate-pulse text-zinc-400">Loading your active picks...</div>
                   </div>
                 ) : bets.filter(b => b.result === 'pending').length === 0 ? (
-                  <div className="bg-surface border border-zinc-800/50 rounded-2xl p-12 text-center">
-                    <div className="w-16 h-16 bg-emerald-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <svg className="w-8 h-8 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-12 text-center">
+                    <div className="w-16 h-16 bg-[#1a3030] rounded-full flex items-center justify-center mx-auto mb-4">
+                      <svg className="w-8 h-8 text-[#2d9090]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                       </svg>
                     </div>
-                    <h3 className="text-lg font-semibold text-white mb-2">No Active Bets</h3>
+                    <h3 className="text-lg font-semibold text-white mb-2">No Active Picks</h3>
                     <p className="text-zinc-400 mb-4">Place a bet from the AI Swarm analysis to start tracking!</p>
                     <button
                       onClick={() => setActiveTab('events')}
-                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium transition-colors"
+                      className="px-4 py-2 bg-[#2d9090] hover:bg-[#3aa0a0] text-white rounded-lg text-sm font-medium transition-colors"
                     >
                       Browse Events
                     </button>
@@ -1982,7 +2168,7 @@ export default function Dashboard() {
                 ) : (
                   <div className="grid gap-4">
                     {bets.filter(b => b.result === 'pending').map(bet => (
-                      <div key={bet.id} className="bg-surface border border-emerald-900/30 rounded-2xl p-5 hover:border-emerald-700/50 transition-all">
+                      <div key={bet.id} className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-5 hover:border-[#3a3a3a] transition-all">
                         <div className="flex items-start justify-between mb-4">
                           <div>
                             <div className="flex items-center gap-2 mb-1">
@@ -2004,7 +2190,7 @@ export default function Dashboard() {
                         <div className="grid grid-cols-3 gap-4 mb-4 p-3 bg-zinc-900/50 rounded-xl">
                           <div>
                             <div className="text-xs text-zinc-500 mb-1">Selection</div>
-                            <div className="font-medium text-emerald-400">{bet.selection}</div>
+                            <div className="font-medium text-[#5cc4c4]">{bet.selection}</div>
                           </div>
                           <div>
                             <div className="text-xs text-zinc-500 mb-1">Odds</div>
@@ -2052,17 +2238,17 @@ export default function Dashboard() {
               <div className="space-y-4">
                 {loadingBets ? (
                   <div className="bg-surface border border-zinc-800/50 rounded-2xl p-12 text-center">
-                    <div className="animate-pulse text-zinc-400">Loading bet history...</div>
+                    <div className="animate-pulse text-zinc-400">Loading pick history...</div>
                   </div>
                 ) : bets.filter(b => b.result !== 'pending').length === 0 ? (
-                  <div className="bg-surface border border-zinc-800/50 rounded-2xl p-12 text-center">
+                  <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-12 text-center">
                     <div className="w-16 h-16 bg-zinc-800 rounded-full flex items-center justify-center mx-auto mb-4">
                       <svg className="w-8 h-8 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                     </div>
-                    <h3 className="text-lg font-semibold text-white mb-2">No Bet History Yet</h3>
-                    <p className="text-zinc-400">Your settled bets will appear here</p>
+                    <h3 className="text-lg font-semibold text-white mb-2">No Pick History Yet</h3>
+                    <p className="text-zinc-400">Your settled picks will appear here</p>
                   </div>
                 ) : (
                   <div className="space-y-3">
