@@ -1101,28 +1101,28 @@ export default function Dashboard() {
 
               const challengeTiers = [
                 {
-                  size: 1000, cost: 19.99, label: '$1K', resetFee: 9.99,
-                  rewards: [25, 50, 100, 200] // Level 1-4 rewards
+                  size: 1000, cost: 24.99, label: '$1K', resetFee: 12.49,
+                  rewards: [3, 100, 500, 1000] // Level 1-4 rewards
                 },
                 {
                   size: 5000, cost: 99, label: '$5K', resetFee: 49,
-                  rewards: [125, 250, 500, 1000]
+                  rewards: [20, 350, 2000, 5000]
                 },
                 {
                   size: 10000, cost: 199, label: '$10K', resetFee: 99,
-                  rewards: [250, 500, 1000, 2000]
+                  rewards: [60, 700, 4500, 10000]
                 },
                 {
                   size: 25000, cost: 399, label: '$25K', resetFee: 199,
-                  rewards: [625, 1250, 2500, 5000]
+                  rewards: [100, 1400, 10000, 25000]
                 },
                 {
                   size: 50000, cost: 699, label: '$50K', resetFee: 349,
-                  rewards: [1250, 2500, 5000, 10000]
+                  rewards: [150, 2800, 20000, 50000]
                 },
                 {
                   size: 100000, cost: 999, label: '$100K', resetFee: 499,
-                  rewards: [2500, 5000, 10000, 20000]
+                  rewards: [250, 5000, 50000, 100000]
                 },
               ];
 
@@ -4063,12 +4063,12 @@ export default function Dashboard() {
                     { lvl: 3, wins: 7, color: 'from-yellow-500 to-yellow-400' },
                     { lvl: 4, wins: 10, color: 'from-cyan-400 to-blue-400' },
                   ].map((l, i) => {
-                    const rewards = selectedChallenge.size === 1000 ? [25, 50, 100, 200] :
-                                   selectedChallenge.size === 5000 ? [125, 250, 500, 1000] :
-                                   selectedChallenge.size === 10000 ? [250, 500, 1000, 2000] :
-                                   selectedChallenge.size === 25000 ? [625, 1250, 2500, 5000] :
-                                   selectedChallenge.size === 50000 ? [1250, 2500, 5000, 10000] :
-                                   [2500, 5000, 10000, 20000];
+                    const rewards = selectedChallenge.size === 1000 ? [3, 100, 500, 1000] :
+                                   selectedChallenge.size === 5000 ? [20, 350, 2000, 5000] :
+                                   selectedChallenge.size === 10000 ? [60, 700, 4500, 10000] :
+                                   selectedChallenge.size === 25000 ? [100, 1400, 10000, 25000] :
+                                   selectedChallenge.size === 50000 ? [150, 2800, 20000, 50000] :
+                                   [250, 5000, 50000, 100000];
                     return (
                       <div key={l.lvl} className="bg-zinc-800/50 rounded-lg p-2 text-center">
                         <div className={`text-[9px] font-bold bg-gradient-to-r ${l.color} bg-clip-text text-transparent`}>L{l.lvl}•{l.wins}W</div>
