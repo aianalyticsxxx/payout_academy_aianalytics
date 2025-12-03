@@ -233,6 +233,21 @@ export default function Dashboard() {
   const [loadingPredictions, setLoadingPredictions] = useState(false);
   const [selectedPrediction, setSelectedPrediction] = useState<AIPrediction | null>(null);
 
+  // Bet placement modal state
+  const [betModalOpen, setBetModalOpen] = useState(false);
+  const [betStake, setBetStake] = useState<number>(10);
+  const [placingBet, setPlacingBet] = useState(false);
+  const [betSuccess, setBetSuccess] = useState(false);
+  const [betsSubTab, setBetsSubTab] = useState<'active' | 'history'>('active');
+
+  // Event AI analysis cache (for showing verdict on event cards)
+  const [eventAnalysisCache, setEventAnalysisCache] = useState<Record<string, SwarmResult>>({});
+  const [loadingEventAnalysis, setLoadingEventAnalysis] = useState<Record<string, boolean>>({});
+
+  // Quick bet from odds click
+  const [quickBetEvent, setQuickBetEvent] = useState<SportEvent | null>(null);
+  const [quickBetSelection, setQuickBetSelection] = useState<{ type: string; name: string; odds: number } | null>(null);
+
   // Redirect if not authenticated
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -382,6 +397,98 @@ export default function Dashboard() {
     }
   };
 
+  // Fetch AI analysis for event card preview (doesn't switch tabs)
+  const fetchEventAnalysis = async (event: SportEvent) => {
+    if (eventAnalysisCache[event.id] || loadingEventAnalysis[event.id]) return;
+
+    setLoadingEventAnalysis(prev => ({ ...prev, [event.id]: true }));
+    try {
+      const res = await fetch('/api/ai/swarm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event }),
+      });
+      const data = await res.json();
+      setEventAnalysisCache(prev => ({ ...prev, [event.id]: data }));
+    } catch (error) {
+      console.error('Event analysis failed:', error);
+    } finally {
+      setLoadingEventAnalysis(prev => ({ ...prev, [event.id]: false }));
+    }
+  };
+
+  // Open bet modal for a specific event with its analysis
+  const openBetModalForEvent = (event: SportEvent) => {
+    const cachedResult = eventAnalysisCache[event.id];
+    if (cachedResult) {
+      setSelectedEvent(event);
+      setSwarmResult(cachedResult);
+      setBetModalOpen(true);
+    }
+  };
+
+  // View full AI analysis for an event
+  const viewEventAnalysis = (event: SportEvent) => {
+    const cachedResult = eventAnalysisCache[event.id];
+    if (cachedResult) {
+      setSelectedEvent(event);
+      setSwarmResult(cachedResult);
+      setActiveTab('ai');
+      setAiSubTab('swarm');
+    }
+  };
+
+  // Open quick bet modal from odds click
+  const openQuickBet = (event: SportEvent, selectionType: 'home' | 'draw' | 'away', selectionName: string, odds: number) => {
+    if (!session) return; // Must be logged in
+    setQuickBetEvent(event);
+    setQuickBetSelection({ type: selectionType, name: selectionName, odds });
+    setBetStake(10);
+    setBetModalOpen(true);
+  };
+
+  // Handle quick bet placement (from odds click)
+  const handleQuickBetPlace = async () => {
+    if (!quickBetEvent || !quickBetSelection) return;
+
+    setPlacingBet(true);
+    try {
+      const res = await fetch('/api/bets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          eventId: quickBetEvent.id,
+          sport: quickBetEvent.sportTitle,
+          league: quickBetEvent.league || selectedLeague.name,
+          matchup: `${quickBetEvent.awayTeam} @ ${quickBetEvent.homeTeam}`,
+          betType: '1X2',
+          selection: quickBetSelection.name,
+          odds: quickBetSelection.odds.toFixed(2),
+          stake: betStake,
+          aiConsensus: 'MANUAL',
+          aiScore: '0',
+        }),
+      });
+
+      if (res.ok) {
+        setBetSuccess(true);
+        fetchBets();
+        fetchUserStats();
+        setTimeout(() => {
+          setBetModalOpen(false);
+          setBetSuccess(false);
+          setQuickBetEvent(null);
+          setQuickBetSelection(null);
+          setBetStake(10);
+        }, 2000);
+      }
+    } catch (error) {
+      console.error('Failed to place bet:', error);
+    } finally {
+      setPlacingBet(false);
+    }
+  };
+
   const settleBet = async (betId: string, result: 'won' | 'lost' | 'push') => {
     try {
       await fetch('/api/bets', {
@@ -393,6 +500,69 @@ export default function Dashboard() {
       fetchUserStats();
     } catch (error) {
       console.error('Failed to settle bet:', error);
+    }
+  };
+
+  const handlePlaceBet = async () => {
+    if (!selectedEvent || !swarmResult) return;
+
+    // Get the recommended bet selection from swarm result
+    const betTypes: Record<string, number> = {};
+    const selections: Record<string, { count: number; odds: number[] }> = {};
+
+    swarmResult.analyses.forEach(a => {
+      if (a.betType) {
+        betTypes[a.betType] = (betTypes[a.betType] || 0) + 1;
+      }
+      if (a.betSelection) {
+        if (!selections[a.betSelection]) {
+          selections[a.betSelection] = { count: 0, odds: [] };
+        }
+        selections[a.betSelection].count++;
+        if (a.betOdds) selections[a.betSelection].odds.push(a.betOdds);
+      }
+    });
+
+    const topBetType = Object.entries(betTypes).sort((a, b) => b[1] - a[1])[0];
+    const topSelection = Object.entries(selections).sort((a, b) => b[1].count - a[1].count)[0];
+    const avgOdds = topSelection?.[1].odds.length
+      ? topSelection[1].odds.reduce((a, b) => a + b, 0) / topSelection[1].odds.length
+      : 1.91; // Default odds
+
+    setPlacingBet(true);
+    try {
+      const res = await fetch('/api/bets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          eventId: selectedEvent.id,
+          sport: selectedEvent.sportTitle,
+          league: selectedEvent.league || selectedLeague.name,
+          matchup: `${selectedEvent.awayTeam} @ ${selectedEvent.homeTeam}`,
+          betType: topBetType?.[0] || '1X2',
+          selection: topSelection?.[0] || 'Unknown',
+          odds: avgOdds.toFixed(2),
+          stake: betStake,
+          aiConsensus: swarmResult.consensus.verdict,
+          aiScore: swarmResult.consensus.score,
+        }),
+      });
+
+      if (res.ok) {
+        setBetSuccess(true);
+        fetchBets();
+        fetchUserStats();
+        // Auto close modal after 2 seconds
+        setTimeout(() => {
+          setBetModalOpen(false);
+          setBetSuccess(false);
+          setBetStake(10);
+        }, 2000);
+      }
+    } catch (error) {
+      console.error('Failed to place bet:', error);
+    } finally {
+      setPlacingBet(false);
     }
   };
 
@@ -598,49 +768,175 @@ export default function Dashboard() {
                               )}
                             </div>
                             <div className="grid grid-cols-3 gap-2">
-                              <div className="bg-zinc-800/50 backdrop-blur rounded-xl p-3 text-center border border-zinc-700/50 hover:border-teal-700/50 transition-colors">
-                                <div className="text-[10px] text-zinc-500 font-medium mb-1">HOME</div>
+                              <button
+                                onClick={() => session && event.bestOdds.home?.price && openQuickBet(event, 'home', event.homeTeam, event.bestOdds.home.price)}
+                                disabled={!session || !event.bestOdds.home?.price}
+                                className={`bg-zinc-800/50 backdrop-blur rounded-xl p-3 text-center border border-zinc-700/50 transition-all ${
+                                  session && event.bestOdds.home?.price
+                                    ? 'hover:border-teal-500 hover:bg-teal-900/20 cursor-pointer hover:scale-105'
+                                    : 'cursor-default'
+                                }`}
+                                title={session ? `Bet on ${event.homeTeam}` : 'Sign in to place bets'}
+                              >
+                                <div className="text-[10px] text-zinc-500 font-medium mb-1 truncate" title={event.homeTeam}>
+                                  {event.homeTeam.length > 12 ? event.homeTeam.slice(0, 10) + '...' : event.homeTeam}
+                                </div>
                                 <div className="text-lg font-bold text-teal-400">
                                   {event.bestOdds.home?.price?.toFixed(2)}
                                 </div>
-                              </div>
+                              </button>
                               {event.bestOdds.draw?.price > 0 ? (
-                                <div className="bg-zinc-800/50 backdrop-blur rounded-xl p-3 text-center border border-zinc-700/50 hover:border-teal-700/50 transition-colors">
+                                <button
+                                  onClick={() => session && event.bestOdds.draw?.price && openQuickBet(event, 'draw', 'Draw', event.bestOdds.draw.price)}
+                                  disabled={!session || !event.bestOdds.draw?.price}
+                                  className={`bg-zinc-800/50 backdrop-blur rounded-xl p-3 text-center border border-zinc-700/50 transition-all ${
+                                    session && event.bestOdds.draw?.price
+                                      ? 'hover:border-teal-500 hover:bg-teal-900/20 cursor-pointer hover:scale-105'
+                                      : 'cursor-default'
+                                  }`}
+                                  title={session ? 'Bet on Draw' : 'Sign in to place bets'}
+                                >
                                   <div className="text-[10px] text-zinc-500 font-medium mb-1">DRAW</div>
                                   <div className="text-lg font-bold text-teal-400">
                                     {event.bestOdds.draw?.price?.toFixed(2)}
                                   </div>
-                                </div>
+                                </button>
                               ) : (
                                 <div className="bg-zinc-900/50 rounded-xl p-3 text-center border border-zinc-800/30">
-                                  <div className="text-[10px] text-zinc-600 font-medium mb-1">DRAW</div>
+                                  <div className="text-[10px] text-zinc-600 font-medium mb-1">—</div>
                                   <div className="text-lg font-bold text-zinc-700">—</div>
                                 </div>
                               )}
-                              <div className="bg-zinc-800/50 backdrop-blur rounded-xl p-3 text-center border border-zinc-700/50 hover:border-teal-700/50 transition-colors">
-                                <div className="text-[10px] text-zinc-500 font-medium mb-1">AWAY</div>
+                              <button
+                                onClick={() => session && event.bestOdds.away?.price && openQuickBet(event, 'away', event.awayTeam, event.bestOdds.away.price)}
+                                disabled={!session || !event.bestOdds.away?.price}
+                                className={`bg-zinc-800/50 backdrop-blur rounded-xl p-3 text-center border border-zinc-700/50 transition-all ${
+                                  session && event.bestOdds.away?.price
+                                    ? 'hover:border-teal-500 hover:bg-teal-900/20 cursor-pointer hover:scale-105'
+                                    : 'cursor-default'
+                                }`}
+                                title={session ? `Bet on ${event.awayTeam}` : 'Sign in to place bets'}
+                              >
+                                <div className="text-[10px] text-zinc-500 font-medium mb-1 truncate" title={event.awayTeam}>
+                                  {event.awayTeam.length > 12 ? event.awayTeam.slice(0, 10) + '...' : event.awayTeam}
+                                </div>
                                 <div className="text-lg font-bold text-teal-400">
                                   {event.bestOdds.away?.price?.toFixed(2)}
                                 </div>
-                              </div>
+                              </button>
                             </div>
                           </div>
                         )}
 
-                        {/* CTA Button - Teal Gradient */}
-                        <button
-                          onClick={() => runSwarmAnalysis(event)}
-                          className="w-full text-dark font-semibold py-3.5 rounded-xl transition-all duration-300 shadow-lg shadow-teal-900/30 hover:shadow-teal-500/30 flex items-center justify-center gap-2 group/btn"
-                          style={{ background: 'linear-gradient(180deg, #2DD4BF 0%, #14B8A6 100%)' }}
-                        >
-                          <span className="flex items-center gap-2">
-                            <span className="text-lg">🤖</span>
-                            <span>Ask 7 AIs</span>
-                            <svg className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                            </svg>
-                          </span>
-                        </button>
+                        {/* AI Verdict & Actions */}
+                        {(() => {
+                          const cachedAnalysis = eventAnalysisCache[event.id];
+                          const isLoading = loadingEventAnalysis[event.id];
+
+                          if (cachedAnalysis) {
+                            // Show AI verdict with clickable card and Place Bet button
+                            const verdict = cachedAnalysis.consensus.verdict;
+                            const isBettable = ['STRONG BET', 'SLIGHT EDGE'].includes(verdict);
+
+                            // Get top selection info
+                            const selections: Record<string, { count: number; odds: number[] }> = {};
+                            cachedAnalysis.analyses.forEach(a => {
+                              if (a.betSelection) {
+                                if (!selections[a.betSelection]) {
+                                  selections[a.betSelection] = { count: 0, odds: [] };
+                                }
+                                selections[a.betSelection].count++;
+                                if (a.betOdds) selections[a.betSelection].odds.push(a.betOdds);
+                              }
+                            });
+                            const topSelection = Object.entries(selections).sort((a, b) => b[1].count - a[1].count)[0];
+                            const avgOdds = topSelection?.[1].odds.length
+                              ? topSelection[1].odds.reduce((a, b) => a + b, 0) / topSelection[1].odds.length
+                              : null;
+
+                            return (
+                              <div className="space-y-3">
+                                {/* AI Verdict Card - Clickable */}
+                                <button
+                                  onClick={() => viewEventAnalysis(event)}
+                                  className={`w-full p-3 rounded-xl border transition-all text-left group/verdict ${
+                                    verdict === 'STRONG BET' ? 'bg-emerald-950/50 border-emerald-700/50 hover:border-emerald-500/70' :
+                                    verdict === 'SLIGHT EDGE' ? 'bg-amber-950/30 border-amber-700/40 hover:border-amber-500/60' :
+                                    verdict === 'RISKY' ? 'bg-orange-950/30 border-orange-700/40 hover:border-orange-500/60' :
+                                    'bg-red-950/30 border-red-700/40 hover:border-red-500/60'
+                                  }`}
+                                >
+                                  <div className="flex items-center justify-between mb-2">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-sm">🤖</span>
+                                      <span className="text-xs text-zinc-400 font-medium">AI CONSENSUS</span>
+                                    </div>
+                                    <svg className="w-4 h-4 text-zinc-500 group-hover/verdict:text-white group-hover/verdict:translate-x-0.5 transition-all" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                    </svg>
+                                  </div>
+                                  <div className="flex items-center justify-between">
+                                    <span className={`text-lg font-bold ${
+                                      verdict === 'STRONG BET' ? 'text-emerald-400' :
+                                      verdict === 'SLIGHT EDGE' ? 'text-amber-400' :
+                                      verdict === 'RISKY' ? 'text-orange-400' : 'text-red-400'
+                                    }`}>
+                                      {verdict}
+                                    </span>
+                                    {topSelection && avgOdds && (
+                                      <div className="text-right">
+                                        <div className="text-xs text-zinc-500">{topSelection[0]}</div>
+                                        <div className="text-sm font-mono font-bold text-teal-400">@{avgOdds.toFixed(2)}</div>
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="text-xs text-zinc-500 mt-1">
+                                    {cachedAnalysis.consensus.betVotes}/{cachedAnalysis.consensus.betVotes + cachedAnalysis.consensus.passVotes} AIs recommend betting
+                                  </div>
+                                </button>
+
+                                {/* Place Bet Button - Only for bettable verdicts */}
+                                {isBettable && session && (
+                                  <button
+                                    onClick={() => openBetModalForEvent(event)}
+                                    className="w-full py-3 px-4 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-semibold rounded-xl transition-all shadow-lg shadow-emerald-900/30 flex items-center justify-center gap-2"
+                                  >
+                                    <span>Place Bet</span>
+                                    {avgOdds && <span className="text-emerald-200 text-sm">@{avgOdds.toFixed(2)}</span>}
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          }
+
+                          // Show Get AI Analysis button (initial state or loading)
+                          return (
+                            <button
+                              onClick={() => fetchEventAnalysis(event)}
+                              disabled={isLoading}
+                              className="w-full text-dark font-semibold py-3.5 rounded-xl transition-all duration-300 shadow-lg shadow-teal-900/30 hover:shadow-teal-500/30 flex items-center justify-center gap-2 group/btn disabled:opacity-70"
+                              style={{ background: 'linear-gradient(180deg, #2DD4BF 0%, #14B8A6 100%)' }}
+                            >
+                              {isLoading ? (
+                                <span className="flex items-center gap-2">
+                                  <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                  </svg>
+                                  <span>Analyzing...</span>
+                                </span>
+                              ) : (
+                                <span className="flex items-center gap-2">
+                                  <span className="text-lg">🤖</span>
+                                  <span>Get AI Analysis</span>
+                                  <svg className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                                  </svg>
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })()}
                       </div>
                     </div>
                   );
@@ -883,6 +1179,21 @@ export default function Dashboard() {
                             </span>
                           </div>
                         </div>
+
+                        {/* Place This Bet Button - Only for STRONG BET or SLIGHT EDGE */}
+                        {session && ['STRONG BET', 'SLIGHT EDGE'].includes(swarmResult.consensus.verdict) && (
+                          <div className="p-5 border-t border-emerald-900/20">
+                            <button
+                              onClick={() => setBetModalOpen(true)}
+                              className="w-full py-3.5 px-4 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-semibold rounded-xl transition-all duration-200 flex items-center justify-center gap-3 shadow-lg shadow-emerald-900/30"
+                            >
+                              <span className="text-lg">Place This Bet</span>
+                              <span className="bg-emerald-700/50 px-2 py-0.5 rounded-md text-emerald-200 text-sm">
+                                Track &amp; Win
+                              </span>
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -1051,7 +1362,7 @@ export default function Dashboard() {
                       </div>
                       <div className="text-2xl font-bold text-white mb-3">Select an Event</div>
                       <div className="text-zinc-400 max-w-md mx-auto mb-6">
-                        Browse upcoming matches and click "Ask 7 AIs" to get comprehensive AI analysis
+                        Browse upcoming matches and click "Get AI Analysis" to see the AI verdict and place bets
                       </div>
                       <button
                         onClick={() => setActiveTab('events')}
@@ -1581,37 +1892,37 @@ export default function Dashboard() {
         {activeTab === 'bets' && (
           <div className="space-y-6">
             {/* Header */}
-            <div className="bg-gradient-to-r from-teal-900/30 to-teal-800/20 border border-teal-700/30 rounded-2xl p-6">
-              <h2 className="text-2xl font-bold text-teal-400">Bet Analysis Center</h2>
-              <p className="text-zinc-400 mt-1">Track, analyze, and improve your betting performance</p>
+            <div className="bg-gradient-to-r from-emerald-950/50 to-emerald-900/30 border border-emerald-800/30 rounded-2xl p-6">
+              <h2 className="text-2xl font-bold text-emerald-400">Bet Tracking Dashboard</h2>
+              <p className="text-zinc-400 mt-1">Track your bets placed from AI recommendations</p>
             </div>
 
-            {/* Stats */}
+            {/* Stats Summary */}
             {userStats && (
               <div className="grid gap-4 md:grid-cols-5">
-                <div className="bg-surface border border-zinc-800/50 rounded-xl p-4 text-center">
+                <div className="bg-emerald-950/30 border border-emerald-900/30 rounded-xl p-4 text-center">
                   <div className="text-sm text-zinc-400">Record</div>
-                  <div className="text-2xl font-bold">{userStats.wins}-{userStats.losses}</div>
+                  <div className="text-2xl font-bold text-white">{userStats.wins}-{userStats.losses}</div>
                 </div>
-                <div className="bg-surface border border-zinc-800/50 rounded-xl p-4 text-center">
+                <div className="bg-emerald-950/30 border border-emerald-900/30 rounded-xl p-4 text-center">
                   <div className="text-sm text-zinc-400">Win Rate</div>
-                  <div className={`text-2xl font-bold ${userStats.winRate >= 55 ? 'text-teal-400' : userStats.winRate >= 50 ? 'text-gold' : 'text-red-400'}`}>
+                  <div className={`text-2xl font-bold ${userStats.winRate >= 55 ? 'text-emerald-400' : userStats.winRate >= 50 ? 'text-amber-400' : 'text-red-400'}`}>
                     {userStats.winRate?.toFixed(1)}%
                   </div>
                 </div>
-                <div className="bg-surface border border-zinc-800/50 rounded-xl p-4 text-center">
+                <div className="bg-emerald-950/30 border border-emerald-900/30 rounded-xl p-4 text-center">
                   <div className="text-sm text-zinc-400">ROI</div>
-                  <div className={`text-2xl font-bold ${userStats.roi >= 0 ? 'text-teal-400' : 'text-red-400'}`}>
+                  <div className={`text-2xl font-bold ${userStats.roi >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                     {userStats.roi >= 0 ? '+' : ''}{userStats.roi?.toFixed(1)}%
                   </div>
                 </div>
-                <div className="bg-surface border border-zinc-800/50 rounded-xl p-4 text-center">
+                <div className="bg-emerald-950/30 border border-emerald-900/30 rounded-xl p-4 text-center">
                   <div className="text-sm text-zinc-400">Profit/Loss</div>
-                  <div className={`text-2xl font-bold ${userStats.totalProfit >= 0 ? 'text-teal-400' : 'text-red-400'}`}>
-                    ${Math.abs(userStats.totalProfit)?.toFixed(2)}
+                  <div className={`text-2xl font-bold ${userStats.totalProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                    {userStats.totalProfit >= 0 ? '+' : '-'}${Math.abs(userStats.totalProfit || 0)?.toFixed(2)}
                   </div>
                 </div>
-                <div className="bg-surface border border-zinc-800/50 rounded-xl p-4 text-center">
+                <div className="bg-emerald-950/30 border border-emerald-900/30 rounded-xl p-4 text-center">
                   <div className="text-sm text-zinc-400">Streak</div>
                   <div className="text-2xl font-bold">
                     {userStats.currentStreak > 0 ? '🔥' : userStats.currentStreak < 0 ? '❄️' : '➖'}
@@ -1621,57 +1932,189 @@ export default function Dashboard() {
               </div>
             )}
 
-            {/* Bet History */}
-            <div className="bg-surface border border-zinc-800/50 rounded-2xl overflow-hidden">
-              <div className="p-4 border-b border-zinc-800/50">
-                <h3 className="font-semibold">Recent Bets</h3>
-              </div>
-              {loadingBets ? (
-                <div className="p-8 text-center text-zinc-400">Loading...</div>
-              ) : bets.length === 0 ? (
-                <div className="p-8 text-center text-zinc-400">No bets yet. Start tracking!</div>
-              ) : (
-                <div className="divide-y divide-zinc-800/50">
-                  {bets.slice(0, 10).map(bet => (
-                    <div key={bet.id} className="p-4 flex items-center justify-between hover:bg-teal-900/10 transition-colors">
-                      <div>
-                        <div className="font-medium">{bet.matchup}</div>
-                        <div className="text-sm text-zinc-400">
-                          {bet.selection} @ {bet.odds} • ${bet.stake}
+            {/* Sub-tab Switcher */}
+            <div className="flex gap-2 p-1 bg-zinc-900/50 rounded-xl">
+              <button
+                onClick={() => setBetsSubTab('active')}
+                className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${
+                  betsSubTab === 'active'
+                    ? 'bg-emerald-600 text-white shadow-lg'
+                    : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50'
+                }`}
+              >
+                Active Bets ({bets.filter(b => b.result === 'pending').length})
+              </button>
+              <button
+                onClick={() => setBetsSubTab('history')}
+                className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${
+                  betsSubTab === 'history'
+                    ? 'bg-emerald-600 text-white shadow-lg'
+                    : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50'
+                }`}
+              >
+                History ({bets.filter(b => b.result !== 'pending').length})
+              </button>
+            </div>
+
+            {/* Active Bets Section */}
+            {betsSubTab === 'active' && (
+              <div className="space-y-4">
+                {loadingBets ? (
+                  <div className="bg-surface border border-zinc-800/50 rounded-2xl p-12 text-center">
+                    <div className="animate-pulse text-zinc-400">Loading your active bets...</div>
+                  </div>
+                ) : bets.filter(b => b.result === 'pending').length === 0 ? (
+                  <div className="bg-surface border border-zinc-800/50 rounded-2xl p-12 text-center">
+                    <div className="w-16 h-16 bg-emerald-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <svg className="w-8 h-8 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                      </svg>
+                    </div>
+                    <h3 className="text-lg font-semibold text-white mb-2">No Active Bets</h3>
+                    <p className="text-zinc-400 mb-4">Place a bet from the AI Swarm analysis to start tracking!</p>
+                    <button
+                      onClick={() => setActiveTab('events')}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium transition-colors"
+                    >
+                      Browse Events
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid gap-4">
+                    {bets.filter(b => b.result === 'pending').map(bet => (
+                      <div key={bet.id} className="bg-surface border border-emerald-900/30 rounded-2xl p-5 hover:border-emerald-700/50 transition-all">
+                        <div className="flex items-start justify-between mb-4">
+                          <div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-lg">
+                                {bet.sport?.includes('basketball') ? '🏀' :
+                                 bet.sport?.includes('football') || bet.sport?.includes('nfl') ? '🏈' :
+                                 bet.sport?.includes('soccer') ? '⚽' :
+                                 bet.sport?.includes('hockey') ? '🏒' : '🎲'}
+                              </span>
+                              <span className="text-xs text-zinc-500 uppercase tracking-wide">{bet.league || bet.sport}</span>
+                            </div>
+                            <div className="font-semibold text-white text-lg">{bet.matchup}</div>
+                          </div>
+                          <span className="px-3 py-1 bg-amber-500/20 text-amber-400 rounded-full text-xs font-semibold">
+                            PENDING
+                          </span>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {bet.result === 'pending' ? (
-                          <>
+
+                        <div className="grid grid-cols-3 gap-4 mb-4 p-3 bg-zinc-900/50 rounded-xl">
+                          <div>
+                            <div className="text-xs text-zinc-500 mb-1">Selection</div>
+                            <div className="font-medium text-emerald-400">{bet.selection}</div>
+                          </div>
+                          <div>
+                            <div className="text-xs text-zinc-500 mb-1">Odds</div>
+                            <div className="font-mono font-bold text-amber-400">@{bet.odds}</div>
+                          </div>
+                          <div>
+                            <div className="text-xs text-zinc-500 mb-1">Stake</div>
+                            <div className="font-medium text-white">${bet.stake}</div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="text-xs text-zinc-500 mb-1">Potential Return</div>
+                            <div className="text-xl font-bold text-emerald-400 font-mono">
+                              ${(bet.stake * parseFloat(bet.odds)).toFixed(2)}
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
                             <button
                               onClick={() => settleBet(bet.id, 'won')}
-                              className="bg-green-600 hover:bg-green-500 px-3 py-1 rounded-lg text-sm transition-colors"
+                              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-1"
                             >
-                              Won
+                              <span>Won</span>
+                              <span className="text-emerald-200">+${((bet.stake * parseFloat(bet.odds)) - bet.stake).toFixed(2)}</span>
                             </button>
                             <button
                               onClick={() => settleBet(bet.id, 'lost')}
-                              className="bg-red-600 hover:bg-red-500 px-3 py-1 rounded-lg text-sm transition-colors"
+                              className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-1"
                             >
-                              Lost
+                              <span>Lost</span>
+                              <span className="text-red-200">-${bet.stake.toFixed(2)}</span>
                             </button>
-                          </>
-                        ) : (
-                          <span className={`px-3 py-1 rounded-lg text-sm ${
-                            bet.result === 'won' ? 'bg-green-900/50 text-green-400' :
-                            bet.result === 'lost' ? 'bg-red-900/50 text-red-400' :
-                            'bg-zinc-800/30 text-zinc-400'
-                          }`}>
-                            {bet.result.toUpperCase()}
-                            {bet.profitLoss !== undefined && ` (${bet.profitLoss >= 0 ? '+' : ''}$${bet.profitLoss.toFixed(2)})`}
-                          </span>
-                        )}
+                          </div>
+                        </div>
                       </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* History Section */}
+            {betsSubTab === 'history' && (
+              <div className="space-y-4">
+                {loadingBets ? (
+                  <div className="bg-surface border border-zinc-800/50 rounded-2xl p-12 text-center">
+                    <div className="animate-pulse text-zinc-400">Loading bet history...</div>
+                  </div>
+                ) : bets.filter(b => b.result !== 'pending').length === 0 ? (
+                  <div className="bg-surface border border-zinc-800/50 rounded-2xl p-12 text-center">
+                    <div className="w-16 h-16 bg-zinc-800 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <svg className="w-8 h-8 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                    <h3 className="text-lg font-semibold text-white mb-2">No Bet History Yet</h3>
+                    <p className="text-zinc-400">Your settled bets will appear here</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {bets.filter(b => b.result !== 'pending').map(bet => {
+                      const isWon = bet.result === 'won';
+                      const profit = isWon
+                        ? (bet.stake * parseFloat(bet.odds)) - bet.stake
+                        : -bet.stake;
+
+                      return (
+                        <div
+                          key={bet.id}
+                          className={`bg-surface border rounded-xl p-4 flex items-center justify-between ${
+                            isWon ? 'border-emerald-800/30' : 'border-red-900/30'
+                          }`}
+                        >
+                          <div className="flex items-center gap-4">
+                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                              isWon ? 'bg-emerald-900/50' : 'bg-red-900/50'
+                            }`}>
+                              {isWon ? (
+                                <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                              ) : (
+                                <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              )}
+                            </div>
+                            <div>
+                              <div className="font-medium text-white">{bet.matchup}</div>
+                              <div className="text-sm text-zinc-400">
+                                {bet.selection} @ {bet.odds} &middot; ${bet.stake} stake
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className={`text-lg font-bold font-mono ${isWon ? 'text-emerald-400' : 'text-red-400'}`}>
+                              {profit >= 0 ? '+' : ''}{profit.toFixed(2)}
+                            </div>
+                            <div className={`text-xs font-semibold uppercase ${isWon ? 'text-emerald-500' : 'text-red-500'}`}>
+                              {bet.result}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -1803,6 +2246,370 @@ export default function Dashboard() {
         <p className="text-teal-400 font-semibold tracking-tight">PAYOUT ACADEMY</p>
         <p className="text-zinc-500 text-xs mt-1">Analytics • For Entertainment Only • Gamble Responsibly</p>
       </footer>
+
+      {/* Bet Placement Modal */}
+      {betModalOpen && selectedEvent && swarmResult && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-gradient-to-b from-emerald-950 to-zinc-950 border border-emerald-800/50 rounded-2xl p-6 w-full max-w-md shadow-2xl shadow-emerald-900/20">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold text-white">Place Your Bet</h3>
+              <button
+                onClick={() => {
+                  setBetModalOpen(false);
+                  setBetSuccess(false);
+                  setBetStake(10);
+                }}
+                className="text-zinc-400 hover:text-white transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {betSuccess ? (
+              /* Success State */
+              <div className="text-center py-8">
+                <div className="w-16 h-16 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <h4 className="text-lg font-semibold text-emerald-400 mb-2">Bet Placed Successfully!</h4>
+                <p className="text-zinc-400 text-sm">Track your bet in the Bet Analysis tab</p>
+              </div>
+            ) : (
+              /* Bet Form */
+              <>
+                {/* Event Info */}
+                <div className="bg-emerald-950/50 border border-emerald-900/30 rounded-xl p-4 mb-5">
+                  <div className="text-sm text-zinc-400 mb-1">{selectedEvent.sportTitle}</div>
+                  <div className="font-semibold text-white text-lg">
+                    {selectedEvent.awayTeam} @ {selectedEvent.homeTeam}
+                  </div>
+                  <div className="text-xs text-zinc-500 mt-1">
+                    {new Date(selectedEvent.commenceTime).toLocaleDateString('en-US', {
+                      weekday: 'short',
+                      month: 'short',
+                      day: 'numeric',
+                      hour: 'numeric',
+                      minute: '2-digit'
+                    })}
+                  </div>
+                </div>
+
+                {/* Bet Details */}
+                {(() => {
+                  const betTypes: Record<string, number> = {};
+                  const selections: Record<string, { count: number; odds: number[] }> = {};
+
+                  swarmResult.analyses.forEach(a => {
+                    if (a.betType) {
+                      betTypes[a.betType] = (betTypes[a.betType] || 0) + 1;
+                    }
+                    if (a.betSelection) {
+                      if (!selections[a.betSelection]) {
+                        selections[a.betSelection] = { count: 0, odds: [] };
+                      }
+                      selections[a.betSelection].count++;
+                      if (a.betOdds) selections[a.betSelection].odds.push(a.betOdds);
+                    }
+                  });
+
+                  const topBetType = Object.entries(betTypes).sort((a, b) => b[1] - a[1])[0];
+                  const topSelection = Object.entries(selections).sort((a, b) => b[1].count - a[1].count)[0];
+                  const avgOdds = topSelection?.[1].odds.length
+                    ? topSelection[1].odds.reduce((a, b) => a + b, 0) / topSelection[1].odds.length
+                    : 1.91;
+
+                  return (
+                    <div className="space-y-4 mb-6">
+                      <div className="flex items-center justify-between">
+                        <span className="text-zinc-400">Selection</span>
+                        <span className="font-semibold text-white">{topSelection?.[0] || 'Best Pick'}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-zinc-400">Bet Type</span>
+                        <span className="bg-emerald-900/50 text-emerald-400 px-2 py-0.5 rounded text-sm">
+                          {topBetType?.[0] || '1X2'}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-zinc-400">Odds</span>
+                        <span className="font-mono font-bold text-amber-400 text-lg">@{avgOdds.toFixed(2)}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-zinc-400">AI Consensus</span>
+                        <span className={`px-2 py-0.5 rounded text-sm font-semibold ${getVerdictColor(swarmResult.consensus.verdict)}`}>
+                          {swarmResult.consensus.verdict}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Stake Input */}
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-zinc-300 mb-2">Stake Amount ($)</label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 font-semibold">$</span>
+                    <input
+                      type="number"
+                      min="1"
+                      step="5"
+                      value={betStake}
+                      onChange={(e) => setBetStake(Math.max(1, Number(e.target.value)))}
+                      className="w-full pl-8 pr-4 py-3 bg-zinc-900/80 border border-emerald-800/30 rounded-xl text-white font-mono text-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500"
+                    />
+                  </div>
+                  {/* Quick stake buttons */}
+                  <div className="flex gap-2 mt-3">
+                    {[10, 25, 50, 100].map(amount => (
+                      <button
+                        key={amount}
+                        onClick={() => setBetStake(amount)}
+                        className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
+                          betStake === amount
+                            ? 'bg-emerald-600 text-white'
+                            : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                        }`}
+                      >
+                        ${amount}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Potential Return */}
+                {(() => {
+                  const selections: Record<string, { count: number; odds: number[] }> = {};
+                  swarmResult.analyses.forEach(a => {
+                    if (a.betSelection) {
+                      if (!selections[a.betSelection]) {
+                        selections[a.betSelection] = { count: 0, odds: [] };
+                      }
+                      selections[a.betSelection].count++;
+                      if (a.betOdds) selections[a.betSelection].odds.push(a.betOdds);
+                    }
+                  });
+                  const topSelection = Object.entries(selections).sort((a, b) => b[1].count - a[1].count)[0];
+                  const avgOdds = topSelection?.[1].odds.length
+                    ? topSelection[1].odds.reduce((a, b) => a + b, 0) / topSelection[1].odds.length
+                    : 1.91;
+                  const potentialReturn = betStake * avgOdds;
+                  const profit = potentialReturn - betStake;
+
+                  return (
+                    <div className="bg-emerald-900/30 border border-emerald-800/30 rounded-xl p-4 mb-6">
+                      <div className="flex justify-between items-center">
+                        <span className="text-zinc-300">Potential Return</span>
+                        <div className="text-right">
+                          <div className="text-2xl font-bold text-emerald-400 font-mono">${potentialReturn.toFixed(2)}</div>
+                          <div className="text-xs text-emerald-500">+${profit.toFixed(2)} profit</div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Action Buttons */}
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => {
+                      setBetModalOpen(false);
+                      setBetStake(10);
+                    }}
+                    className="flex-1 py-3 px-4 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-medium rounded-xl transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handlePlaceBet}
+                    disabled={placingBet}
+                    className="flex-1 py-3 px-4 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-semibold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {placingBet ? (
+                      <>
+                        <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                        <span>Placing...</span>
+                      </>
+                    ) : (
+                      <span>Confirm Bet</span>
+                    )}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Quick Bet Modal (from clicking odds directly) */}
+      {betModalOpen && quickBetEvent && quickBetSelection && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-gradient-to-b from-emerald-950 to-zinc-950 border border-emerald-800/50 rounded-2xl p-6 w-full max-w-md shadow-2xl shadow-emerald-900/20">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold text-white">Quick Bet</h3>
+              <button
+                onClick={() => {
+                  setBetModalOpen(false);
+                  setBetSuccess(false);
+                  setBetStake(10);
+                  setQuickBetEvent(null);
+                  setQuickBetSelection(null);
+                }}
+                className="text-zinc-400 hover:text-white transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {betSuccess ? (
+              /* Success State */
+              <div className="text-center py-8">
+                <div className="w-16 h-16 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <h4 className="text-lg font-semibold text-emerald-400 mb-2">Bet Placed Successfully!</h4>
+                <p className="text-zinc-400 text-sm">Track your bet in the Bet Analysis tab</p>
+              </div>
+            ) : (
+              /* Bet Form */
+              <>
+                {/* Event Info */}
+                <div className="bg-emerald-950/50 border border-emerald-900/30 rounded-xl p-4 mb-5">
+                  <div className="text-sm text-zinc-400 mb-1">{quickBetEvent.sportTitle}</div>
+                  <div className="font-semibold text-white text-lg">
+                    {quickBetEvent.awayTeam} @ {quickBetEvent.homeTeam}
+                  </div>
+                  <div className="text-xs text-zinc-500 mt-1">
+                    {new Date(quickBetEvent.commenceTime).toLocaleDateString('en-US', {
+                      weekday: 'short',
+                      month: 'short',
+                      day: 'numeric',
+                      hour: 'numeric',
+                      minute: '2-digit'
+                    })}
+                  </div>
+                </div>
+
+                {/* Bet Details */}
+                <div className="space-y-4 mb-6">
+                  <div className="flex items-center justify-between">
+                    <span className="text-zinc-400">Selection</span>
+                    <span className="font-semibold text-white">{quickBetSelection.name}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-zinc-400">Bet Type</span>
+                    <span className="bg-emerald-900/50 text-emerald-400 px-2 py-0.5 rounded text-sm">
+                      {quickBetSelection.type === 'draw' ? 'Draw' : '1X2'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-zinc-400">Odds</span>
+                    <span className="font-mono font-bold text-amber-400 text-lg">@{quickBetSelection.odds.toFixed(2)}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-zinc-400">Source</span>
+                    <span className="text-zinc-300 text-sm">Direct Odds Selection</span>
+                  </div>
+                </div>
+
+                {/* Stake Input */}
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-zinc-300 mb-2">Stake Amount ($)</label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 font-semibold">$</span>
+                    <input
+                      type="number"
+                      min="1"
+                      step="5"
+                      value={betStake}
+                      onChange={(e) => setBetStake(Math.max(1, Number(e.target.value)))}
+                      className="w-full pl-8 pr-4 py-3 bg-zinc-900/80 border border-emerald-800/30 rounded-xl text-white font-mono text-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500"
+                    />
+                  </div>
+                  {/* Quick stake buttons */}
+                  <div className="flex gap-2 mt-3">
+                    {[10, 25, 50, 100].map(amount => (
+                      <button
+                        key={amount}
+                        onClick={() => setBetStake(amount)}
+                        className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
+                          betStake === amount
+                            ? 'bg-emerald-600 text-white'
+                            : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                        }`}
+                      >
+                        ${amount}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Potential Return */}
+                {(() => {
+                  const potentialReturn = betStake * quickBetSelection.odds;
+                  const profit = potentialReturn - betStake;
+
+                  return (
+                    <div className="bg-emerald-900/30 border border-emerald-800/30 rounded-xl p-4 mb-6">
+                      <div className="flex justify-between items-center">
+                        <span className="text-zinc-300">Potential Return</span>
+                        <div className="text-right">
+                          <div className="text-2xl font-bold text-emerald-400 font-mono">${potentialReturn.toFixed(2)}</div>
+                          <div className="text-xs text-emerald-500">+${profit.toFixed(2)} profit</div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Action Buttons */}
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => {
+                      setBetModalOpen(false);
+                      setBetStake(10);
+                      setQuickBetEvent(null);
+                      setQuickBetSelection(null);
+                    }}
+                    className="flex-1 py-3 px-4 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-medium rounded-xl transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleQuickBetPlace}
+                    disabled={placingBet}
+                    className="flex-1 py-3 px-4 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-semibold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {placingBet ? (
+                      <>
+                        <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                        <span>Placing...</span>
+                      </>
+                    ) : (
+                      <span>Confirm Bet</span>
+                    )}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
