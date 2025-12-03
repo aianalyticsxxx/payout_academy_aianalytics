@@ -234,7 +234,13 @@ export default function Dashboard() {
   const router = useRouter();
 
   // State
-  const [activeTab, setActiveTab] = useState<'events' | 'ai' | 'bets' | 'competition'>('events');
+  const [activeTab, setActiveTab] = useState<'events' | 'ai' | 'bets' | 'rewards' | 'competition'>('events');
+  const [claimedRewards, setClaimedRewards] = useState<number[]>([]);
+  const [rewardModalOpen, setRewardModalOpen] = useState(false);
+  const [rewardToClaim, setRewardToClaim] = useState<number | null>(null);
+  const [payoutModalOpen, setPayoutModalOpen] = useState(false);
+  const [payoutAmount, setPayoutAmount] = useState<number>(50);
+  const [totalEarnings, setTotalEarnings] = useState<number>(0); // Track total earned from rewards
   const [selectedCategory, setSelectedCategory] = useState<SportCategory>(SPORTS_CATEGORIES[0]);
   const [selectedLeague, setSelectedLeague] = useState<League>(SPORTS_CATEGORIES[0].leagues[0]);
   const [events, setEvents] = useState<SportEvent[]>([]);
@@ -765,6 +771,7 @@ export default function Dashboard() {
             { id: 'events', label: 'Events', icon: '🎯' },
             { id: 'ai', label: 'AI Hub', icon: '🤖' },
             { id: 'bets', label: 'Bet Analysis', icon: '📊' },
+            { id: 'rewards', label: 'Rewards', icon: '🎁' },
             { id: 'competition', label: 'Competition', icon: '🏆' },
           ].map(tab => (
             <button
@@ -2035,6 +2042,10 @@ export default function Dashboard() {
                     break;
                   }
                 }
+                // Check if challenge failed (most recent bet is a loss and we had progress)
+                const mostRecentBet = settledBets[0];
+                const challengeFailed = mostRecentBet?.result === 'lost';
+
                 // Find best streak ever
                 let bestStreak = 0;
                 let tempStreak = 0;
@@ -2050,77 +2061,149 @@ export default function Dashboard() {
                 const levels = [5, 10, 15, 20];
                 const currentLevel = levels.filter(l => currentStreak >= l).length;
                 const nextLevel = levels.find(l => currentStreak < l) || 20;
-                const progressToNext = currentLevel === 4 ? 100 : ((currentStreak % 5) / 5) * 100;
+                const challengeCompleted = currentStreak >= 20;
 
                 return (
-                  <div className="bg-gradient-to-br from-[#1a3a3a] via-[#153030] to-[#102828] border border-[#2a5555]/50 rounded-2xl p-6 relative overflow-hidden">
-                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(45,180,180,0.12),transparent_50%)]"></div>
+                  <div className={`bg-gradient-to-br ${
+                    challengeFailed
+                      ? 'from-red-950/80 via-red-900/60 to-red-950/80 border-red-800/50'
+                      : challengeCompleted
+                        ? 'from-amber-950/60 via-amber-900/40 to-amber-950/60 border-amber-700/50'
+                        : 'from-[#1a3a3a] via-[#153030] to-[#102828] border-[#2a5555]/50'
+                  } border rounded-2xl p-6 relative overflow-hidden`}>
+                    <div className={`absolute inset-0 ${
+                      challengeFailed
+                        ? 'bg-[radial-gradient(circle_at_30%_20%,rgba(220,38,38,0.15),transparent_50%)]'
+                        : challengeCompleted
+                          ? 'bg-[radial-gradient(circle_at_30%_20%,rgba(251,191,36,0.15),transparent_50%)]'
+                          : 'bg-[radial-gradient(circle_at_30%_20%,rgba(45,180,180,0.12),transparent_50%)]'
+                    }`}></div>
                     <div className="relative">
                       <div className="flex items-center justify-between mb-4">
-                        <span className="text-[#7cc4c4] text-sm font-medium">Win Streak Challenge</span>
-                        <span className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
-                          currentStreak >= 20 ? 'bg-amber-500/20 text-amber-400' :
-                          currentStreak >= 15 ? 'bg-purple-500/20 text-purple-400' :
-                          currentStreak >= 10 ? 'bg-blue-500/20 text-blue-400' :
-                          currentStreak >= 5 ? 'bg-emerald-500/20 text-emerald-400' :
-                          'bg-zinc-500/20 text-zinc-400'
-                        }`}>
-                          Level {currentLevel}/4
-                        </span>
-                      </div>
-                      <div className="text-5xl font-bold text-white mb-1 flex items-baseline gap-2">
-                        {currentStreak}
-                        <span className="text-lg text-[#5a9090] font-normal">/ {targetStreak}</span>
-                      </div>
-                      <div className="text-[#5a9090] text-sm mb-4">Consecutive Wins</div>
-
-                      {/* Progress bar to target */}
-                      <div className="h-3 bg-[#0d1f1f] rounded-full overflow-hidden mb-4">
-                        <div
-                          className={`h-full rounded-full transition-all duration-500 ${
-                            currentStreak >= 20 ? 'bg-gradient-to-r from-amber-500 to-yellow-400' :
-                            currentStreak >= 15 ? 'bg-gradient-to-r from-purple-500 to-purple-400' :
-                            currentStreak >= 10 ? 'bg-gradient-to-r from-blue-500 to-blue-400' :
-                            currentStreak >= 5 ? 'bg-gradient-to-r from-emerald-500 to-emerald-400' :
-                            'bg-gradient-to-r from-[#2d9090] to-[#3db5b5]'
-                          }`}
-                          style={{ width: `${(currentStreak / targetStreak) * 100}%` }}
-                        ></div>
+                        <span className={`text-sm font-medium ${
+                          challengeFailed ? 'text-red-400' : challengeCompleted ? 'text-amber-400' : 'text-[#7cc4c4]'
+                        }`}>Win Streak Challenge</span>
+                        {challengeFailed ? (
+                          <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-red-500/20 text-red-400 animate-pulse">
+                            FAILED
+                          </span>
+                        ) : challengeCompleted ? (
+                          <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-500/20 text-amber-400">
+                            COMPLETED!
+                          </span>
+                        ) : (
+                          <span className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
+                            currentStreak >= 15 ? 'bg-purple-500/20 text-purple-400' :
+                            currentStreak >= 10 ? 'bg-blue-500/20 text-blue-400' :
+                            currentStreak >= 5 ? 'bg-emerald-500/20 text-emerald-400' :
+                            'bg-zinc-500/20 text-zinc-400'
+                          }`}>
+                            Level {currentLevel}/4
+                          </span>
+                        )}
                       </div>
 
-                      {/* Level markers */}
-                      <div className="flex justify-between mb-4">
-                        {levels.map((level) => (
-                          <div key={level} className="flex flex-col items-center">
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all ${
-                              currentStreak >= level
-                                ? level === 20 ? 'bg-amber-500 border-amber-400 text-black' :
-                                  level === 15 ? 'bg-purple-500 border-purple-400 text-white' :
-                                  level === 10 ? 'bg-blue-500 border-blue-400 text-white' :
-                                  'bg-emerald-500 border-emerald-400 text-white'
-                                : 'bg-[#0d1f1f] border-[#2a5555] text-[#5a9090]'
-                            }`}>
-                              {currentStreak >= level ? '✓' : level}
-                            </div>
-                            <span className={`text-[10px] mt-1 ${currentStreak >= level ? 'text-[#7cc4c4]' : 'text-[#5a9090]'}`}>
-                              {level === 5 ? 'Bronze' : level === 10 ? 'Silver' : level === 15 ? 'Gold' : 'Elite'}
-                            </span>
+                      {challengeFailed ? (
+                        <>
+                          <div className="text-5xl font-bold text-red-400 mb-1 flex items-center gap-3">
+                            <span className="text-4xl">✕</span>
+                            <span>0</span>
+                            <span className="text-lg text-red-500/60 font-normal">/ {targetStreak}</span>
                           </div>
-                        ))}
+                          <div className="text-red-400/70 text-sm mb-4">Challenge Failed - Start Over</div>
+
+                          {/* Failed progress bar */}
+                          <div className="h-3 bg-red-950/50 rounded-full overflow-hidden mb-4">
+                            <div className="h-full w-0 rounded-full bg-red-500/50"></div>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="text-5xl font-bold text-white mb-1 flex items-baseline gap-2">
+                            {currentStreak}
+                            <span className="text-lg text-[#5a9090] font-normal">/ {targetStreak}</span>
+                            {challengeCompleted && <span className="text-3xl ml-2">🏆</span>}
+                          </div>
+                          <div className="text-[#5a9090] text-sm mb-4">Consecutive Wins</div>
+
+                          {/* Progress bar to target */}
+                          <div className="h-3 bg-[#0d1f1f] rounded-full overflow-hidden mb-4">
+                            <div
+                              className={`h-full rounded-full transition-all duration-500 ${
+                                currentStreak >= 20 ? 'bg-gradient-to-r from-amber-500 to-yellow-400' :
+                                currentStreak >= 15 ? 'bg-gradient-to-r from-purple-500 to-purple-400' :
+                                currentStreak >= 10 ? 'bg-gradient-to-r from-blue-500 to-blue-400' :
+                                currentStreak >= 5 ? 'bg-gradient-to-r from-emerald-500 to-emerald-400' :
+                                'bg-gradient-to-r from-[#2d9090] to-[#3db5b5]'
+                              }`}
+                              style={{ width: `${(currentStreak / targetStreak) * 100}%` }}
+                            ></div>
+                          </div>
+                        </>
+                      )}
+
+                      {/* Level markers - Clickable when reward available */}
+                      <div className="flex justify-between mb-4">
+                        {levels.map((level, idx) => {
+                          const levelNum = idx + 1;
+                          const isComplete = bestStreak >= level;
+                          const canClaimReward = isComplete && !claimedRewards.includes(levelNum);
+
+                          return (
+                            <button
+                              key={level}
+                              onClick={() => {
+                                if (canClaimReward) {
+                                  setRewardToClaim(levelNum);
+                                  setRewardModalOpen(true);
+                                }
+                              }}
+                              disabled={!canClaimReward}
+                              className={`flex flex-col items-center ${canClaimReward ? 'cursor-pointer' : 'cursor-default'}`}
+                            >
+                              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all ${
+                                challengeFailed
+                                  ? 'bg-red-950/50 border-red-800/50 text-red-500/50'
+                                  : currentStreak >= level
+                                    ? level === 20 ? 'bg-amber-500 border-amber-400 text-black' :
+                                      level === 15 ? 'bg-purple-500 border-purple-400 text-white' :
+                                      level === 10 ? 'bg-blue-500 border-blue-400 text-white' :
+                                      'bg-emerald-500 border-emerald-400 text-white'
+                                    : 'bg-[#0d1f1f] border-[#2a5555] text-[#5a9090]'
+                              } ${canClaimReward ? 'ring-2 ring-teal-400/50 animate-pulse' : ''}`}>
+                                {challengeFailed ? '✕' : currentStreak >= level ? '✓' : level}
+                              </div>
+                              <span className={`text-[10px] mt-1 ${
+                                challengeFailed ? 'text-red-500/50' : currentStreak >= level ? 'text-[#7cc4c4]' : 'text-[#5a9090]'
+                              }`}>
+                                {level === 5 ? 'Lvl 1' : level === 10 ? 'Lvl 2' : level === 15 ? 'Lvl 3' : 'Lvl 4'}
+                              </span>
+                              {canClaimReward && (
+                                <span className="text-[8px] text-teal-400 font-medium mt-0.5">CLAIM</span>
+                              )}
+                            </button>
+                          );
+                        })}
                       </div>
 
-                      <div className="pt-4 border-t border-[#2a5555]/40 grid grid-cols-3 gap-4">
+                      <div className={`pt-4 border-t ${challengeFailed ? 'border-red-800/40' : 'border-[#2a5555]/40'} grid grid-cols-3 gap-4`}>
                         <div>
-                          <div className="text-[#5a9090] text-xs mb-1">Best Streak</div>
-                          <div className="text-white font-semibold">{bestStreak}</div>
+                          <div className={`text-xs mb-1 ${challengeFailed ? 'text-red-500/60' : 'text-[#5a9090]'}`}>Best Streak</div>
+                          <div className={`font-semibold ${challengeFailed ? 'text-red-300' : 'text-white'}`}>{bestStreak}</div>
                         </div>
                         <div>
-                          <div className="text-[#5a9090] text-xs mb-1">Next Level</div>
-                          <div className="text-[#7cc4c4] font-semibold">{currentStreak >= 20 ? 'Completed!' : `${nextLevel - currentStreak} more`}</div>
+                          <div className={`text-xs mb-1 ${challengeFailed ? 'text-red-500/60' : 'text-[#5a9090]'}`}>
+                            {challengeFailed ? 'Status' : 'Next Level'}
+                          </div>
+                          <div className={`font-semibold ${
+                            challengeFailed ? 'text-red-400' : 'text-[#7cc4c4]'
+                          }`}>
+                            {challengeFailed ? 'Restart' : currentStreak >= 20 ? 'Completed!' : `${nextLevel - currentStreak} more`}
+                          </div>
                         </div>
                         <div>
-                          <div className="text-[#5a9090] text-xs mb-1">Record</div>
-                          <div className="text-white font-semibold">{userStats?.wins || 0}-{userStats?.losses || 0}</div>
+                          <div className={`text-xs mb-1 ${challengeFailed ? 'text-red-500/60' : 'text-[#5a9090]'}`}>Record</div>
+                          <div className={`font-semibold ${challengeFailed ? 'text-red-300' : 'text-white'}`}>{userStats?.wins || 0}-{userStats?.losses || 0}</div>
                         </div>
                       </div>
                     </div>
@@ -2524,6 +2607,244 @@ export default function Dashboard() {
                 )}
               </div>
             )}
+          </div>
+        )}
+
+        {/* REWARDS TAB */}
+        {activeTab === 'rewards' && (
+          <div className="space-y-6">
+            {/* Earnings Balance Card */}
+            <div className="bg-gradient-to-br from-emerald-950/60 via-emerald-900/40 to-emerald-950/60 border border-emerald-700/40 rounded-2xl p-6 relative overflow-hidden">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(16,185,129,0.15),transparent_50%)]"></div>
+              <div className="relative">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <div className="text-sm text-emerald-400 font-medium mb-1">Available Balance</div>
+                    <div className="text-4xl font-bold text-white">${totalEarnings.toLocaleString()}</div>
+                  </div>
+                  <div className="w-16 h-16 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center">
+                    <span className="text-3xl">💰</span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setPayoutModalOpen(true)}
+                  disabled={totalEarnings < 50}
+                  className={`w-full py-3 rounded-xl font-bold transition-all ${
+                    totalEarnings >= 50
+                      ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white shadow-lg shadow-emerald-500/20'
+                      : 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
+                  }`}
+                >
+                  {totalEarnings >= 50 ? 'Request Payout' : `Minimum $50 to withdraw (need $${50 - totalEarnings} more)`}
+                </button>
+              </div>
+            </div>
+
+            {/* Rewards Header - Teal Theme */}
+            <div className="bg-gradient-to-br from-[#1a3a3a] via-[#153030] to-[#102828] border border-[#2a5555]/50 rounded-2xl p-6 relative overflow-hidden">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(45,180,180,0.12),transparent_50%)]"></div>
+              <div className="relative flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold text-white mb-2">Win Streak Rewards</h2>
+                  <p className="text-[#7cc4c4]">Claim exclusive rewards for reaching streak milestones</p>
+                </div>
+                <div className="w-16 h-16 rounded-2xl bg-teal-500/10 border border-teal-500/30 flex items-center justify-center">
+                  <svg className="w-8 h-8 text-teal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            {/* Rewards Grid */}
+            {(() => {
+              // Calculate current streak (same logic as Bet Analysis)
+              const settledBets = bets.filter(b => b.result !== 'pending').sort((a, b) =>
+                new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+              );
+              let currentStreak = 0;
+              for (const bet of settledBets) {
+                if (bet.result === 'won') {
+                  currentStreak++;
+                } else {
+                  break;
+                }
+              }
+              // Find best streak ever
+              let bestStreak = 0;
+              let tempStreak = 0;
+              for (const bet of [...settledBets].reverse()) {
+                if (bet.result === 'won') {
+                  tempStreak++;
+                  bestStreak = Math.max(bestStreak, tempStreak);
+                } else {
+                  tempStreak = 0;
+                }
+              }
+
+              const rewards = [
+                { level: 1, streak: 5, title: 'Lvl 1', description: '5 consecutive wins', reward: '$3', value: 3, icon: '💵', accent: 'emerald' },
+                { level: 2, streak: 10, title: 'Lvl 2', description: '10 consecutive wins', reward: '$100', value: 100, icon: '💰', accent: 'blue' },
+                { level: 3, streak: 15, title: 'Lvl 3', description: '15 consecutive wins', reward: '$500', value: 500, icon: '💎', accent: 'purple' },
+                { level: 4, streak: 20, title: 'Lvl 4', description: '20 consecutive wins', reward: '$1,000', value: 1000, icon: '🏆', accent: 'amber' },
+              ];
+
+              // Accent colors for progress bar and badge only
+              const accentColors: Record<string, { bar: string; badge: string; glow: string }> = {
+                emerald: { bar: 'bg-emerald-500', badge: 'text-emerald-400 bg-emerald-500/20', glow: 'shadow-emerald-500/20' },
+                blue: { bar: 'bg-blue-500', badge: 'text-blue-400 bg-blue-500/20', glow: 'shadow-blue-500/20' },
+                purple: { bar: 'bg-purple-500', badge: 'text-purple-400 bg-purple-500/20', glow: 'shadow-purple-500/20' },
+                amber: { bar: 'bg-amber-500', badge: 'text-amber-400 bg-amber-500/20', glow: 'shadow-amber-500/20' },
+              };
+
+              return (
+                <div className="grid gap-4 md:grid-cols-2">
+                  {rewards.map((reward) => {
+                    const isUnlocked = bestStreak >= reward.streak;
+                    const isClaimed = claimedRewards.includes(reward.level);
+                    const canClaim = isUnlocked && !isClaimed;
+                    const progress = Math.min(100, (bestStreak / reward.streak) * 100);
+                    const accent = accentColors[reward.accent];
+
+                    return (
+                      <div
+                        key={reward.level}
+                        className={`bg-[#111111] border rounded-2xl p-6 relative overflow-hidden transition-all duration-300 ${
+                          isUnlocked
+                            ? 'border-[#2a5555]/50 hover:border-teal-600/60'
+                            : 'border-zinc-800/50 opacity-50'
+                        }`}
+                      >
+                        {/* Subtle glow for unlocked */}
+                        {isUnlocked && (
+                          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(45,180,180,0.08),transparent_60%)]"></div>
+                        )}
+
+                        <div className="relative">
+                          {/* Header Row */}
+                          <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-3">
+                              <span className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
+                                isUnlocked ? accent.badge : 'bg-zinc-800 text-zinc-500'
+                              }`}>
+                                {reward.title}
+                              </span>
+                            </div>
+                            <span className={`px-2.5 py-1 rounded-lg text-xs font-medium ${
+                              isClaimed
+                                ? 'bg-teal-500/20 text-teal-400'
+                                : isUnlocked
+                                  ? 'bg-emerald-500/20 text-emerald-400 animate-pulse'
+                                  : 'bg-zinc-800 text-zinc-500'
+                            }`}>
+                              {isClaimed ? '✓ CLAIMED' : isUnlocked ? 'READY' : 'LOCKED'}
+                            </span>
+                          </div>
+
+                          {/* Progress Bar */}
+                          <div className="mb-4">
+                            <div className="h-2 bg-zinc-800/80 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all duration-700 ${isUnlocked ? accent.bar : 'bg-zinc-700'}`}
+                                style={{ width: `${progress}%` }}
+                              ></div>
+                            </div>
+                            <div className="flex justify-between mt-1.5">
+                              <span className="text-xs text-zinc-500">{reward.description}</span>
+                              <span className={`text-xs font-medium ${isUnlocked ? 'text-white' : 'text-zinc-500'}`}>
+                                {Math.min(bestStreak, reward.streak)}/{reward.streak}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Reward Display */}
+                          <div className={`flex items-center gap-2 mb-4 p-3 rounded-xl ${
+                            isUnlocked ? 'bg-[#1a1a1a] border border-zinc-800' : 'bg-zinc-900/50'
+                          }`}>
+                            <span className="text-xl">{reward.icon}</span>
+                            <span className={`font-medium ${isUnlocked ? 'text-teal-300' : 'text-zinc-500'}`}>
+                              {reward.reward}
+                            </span>
+                          </div>
+
+                          {/* Action Button */}
+                          {canClaim ? (
+                            <button
+                              onClick={() => {
+                                setClaimedRewards(prev => [...prev, reward.level]);
+                                setTotalEarnings(prev => prev + reward.value);
+                              }}
+                              className="w-full py-3 rounded-xl font-bold text-white bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-teal-400 transition-all shadow-lg shadow-teal-500/20"
+                            >
+                              Claim Reward
+                            </button>
+                          ) : isClaimed ? (
+                            <div className="w-full py-3 rounded-xl font-medium text-center bg-zinc-800/50 text-zinc-500 border border-zinc-700/30">
+                              Reward Claimed
+                            </div>
+                          ) : (
+                            <div className="w-full py-3 rounded-xl font-medium text-center bg-zinc-900/50 text-zinc-600 border border-zinc-800/50">
+                              <span className="opacity-60">🔒</span> {reward.streak - bestStreak} more wins needed
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+
+            {/* Stats Summary - Teal Theme */}
+            <div className="bg-[#111111] border border-zinc-800/50 rounded-2xl p-6">
+              <h3 className="text-lg font-semibold text-white mb-4">Your Progress</h3>
+              {(() => {
+                const settledBets = bets.filter(b => b.result !== 'pending').sort((a, b) =>
+                  new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+                );
+                let currentStreak = 0;
+                for (const bet of settledBets) {
+                  if (bet.result === 'won') {
+                    currentStreak++;
+                  } else {
+                    break;
+                  }
+                }
+                let bestStreak = 0;
+                let tempStreak = 0;
+                for (const bet of [...settledBets].reverse()) {
+                  if (bet.result === 'won') {
+                    tempStreak++;
+                    bestStreak = Math.max(bestStreak, tempStreak);
+                  } else {
+                    tempStreak = 0;
+                  }
+                }
+                const rewardsUnlocked = [5, 10, 15, 20].filter(s => bestStreak >= s).length;
+                const rewardsClaimed = claimedRewards.length;
+
+                return (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="bg-[#1a1a1a] border border-zinc-800/50 rounded-xl p-4">
+                      <div className="text-2xl font-bold text-teal-400">{currentStreak}</div>
+                      <div className="text-xs text-zinc-500">Current Streak</div>
+                    </div>
+                    <div className="bg-[#1a1a1a] border border-zinc-800/50 rounded-xl p-4">
+                      <div className="text-2xl font-bold text-white">{bestStreak}</div>
+                      <div className="text-xs text-zinc-500">Best Streak</div>
+                    </div>
+                    <div className="bg-[#1a1a1a] border border-zinc-800/50 rounded-xl p-4">
+                      <div className="text-2xl font-bold text-emerald-400">{rewardsUnlocked}/4</div>
+                      <div className="text-xs text-zinc-500">Unlocked</div>
+                    </div>
+                    <div className="bg-[#1a1a1a] border border-zinc-800/50 rounded-xl p-4">
+                      <div className="text-2xl font-bold text-[#7cc4c4]">{rewardsClaimed}/4</div>
+                      <div className="text-xs text-zinc-500">Claimed</div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
           </div>
         )}
 
@@ -3233,6 +3554,186 @@ export default function Dashboard() {
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* REWARD CLAIM MODAL */}
+      {rewardModalOpen && rewardToClaim && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setRewardModalOpen(false)}>
+          <div
+            className="bg-gradient-to-b from-[#1a3a3a] via-[#153030] to-[#111111] border border-[#2a5555]/50 rounded-2xl p-6 w-full max-w-md relative overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Background glow */}
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(45,180,180,0.15),transparent_60%)]"></div>
+
+            {/* Close button */}
+            <button
+              onClick={() => setRewardModalOpen(false)}
+              className="absolute top-4 right-4 text-zinc-500 hover:text-white transition-colors z-10"
+            >
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+
+            <div className="relative text-center">
+              {/* Celebration animation */}
+              <div className="text-6xl mb-4 animate-bounce">
+                🎉
+              </div>
+
+              {/* Title */}
+              <h2 className="text-2xl font-bold text-white mb-2">
+                LEVEL {rewardToClaim} COMPLETE!
+              </h2>
+
+              {/* Subtitle */}
+              <p className="text-[#7cc4c4] mb-6">
+                You&apos;ve reached {rewardToClaim === 1 ? 5 : rewardToClaim === 2 ? 10 : rewardToClaim === 3 ? 15 : 20} consecutive wins!
+              </p>
+
+              {/* Reward Box */}
+              <div className="bg-[#111111] border border-zinc-800 rounded-xl p-4 mb-6">
+                <div className="text-xs text-zinc-500 mb-2 uppercase tracking-wide">Your Reward</div>
+                <div className="flex items-center justify-center gap-3">
+                  <span className="text-3xl">
+                    {rewardToClaim === 1 ? '💵' : rewardToClaim === 2 ? '💰' : rewardToClaim === 3 ? '💎' : '🏆'}
+                  </span>
+                  <span className="text-2xl font-bold text-emerald-400">
+                    {rewardToClaim === 1 ? '$3' :
+                     rewardToClaim === 2 ? '$100' :
+                     rewardToClaim === 3 ? '$500' :
+                     '$1,000'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Claim Button */}
+              <button
+                onClick={() => {
+                  const rewardValues: Record<number, number> = { 1: 3, 2: 100, 3: 500, 4: 1000 };
+                  setClaimedRewards(prev => [...prev, rewardToClaim]);
+                  setTotalEarnings(prev => prev + (rewardValues[rewardToClaim] || 0));
+                  setRewardModalOpen(false);
+                  // Navigate to rewards tab
+                  setActiveTab('rewards');
+                }}
+                className="w-full py-4 rounded-xl font-bold text-white bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-teal-400 transition-all shadow-lg shadow-teal-500/30 mb-4"
+              >
+                Claim Reward
+              </button>
+
+              {/* View All Link */}
+              <button
+                onClick={() => {
+                  setRewardModalOpen(false);
+                  setActiveTab('rewards');
+                }}
+                className="text-teal-400 hover:text-teal-300 text-sm font-medium transition-colors"
+              >
+                View All Rewards →
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PAYOUT REQUEST MODAL */}
+      {payoutModalOpen && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setPayoutModalOpen(false)}>
+          <div
+            className="bg-gradient-to-b from-emerald-950/80 via-emerald-900/60 to-[#111111] border border-emerald-700/40 rounded-2xl p-6 w-full max-w-md relative overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Background glow */}
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(16,185,129,0.15),transparent_60%)]"></div>
+
+            {/* Close button */}
+            <button
+              onClick={() => setPayoutModalOpen(false)}
+              className="absolute top-4 right-4 text-zinc-500 hover:text-white transition-colors z-10"
+            >
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+
+            <div className="relative">
+              {/* Header */}
+              <div className="text-center mb-6">
+                <span className="text-4xl mb-2 block">💸</span>
+                <h2 className="text-2xl font-bold text-white">Request Payout</h2>
+                <p className="text-emerald-400 text-sm mt-1">Available: ${totalEarnings.toLocaleString()}</p>
+              </div>
+
+              {/* Amount Input */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-zinc-300 mb-2">Withdrawal Amount</label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-400 font-bold text-xl">$</span>
+                  <input
+                    type="number"
+                    min="50"
+                    max={totalEarnings}
+                    value={payoutAmount}
+                    onChange={(e) => setPayoutAmount(Math.max(50, Math.min(totalEarnings, Number(e.target.value))))}
+                    className="w-full pl-10 pr-4 py-4 bg-zinc-900/80 border border-emerald-800/30 rounded-xl text-white font-mono text-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500"
+                  />
+                </div>
+                <div className="text-xs text-zinc-500 mt-2">Minimum withdrawal: $50</div>
+              </div>
+
+              {/* Quick Amount Buttons */}
+              <div className="grid grid-cols-4 gap-2 mb-6">
+                {[50, 100, 250, totalEarnings].map((amount, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setPayoutAmount(Math.min(amount, totalEarnings))}
+                    disabled={amount > totalEarnings}
+                    className={`py-2 rounded-lg text-sm font-medium transition-all ${
+                      payoutAmount === amount
+                        ? 'bg-emerald-600 text-white'
+                        : amount > totalEarnings
+                          ? 'bg-zinc-800/50 text-zinc-600 cursor-not-allowed'
+                          : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                    }`}
+                  >
+                    {idx === 3 ? 'Max' : `$${amount}`}
+                  </button>
+                ))}
+              </div>
+
+              {/* Summary */}
+              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 mb-6">
+                <div className="flex justify-between mb-2">
+                  <span className="text-zinc-400">Withdrawal Amount</span>
+                  <span className="text-white font-mono">${payoutAmount.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-400">Remaining Balance</span>
+                  <span className="text-emerald-400 font-mono">${(totalEarnings - payoutAmount).toLocaleString()}</span>
+                </div>
+              </div>
+
+              {/* Submit Button */}
+              <button
+                onClick={() => {
+                  setTotalEarnings(prev => prev - payoutAmount);
+                  setPayoutModalOpen(false);
+                  alert(`Payout request for $${payoutAmount} submitted! You will receive your funds within 3-5 business days.`);
+                }}
+                disabled={payoutAmount < 50 || payoutAmount > totalEarnings}
+                className="w-full py-4 rounded-xl font-bold text-white bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Submit Payout Request
+              </button>
+
+              <p className="text-xs text-zinc-500 text-center mt-4">
+                Payouts are processed within 3-5 business days via your preferred payment method.
+              </p>
+            </div>
           </div>
         </div>
       )}
