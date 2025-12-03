@@ -2900,8 +2900,8 @@ export default function Dashboard() {
                     }}
                     className={`w-full py-3 px-4 font-medium rounded-xl transition-colors flex items-center justify-center gap-2 ${
                       parlayLegs.some(leg => leg.eventId === quickBetEvent.id)
-                        ? 'bg-purple-600 text-white'
-                        : 'bg-purple-900/50 border border-purple-700/50 text-purple-300 hover:bg-purple-800/50'
+                        ? 'bg-teal-600 text-white'
+                        : 'bg-teal-900/50 border border-teal-700/50 text-teal-300 hover:bg-teal-800/50'
                     }`}
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2955,14 +2955,14 @@ export default function Dashboard() {
         <div className="fixed bottom-6 right-6 z-40">
           <button
             onClick={() => setParlayModalOpen(true)}
-            className="bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 text-white px-6 py-4 rounded-2xl shadow-2xl shadow-purple-900/50 flex items-center gap-3 transition-all hover:scale-105"
+            className="bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-teal-400 text-white px-6 py-4 rounded-2xl shadow-2xl shadow-teal-900/50 flex items-center gap-3 transition-all hover:scale-105"
           >
             <div className="bg-white/20 rounded-full w-8 h-8 flex items-center justify-center font-bold">
               {parlayLegs.length}
             </div>
             <div className="text-left">
               <div className="font-semibold">Parlay Slip</div>
-              <div className="text-xs text-purple-200">
+              <div className="text-xs text-teal-200">
                 @{calculateParlayOdds().toFixed(2)} combined odds
               </div>
             </div>
@@ -2976,16 +2976,16 @@ export default function Dashboard() {
       {/* Parlay Modal */}
       {parlayModalOpen && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-gradient-to-b from-purple-950 to-zinc-950 border border-purple-800/50 rounded-2xl p-6 w-full max-w-lg shadow-2xl shadow-purple-900/20 max-h-[90vh] overflow-y-auto">
+          <div className="bg-gradient-to-b from-teal-950 to-zinc-950 border border-teal-800/50 rounded-2xl p-6 w-full max-w-lg shadow-2xl shadow-teal-900/20 max-h-[90vh] overflow-y-auto">
             {/* Modal Header */}
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
-                <div className="bg-purple-500/20 rounded-full w-10 h-10 flex items-center justify-center">
+                <div className="bg-teal-500/20 rounded-full w-10 h-10 flex items-center justify-center">
                   <span className="text-xl">🎯</span>
                 </div>
                 <div>
                   <h3 className="text-xl font-bold text-white">Parlay Slip</h3>
-                  <p className="text-sm text-purple-300">{parlayLegs.length} {parlayLegs.length === 1 ? 'leg' : 'legs'}</p>
+                  <p className="text-sm text-teal-300">{parlayLegs.length} {parlayLegs.length === 1 ? 'leg' : 'legs'}</p>
                 </div>
               </div>
               <button
@@ -3001,12 +3001,12 @@ export default function Dashboard() {
             {parlaySuccess ? (
               /* Success State */
               <div className="text-center py-8">
-                <div className="w-16 h-16 bg-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-8 h-8 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="w-16 h-16 bg-teal-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
                 </div>
-                <h4 className="text-lg font-semibold text-purple-400 mb-2">Parlay Placed!</h4>
+                <h4 className="text-lg font-semibold text-teal-400 mb-2">Parlay Placed!</h4>
                 <p className="text-zinc-400 text-sm">Track your parlay in the Bet Analysis tab</p>
               </div>
             ) : (
@@ -3014,13 +3014,13 @@ export default function Dashboard() {
                 {/* Parlay Legs */}
                 <div className="space-y-3 mb-6">
                   {parlayLegs.map((leg, index) => (
-                    <div key={leg.eventId} className="bg-purple-950/50 border border-purple-900/30 rounded-xl p-4">
+                    <div key={leg.eventId} className="bg-teal-950/50 border border-teal-900/30 rounded-xl p-4">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
-                          <div className="text-xs text-purple-400 mb-1">Leg {index + 1}</div>
+                          <div className="text-xs text-teal-400 mb-1">Leg {index + 1}</div>
                           <div className="font-medium text-white text-sm">{leg.matchup}</div>
                           <div className="flex items-center gap-2 mt-2">
-                            <span className="bg-purple-900/50 text-purple-300 px-2 py-0.5 rounded text-xs">{leg.betType}</span>
+                            <span className="bg-teal-900/50 text-teal-300 px-2 py-0.5 rounded text-xs">{leg.betType}</span>
                             <span className="text-zinc-300 text-sm">{leg.selection}</span>
                             <span className="font-mono font-bold text-amber-400 text-sm">@{leg.odds}</span>
                           </div>
@@ -3050,10 +3050,10 @@ export default function Dashboard() {
                 )}
 
                 {/* Combined Odds */}
-                <div className="bg-purple-900/30 border border-purple-800/30 rounded-xl p-4 mb-6">
+                <div className="bg-teal-900/30 border border-teal-800/30 rounded-xl p-4 mb-6">
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-zinc-300">Combined Odds</span>
-                    <span className="font-mono font-bold text-2xl text-purple-400">@{calculateParlayOdds().toFixed(2)}</span>
+                    <span className="font-mono font-bold text-2xl text-teal-400">@{calculateParlayOdds().toFixed(2)}</span>
                   </div>
                 </div>
 
@@ -3068,7 +3068,7 @@ export default function Dashboard() {
                       step="5"
                       value={parlayStake}
                       onChange={(e) => setParlayStake(Math.max(1, Number(e.target.value)))}
-                      className="w-full pl-8 pr-4 py-3 bg-zinc-900/80 border border-purple-800/30 rounded-xl text-white font-mono text-lg focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500"
+                      className="w-full pl-8 pr-4 py-3 bg-zinc-900/80 border border-teal-800/30 rounded-xl text-white font-mono text-lg focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500"
                     />
                   </div>
                   {/* Quick stake buttons */}
@@ -3079,7 +3079,7 @@ export default function Dashboard() {
                         onClick={() => setParlayStake(amount)}
                         className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
                           parlayStake === amount
-                            ? 'bg-purple-600 text-white'
+                            ? 'bg-teal-600 text-white'
                             : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
                         }`}
                       >
@@ -3095,12 +3095,12 @@ export default function Dashboard() {
                   const profit = potentialReturn - parlayStake;
 
                   return (
-                    <div className="bg-purple-900/30 border border-purple-800/30 rounded-xl p-4 mb-6">
+                    <div className="bg-teal-900/30 border border-teal-800/30 rounded-xl p-4 mb-6">
                       <div className="flex justify-between items-center">
                         <span className="text-zinc-300">Potential Return</span>
                         <div className="text-right">
-                          <div className="text-2xl font-bold text-purple-400 font-mono">${potentialReturn.toFixed(2)}</div>
-                          <div className="text-xs text-purple-500">+${profit.toFixed(2)} profit</div>
+                          <div className="text-2xl font-bold text-teal-400 font-mono">${potentialReturn.toFixed(2)}</div>
+                          <div className="text-xs text-teal-500">+${profit.toFixed(2)} profit</div>
                         </div>
                       </div>
                     </div>
@@ -3121,7 +3121,7 @@ export default function Dashboard() {
                   <button
                     onClick={handlePlaceParlay}
                     disabled={placingParlay || parlayLegs.length < 2}
-                    className="flex-1 py-3 px-4 bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 text-white font-semibold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    className="flex-1 py-3 px-4 bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-teal-400 text-white font-semibold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
                     {placingParlay ? (
                       <>
