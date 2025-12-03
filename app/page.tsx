@@ -2564,7 +2564,7 @@ export default function Dashboard() {
       {/* Bet Placement Modal */}
       {betModalOpen && selectedEvent && swarmResult && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-gradient-to-b from-emerald-950 to-zinc-950 border border-emerald-800/50 rounded-2xl p-6 w-full max-w-md shadow-2xl shadow-emerald-900/20">
+          <div className="bg-gradient-to-b from-teal-950 to-zinc-950 border border-teal-800/50 rounded-2xl p-6 w-full max-w-md shadow-2xl shadow-teal-900/20">
             {/* Modal Header */}
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl font-bold text-white">Place Your Bet</h3>
@@ -2585,19 +2585,19 @@ export default function Dashboard() {
             {betSuccess ? (
               /* Success State */
               <div className="text-center py-8">
-                <div className="w-16 h-16 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-8 h-8 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="w-16 h-16 bg-teal-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
                 </div>
-                <h4 className="text-lg font-semibold text-emerald-400 mb-2">Bet Placed Successfully!</h4>
+                <h4 className="text-lg font-semibold text-teal-400 mb-2">Bet Placed Successfully!</h4>
                 <p className="text-zinc-400 text-sm">Track your bet in the Bet Analysis tab</p>
               </div>
             ) : (
               /* Bet Form */
               <>
                 {/* Event Info */}
-                <div className="bg-emerald-950/50 border border-emerald-900/30 rounded-xl p-4 mb-5">
+                <div className="bg-teal-950/50 border border-teal-900/30 rounded-xl p-4 mb-5">
                   <div className="text-sm text-zinc-400 mb-1">{selectedEvent.sportTitle}</div>
                   <div className="font-semibold text-white text-lg">
                     {selectedEvent.awayTeam} @ {selectedEvent.homeTeam}
@@ -2645,7 +2645,7 @@ export default function Dashboard() {
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-zinc-400">Bet Type</span>
-                        <span className="bg-emerald-900/50 text-emerald-400 px-2 py-0.5 rounded text-sm">
+                        <span className="bg-teal-900/50 text-teal-400 px-2 py-0.5 rounded text-sm">
                           {topBetType?.[0] || '1X2'}
                         </span>
                       </div>
@@ -2674,7 +2674,7 @@ export default function Dashboard() {
                       step="5"
                       value={betStake}
                       onChange={(e) => setBetStake(Math.max(1, Number(e.target.value)))}
-                      className="w-full pl-8 pr-4 py-3 bg-zinc-900/80 border border-emerald-800/30 rounded-xl text-white font-mono text-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500"
+                      className="w-full pl-8 pr-4 py-3 bg-zinc-900/80 border border-teal-800/30 rounded-xl text-white font-mono text-lg focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500"
                     />
                   </div>
                   {/* Quick stake buttons */}
@@ -2685,7 +2685,7 @@ export default function Dashboard() {
                         onClick={() => setBetStake(amount)}
                         className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
                           betStake === amount
-                            ? 'bg-emerald-600 text-white'
+                            ? 'bg-teal-600 text-white'
                             : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
                         }`}
                       >
@@ -2715,12 +2715,12 @@ export default function Dashboard() {
                   const profit = potentialReturn - betStake;
 
                   return (
-                    <div className="bg-emerald-900/30 border border-emerald-800/30 rounded-xl p-4 mb-6">
+                    <div className="bg-teal-900/30 border border-teal-800/30 rounded-xl p-4 mb-6">
                       <div className="flex justify-between items-center">
                         <span className="text-zinc-300">Potential Return</span>
                         <div className="text-right">
-                          <div className="text-2xl font-bold text-emerald-400 font-mono">${potentialReturn.toFixed(2)}</div>
-                          <div className="text-xs text-emerald-500">+${profit.toFixed(2)} profit</div>
+                          <div className="text-2xl font-bold text-teal-400 font-mono">${potentialReturn.toFixed(2)}</div>
+                          <div className="text-xs text-teal-500">+${profit.toFixed(2)} profit</div>
                         </div>
                       </div>
                     </div>
@@ -2741,7 +2741,7 @@ export default function Dashboard() {
                   <button
                     onClick={handlePlaceBet}
                     disabled={placingBet}
-                    className="flex-1 py-3 px-4 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-semibold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    className="flex-1 py-3 px-4 bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-teal-400 text-white font-semibold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
                     {placingBet ? (
                       <>
@@ -2765,7 +2765,7 @@ export default function Dashboard() {
       {/* Quick Bet Modal (from clicking odds directly) */}
       {betModalOpen && quickBetEvent && quickBetSelection && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-gradient-to-b from-emerald-950 to-zinc-950 border border-emerald-800/50 rounded-2xl p-6 w-full max-w-md shadow-2xl shadow-emerald-900/20">
+          <div className="bg-gradient-to-b from-teal-950 to-zinc-950 border border-teal-800/50 rounded-2xl p-6 w-full max-w-md shadow-2xl shadow-teal-900/20">
             {/* Modal Header */}
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl font-bold text-white">Quick Bet</h3>
@@ -2788,19 +2788,19 @@ export default function Dashboard() {
             {betSuccess ? (
               /* Success State */
               <div className="text-center py-8">
-                <div className="w-16 h-16 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-8 h-8 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="w-16 h-16 bg-teal-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
                 </div>
-                <h4 className="text-lg font-semibold text-emerald-400 mb-2">Bet Placed Successfully!</h4>
+                <h4 className="text-lg font-semibold text-teal-400 mb-2">Bet Placed Successfully!</h4>
                 <p className="text-zinc-400 text-sm">Track your bet in the Bet Analysis tab</p>
               </div>
             ) : (
               /* Bet Form */
               <>
                 {/* Event Info */}
-                <div className="bg-emerald-950/50 border border-emerald-900/30 rounded-xl p-4 mb-5">
+                <div className="bg-teal-950/50 border border-teal-900/30 rounded-xl p-4 mb-5">
                   <div className="text-sm text-zinc-400 mb-1">{quickBetEvent.sportTitle}</div>
                   <div className="font-semibold text-white text-lg">
                     {quickBetEvent.awayTeam} @ {quickBetEvent.homeTeam}
@@ -2824,7 +2824,7 @@ export default function Dashboard() {
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-zinc-400">Bet Type</span>
-                    <span className="bg-emerald-900/50 text-emerald-400 px-2 py-0.5 rounded text-sm">
+                    <span className="bg-teal-900/50 text-teal-400 px-2 py-0.5 rounded text-sm">
                       {quickBetSelection.type === 'draw' ? 'Draw' : '1X2'}
                     </span>
                   </div>
@@ -2849,7 +2849,7 @@ export default function Dashboard() {
                       step="5"
                       value={betStake}
                       onChange={(e) => setBetStake(Math.max(1, Number(e.target.value)))}
-                      className="w-full pl-8 pr-4 py-3 bg-zinc-900/80 border border-emerald-800/30 rounded-xl text-white font-mono text-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500"
+                      className="w-full pl-8 pr-4 py-3 bg-zinc-900/80 border border-teal-800/30 rounded-xl text-white font-mono text-lg focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500"
                     />
                   </div>
                   {/* Quick stake buttons */}
@@ -2860,7 +2860,7 @@ export default function Dashboard() {
                         onClick={() => setBetStake(amount)}
                         className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
                           betStake === amount
-                            ? 'bg-emerald-600 text-white'
+                            ? 'bg-teal-600 text-white'
                             : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
                         }`}
                       >
@@ -2876,12 +2876,12 @@ export default function Dashboard() {
                   const profit = potentialReturn - betStake;
 
                   return (
-                    <div className="bg-emerald-900/30 border border-emerald-800/30 rounded-xl p-4 mb-6">
+                    <div className="bg-teal-900/30 border border-teal-800/30 rounded-xl p-4 mb-6">
                       <div className="flex justify-between items-center">
                         <span className="text-zinc-300">Potential Return</span>
                         <div className="text-right">
-                          <div className="text-2xl font-bold text-emerald-400 font-mono">${potentialReturn.toFixed(2)}</div>
-                          <div className="text-xs text-emerald-500">+${profit.toFixed(2)} profit</div>
+                          <div className="text-2xl font-bold text-teal-400 font-mono">${potentialReturn.toFixed(2)}</div>
+                          <div className="text-xs text-teal-500">+${profit.toFixed(2)} profit</div>
                         </div>
                       </div>
                     </div>
@@ -2928,7 +2928,7 @@ export default function Dashboard() {
                     <button
                       onClick={handleQuickBetPlace}
                       disabled={placingBet}
-                      className="flex-1 py-3 px-4 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-semibold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      className="flex-1 py-3 px-4 bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-teal-400 text-white font-semibold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
                       {placingBet ? (
                         <>

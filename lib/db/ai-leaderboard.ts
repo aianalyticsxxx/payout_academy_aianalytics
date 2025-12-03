@@ -314,10 +314,21 @@ export async function getAIPredictions(options: {
         createdAt: { gte: since },
       },
       orderBy: { createdAt: 'desc' },
-      take: limit,
+      take: limit * 2, // Fetch more to account for duplicates
     });
 
-    return predictions;
+    // Deduplicate by eventId - keep only the most recent prediction per event
+    const seenEventIds = new Set<string>();
+    const uniquePredictions = predictions.filter(p => {
+      if (seenEventIds.has(p.eventId)) {
+        return false;
+      }
+      seenEventIds.add(p.eventId);
+      return true;
+    });
+
+    // Apply the limit after deduplication
+    return uniquePredictions.slice(0, limit);
   } catch (error) {
     console.error('Failed to get AI predictions:', error);
     return [];

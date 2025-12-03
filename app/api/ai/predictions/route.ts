@@ -9,29 +9,30 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
 
-    const result = searchParams.get('result') || 'all';
+    const resultFilter = searchParams.get('result') || 'all';
     const sport = searchParams.get('sport') || 'all';
     const days = parseInt(searchParams.get('days') || '7', 10);
     const limit = parseInt(searchParams.get('limit') || '50', 10);
 
-    const predictions = await getAIPredictions({
-      result,
+    // Always fetch ALL predictions first (no result filter) to ensure consistent deduplication
+    const allPredictions = await getAIPredictions({
+      result: 'all', // Always fetch all first
       sport,
       days,
-      limit,
+      limit: 200, // Fetch more to get accurate stats
     });
 
-    // Calculate summary stats
-    const total = predictions.length;
-    const won = predictions.filter(p => p.result === 'won').length;
-    const lost = predictions.filter(p => p.result === 'lost').length;
-    const pending = predictions.filter(p => p.result === 'pending').length;
+    // Stats are calculated from ALL deduplicated predictions
+    const total = allPredictions.length;
+    const won = allPredictions.filter(p => p.result === 'won').length;
+    const lost = allPredictions.filter(p => p.result === 'lost').length;
+    const pending = allPredictions.filter(p => p.result === 'pending').length;
     const settled = won + lost;
     const winRate = settled > 0 ? (won / settled) * 100 : 0;
 
-    // Calculate streak
+    // Calculate streak from all settled predictions
     let currentStreak = 0;
-    const settledPredictions = predictions.filter(p => p.result !== 'pending');
+    const settledPredictions = allPredictions.filter(p => p.result !== 'pending');
     for (const pred of settledPredictions) {
       if (pred.result === 'won') {
         if (currentStreak >= 0) currentStreak++;
@@ -43,10 +44,18 @@ export async function GET(request: NextRequest) {
     }
 
     // Get unique sports for filter dropdown
-    const sports = [...new Set(predictions.map(p => p.sport).filter(Boolean))];
+    const sports = [...new Set(allPredictions.map(p => p.sport).filter(Boolean))];
+
+    // Now filter by result for display (after deduplication already happened)
+    const filteredPredictions = resultFilter === 'all'
+      ? allPredictions
+      : allPredictions.filter(p => p.result === resultFilter);
+
+    // Apply limit to filtered results
+    const displayPredictions = filteredPredictions.slice(0, limit);
 
     return NextResponse.json({
-      predictions,
+      predictions: displayPredictions,
       stats: {
         total,
         won,
