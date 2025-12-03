@@ -89,6 +89,7 @@ model User {
   bankrollHistory BankrollHistory[]
   leaderboardEntry GlobalLeaderboard?
   pushSubscription PushSubscription?
+  challenges    Challenge[]
 }
 
 // ==========================================
@@ -122,6 +123,7 @@ model Bet {
   settledAt   DateTime?
   
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  challengeBet ChallengeBet?
 
   @@index([userId])
   @@index([result])
@@ -330,4 +332,89 @@ model UsageLog {
 
   @@index([userId, createdAt])
   @@index([ipAddress, createdAt])
+}
+
+// ==========================================
+// CHALLENGES
+// ==========================================
+
+model Challenge {
+  id            String   @id @default(cuid())
+  userId        String
+
+  // Challenge tier info
+  tier          Int      // 1000, 5000, 10000, 25000, 50000, 100000
+  cost          Float    // Purchase price paid
+  resetFee      Float    // 50% reset fee
+
+  // Status
+  status        String   @default("active") // active, completed, expired, cancelled
+
+  // Progress tracking
+  currentStreak Int      @default(0)
+  currentLevel  Int      @default(1)  // 1, 2, 3, 4
+
+  // Level completion flags
+  level1Completed Boolean @default(false)
+  level2Completed Boolean @default(false)
+  level3Completed Boolean @default(false)
+  level4Completed Boolean @default(false)
+
+  // Financial tracking
+  totalRewardsEarned Float @default(0)
+
+  // Timing
+  purchasedAt   DateTime @default(now())
+  expiresAt     DateTime // purchasedAt + 30 days
+  completedAt   DateTime?
+
+  // Relations
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bets          ChallengeBet[]
+  rewards       ChallengeReward[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([expiresAt])
+}
+
+model ChallengeBet {
+  id            String   @id @default(cuid())
+  challengeId   String
+  betId         String   @unique
+
+  // Snapshot at bet placement
+  streakBefore  Int
+  levelBefore   Int
+
+  // After settlement
+  result        String?  // won, lost, push
+  streakAfter   Int?
+  levelAfter    Int?
+  levelCompleted Int?    // If this bet completed a level
+
+  createdAt     DateTime @default(now())
+  settledAt     DateTime?
+
+  challenge     Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  bet           Bet       @relation(fields: [betId], references: [id], onDelete: Cascade)
+
+  @@index([challengeId])
+  @@index([betId])
+}
+
+model ChallengeReward {
+  id            String   @id @default(cuid())
+  challengeId   String
+
+  level         Int      // 1, 2, 3, 4
+  amount        Float    // Reward amount
+  status        String   @default("pending") // pending, paid
+
+  earnedAt      DateTime @default(now())
+  paidAt        DateTime?
+
+  challenge     Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+
+  @@index([challengeId])
 }

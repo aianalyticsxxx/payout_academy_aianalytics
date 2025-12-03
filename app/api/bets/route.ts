@@ -7,6 +7,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/config';
 import { prisma } from '@/lib/db/prisma';
 import { z } from 'zod';
+import { linkBetToChallenge, processChallengeSettlement } from '@/lib/challenges/challenge-service';
 
 // ==========================================
 // VALIDATION SCHEMAS
@@ -222,6 +223,9 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    // Link to active challenge if exists
+    await linkBetToChallenge(bet.id, userId);
+
     return NextResponse.json(bet, { status: 201 });
     
   } catch (error) {
@@ -285,13 +289,26 @@ export async function PATCH(req: NextRequest) {
       },
     });
 
-    // Update leaderboard if settled
+    // Update leaderboard and process challenge if settled
     if (result && result !== 'pending') {
       await updateUserLeaderboard(userId);
+
+      // Process challenge streak update for all active challenges
+      const challengeResults = await processChallengeSettlement(
+        id,
+        result as 'won' | 'lost' | 'push'
+      );
+      if (challengeResults && challengeResults.length > 0) {
+        for (const cr of challengeResults) {
+          if (cr.levelCompleted) {
+            console.log(`[Bet] User completed challenge level ${cr.levelCompleted} on challenge ${cr.challengeId}`);
+          }
+        }
+      }
     }
 
     return NextResponse.json(bet);
-    
+
   } catch (error) {
     console.error('Update bet error:', error);
     return NextResponse.json({ error: 'Failed to update bet' }, { status: 500 });

@@ -234,7 +234,7 @@ export default function Dashboard() {
   const router = useRouter();
 
   // State
-  const [activeTab, setActiveTab] = useState<'events' | 'challenges' | 'ai' | 'bets' | 'rewards' | 'competition'>('events');
+  const [activeTab, setActiveTab] = useState<'events' | 'challenges' | 'ai' | 'bets' | 'rewards' | 'competition'>('bets');
   const [purchaseModalOpen, setPurchaseModalOpen] = useState(false);
   const [selectedChallenge, setSelectedChallenge] = useState<{ size: number; cost: number; label: string; profit: number; target: number; resetFee: number } | null>(null);
   const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
@@ -278,6 +278,16 @@ export default function Dashboard() {
   const [eventAnalysisCache, setEventAnalysisCache] = useState<Record<string, SwarmResult>>({});
   const [loadingEventAnalysis, setLoadingEventAnalysis] = useState<Record<string, boolean>>({});
 
+  // Challenge state (supports up to 5 active challenges)
+  const [activeChallenges, setActiveChallenges] = useState<any[]>([]);
+  const [selectedChallengeId, setSelectedChallengeId] = useState<string | null>(null);
+  const [canCreateMoreChallenges, setCanCreateMoreChallenges] = useState(true);
+  const [challengeCount, setChallengeCount] = useState(0);
+  const [maxChallenges, setMaxChallenges] = useState(5);
+  const [loadingChallenge, setLoadingChallenge] = useState(false);
+  const [purchasingChallenge, setPurchasingChallenge] = useState(false);
+  const [challengeError, setChallengeError] = useState<string | null>(null);
+
   // Quick bet from odds click
   const [quickBetEvent, setQuickBetEvent] = useState<SportEvent | null>(null);
   const [quickBetSelection, setQuickBetSelection] = useState<{ type: string; name: string; odds: number } | null>(null);
@@ -318,6 +328,7 @@ export default function Dashboard() {
       fetchParlays();
       fetchUserStats();
       fetchLeaderboard();
+      fetchActiveChallenge();
     }
   }, [session]);
 
@@ -384,6 +395,64 @@ export default function Dashboard() {
       setLeaderboard(data.leaderboard || []);
     } catch (error) {
       console.error('Failed to fetch leaderboard:', error);
+    }
+  };
+
+  const fetchActiveChallenge = async () => {
+    setLoadingChallenge(true);
+    try {
+      const res = await fetch('/api/challenges');
+      const data = await res.json();
+      const challenges = data.challenges || [];
+      setActiveChallenges(challenges);
+      setCanCreateMoreChallenges(data.canCreateMore ?? true);
+      setChallengeCount(data.currentCount || 0);
+      setMaxChallenges(data.maxAllowed || 5);
+      // Auto-select first challenge if none selected
+      if (challenges.length > 0 && !selectedChallengeId) {
+        setSelectedChallengeId(challenges[0].id);
+      }
+    } catch (error) {
+      console.error('Failed to fetch active challenges:', error);
+    } finally {
+      setLoadingChallenge(false);
+    }
+  };
+
+  const purchaseChallenge = async () => {
+    if (!selectedChallenge) return;
+
+    setPurchasingChallenge(true);
+    setChallengeError(null);
+
+    try {
+      const res = await fetch('/api/challenges', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tier: selectedChallenge.size }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to purchase challenge');
+      }
+
+      // Success - add to challenges array and close modal
+      setActiveChallenges(prev => [data.challenge, ...prev]);
+      setChallengeCount(prev => prev + 1);
+      setCanCreateMoreChallenges(challengeCount + 1 < maxChallenges);
+      setPurchaseModalOpen(false);
+      setSelectedChallenge(null);
+
+      // Show success feedback
+      alert(`Successfully started ${selectedChallenge.label} Challenge! You now have ${challengeCount + 1}/${maxChallenges} active challenges.`);
+
+    } catch (error: any) {
+      console.error('Failed to purchase challenge:', error);
+      setChallengeError(error.message || 'Failed to purchase challenge');
+    } finally {
+      setPurchasingChallenge(false);
     }
   };
 
@@ -772,10 +841,10 @@ export default function Dashboard() {
       <nav className="bg-surface border-b border-zinc-800/50">
         <div className="max-w-7xl mx-auto flex overflow-x-auto">
           {[
+            { id: 'bets', label: 'Dashboard', icon: '📊' },
             { id: 'events', label: 'Events', icon: '🎯' },
             { id: 'challenges', label: 'Challenges', icon: '🎮' },
             { id: 'ai', label: 'AI Hub', icon: '🤖' },
-            { id: 'bets', label: 'Bet Analysis', icon: '📊' },
             { id: 'rewards', label: 'Rewards', icon: '🎁' },
             { id: 'competition', label: 'Competition', icon: '🏆' },
           ].map(tab => (
@@ -1093,10 +1162,10 @@ export default function Dashboard() {
             {(() => {
               // 4-Level Progression System - Same levels for all, different rewards per account size
               const levelRequirements = [
-                { level: 1, streakRequired: 3, name: 'Bronze', color: 'from-amber-700 to-amber-600' },
-                { level: 2, streakRequired: 5, name: 'Silver', color: 'from-zinc-400 to-zinc-300' },
-                { level: 3, streakRequired: 7, name: 'Gold', color: 'from-yellow-500 to-yellow-400' },
-                { level: 4, streakRequired: 10, name: 'Diamond', color: 'from-cyan-400 to-blue-400' },
+                { level: 1, streakRequired: 5, name: 'Bronze', color: 'from-amber-700 to-amber-600' },
+                { level: 2, streakRequired: 10, name: 'Silver', color: 'from-zinc-400 to-zinc-300' },
+                { level: 3, streakRequired: 15, name: 'Gold', color: 'from-yellow-500 to-yellow-400' },
+                { level: 4, streakRequired: 20, name: 'Diamond', color: 'from-cyan-400 to-blue-400' },
               ];
 
               const challengeTiers = [
@@ -1127,7 +1196,7 @@ export default function Dashboard() {
               ];
 
               const faqs = [
-                { q: "How do the 4 levels work?", a: "Each challenge has 4 levels to complete. Level 1 requires a 3-win streak, Level 2 requires 5 wins, Level 3 requires 7 wins, and Level 4 requires 10 consecutive wins. You earn rewards at each level!" },
+                { q: "How do the 4 levels work?", a: "Each challenge has 4 levels to complete. Level 1 requires a 5-win streak, Level 2 requires 10 wins, Level 3 requires 15 wins, and Level 4 requires 20 consecutive wins. You earn rewards at each level!" },
                 { q: "What happens if I lose during a level?", a: "If you lose while attempting a level, your streak resets to zero but you keep any rewards already earned from completed levels. You can continue attempting the current level." },
                 { q: "Do I need to complete all 4 levels?", a: "No! You can cash out your earned rewards at any time. However, completing all 4 levels unlocks the maximum payout for your account size." },
                 { q: "How long do I have to complete all levels?", a: "You have 30 days from your purchase date to complete as many levels as you can. Any rewards earned during this time are yours to keep." },
@@ -1136,6 +1205,92 @@ export default function Dashboard() {
 
               return (
                 <>
+                  {/* My Active Challenges Section */}
+                  {activeChallenges.length > 0 && (
+                    <div className="bg-gradient-to-br from-[#1a2a2a] via-[#152525] to-[#102020] border border-teal-600/50 rounded-2xl p-6 relative overflow-hidden">
+                      <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(20,184,166,0.1),transparent_50%)]"></div>
+                      <div className="relative">
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="flex items-center gap-3">
+                            <span className="text-2xl">🏆</span>
+                            <h2 className="text-xl font-bold text-white">My Active Challenges</h2>
+                            <span className="bg-teal-500/20 text-teal-400 text-xs font-bold px-2 py-1 rounded-full">
+                              {challengeCount}/{maxChallenges} Active
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {activeChallenges.map((challenge) => {
+                            const tier = challengeTiers.find(t => t.size === challenge.tier);
+                            const nextLevel = levelRequirements.find(l => challenge.currentStreak < l.streakRequired);
+                            const currentLevelReq = levelRequirements.find(l => l.level === challenge.currentLevel);
+                            const streakProgress = nextLevel
+                              ? (challenge.currentStreak / nextLevel.streakRequired) * 100
+                              : 100;
+
+                            return (
+                              <div
+                                key={challenge.id}
+                                className="bg-zinc-900/80 border border-zinc-700/50 rounded-xl p-4 hover:border-teal-500/50 transition-all"
+                              >
+                                <div className="flex items-center justify-between mb-3">
+                                  <div className="flex items-center gap-2">
+                                    <span className={`px-2 py-1 rounded text-xs font-bold bg-gradient-to-r ${currentLevelReq?.color || 'from-zinc-500 to-zinc-400'} text-white`}>
+                                      Level {challenge.currentLevel}
+                                    </span>
+                                    <span className="text-white font-bold">{tier?.label || `$${challenge.tier/1000}K`}</span>
+                                  </div>
+                                  <span className="text-zinc-400 text-xs">{challenge.daysRemaining}d left</span>
+                                </div>
+
+                                {/* Streak Progress */}
+                                <div className="mb-3">
+                                  <div className="flex items-center justify-between text-xs mb-1">
+                                    <span className="text-zinc-400">Current Streak</span>
+                                    <span className="text-teal-400 font-bold">
+                                      {challenge.currentStreak}/{nextLevel?.streakRequired || 20} wins
+                                    </span>
+                                  </div>
+                                  <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
+                                    <div
+                                      className="h-full bg-gradient-to-r from-teal-500 to-emerald-400 transition-all"
+                                      style={{ width: `${streakProgress}%` }}
+                                    ></div>
+                                  </div>
+                                </div>
+
+                                {/* Level Progress Dots */}
+                                <div className="flex items-center justify-center gap-2 mb-3">
+                                  {[1, 2, 3, 4].map((lvl) => (
+                                    <div
+                                      key={lvl}
+                                      className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                                        challenge[`level${lvl}Completed`]
+                                          ? 'bg-gradient-to-r from-emerald-500 to-green-400 text-white'
+                                          : lvl === challenge.currentLevel
+                                          ? 'bg-teal-500/30 border-2 border-teal-500 text-teal-400'
+                                          : 'bg-zinc-800 text-zinc-500'
+                                      }`}
+                                    >
+                                      {challenge[`level${lvl}Completed`] ? '✓' : lvl}
+                                    </div>
+                                  ))}
+                                </div>
+
+                                {/* Rewards Earned */}
+                                <div className="flex items-center justify-between pt-3 border-t border-zinc-800">
+                                  <span className="text-zinc-400 text-xs">Earned</span>
+                                  <span className="text-emerald-400 font-bold">${(challenge.totalRewardsEarned || 0).toLocaleString()}</span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Hero Section */}
                   <div className="bg-gradient-to-br from-[#1a3a3a] via-[#153030] to-[#102828] border border-[#2a5555]/50 rounded-2xl p-8 relative overflow-hidden">
                     <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(45,180,180,0.15),transparent_50%)]"></div>
@@ -2286,6 +2441,7 @@ export default function Dashboard() {
             {/* Top Row: Win Streak Challenge */}
             <div className="grid gap-6 lg:grid-cols-2">
               {/* Win Streak Challenge Card */}
+              <div className={`${activeChallenges.length === 0 ? 'opacity-40 blur-[2px] pointer-events-none select-none' : ''}`}>
               {(() => {
                 // Calculate current win streak from settled bets
                 const settledBets = bets.filter(b => b.result !== 'pending').sort((a, b) =>
@@ -2467,18 +2623,51 @@ export default function Dashboard() {
                   </div>
                 );
               })()}
+              </div>
 
-              {/* Account Size Selection - Bet Analysis Tab */}
+              {/* Account Selection - Dashboard Tab (Only Purchased Challenges) */}
               {(() => {
-                const accountSizes = [
-                  { size: 1000, cost: 19.99, label: '$1K', rewards: [3, 100, 500, 1000] },
-                  { size: 5000, cost: 99, label: '$5K', rewards: [20, 350, 2000, 5000] },
-                  { size: 10000, cost: 199, label: '$10K', rewards: [60, 700, 4500, 10000] },
-                  { size: 25000, cost: 399, label: '$25K', rewards: [100, 1400, 10000, 25000] },
-                  { size: 50000, cost: 699, label: '$50K', rewards: [150, 2800, 20000, 50000] },
-                  { size: 100000, cost: 999, label: '$100K', rewards: [250, 5000, 50000, 100000] },
-                ];
-                const currentAccount = accountSizes.find(a => a.size === selectedAccountSize) || accountSizes[0];
+                // Get reward data for a tier
+                const getTierRewards = (tier: number): number[] => {
+                  const tierData: Record<number, number[]> = {
+                    1000: [3, 100, 500, 1000],
+                    5000: [20, 350, 2000, 5000],
+                    10000: [60, 700, 4500, 10000],
+                    25000: [100, 1400, 10000, 25000],
+                    50000: [150, 2800, 20000, 50000],
+                    100000: [250, 5000, 50000, 100000],
+                  };
+                  return tierData[tier] || [0, 0, 0, 0];
+                };
+
+                const getTierLabel = (tier: number): string => {
+                  if (tier >= 1000) return `$${tier / 1000}K`;
+                  return `$${tier}`;
+                };
+
+                // No active challenges - show prompt to purchase
+                if (activeChallenges.length === 0) {
+                  return (
+                    <div className="bg-gradient-to-br from-[#1a3a3a] via-[#153030] to-[#102828] border border-[#2a5555]/50 rounded-2xl p-6 relative overflow-hidden">
+                      <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(45,180,180,0.12),transparent_50%)]"></div>
+                      <div className="relative text-center py-4">
+                        <div className="text-4xl mb-3">🎯</div>
+                        <h3 className="text-lg font-bold text-white mb-2">No Active Challenges</h3>
+                        <p className="text-sm text-[#7cc4c4] mb-4">Purchase a challenge to start tracking your winning streak!</p>
+                        <button
+                          onClick={() => setActiveTab('challenges')}
+                          className="px-6 py-2 bg-teal-500 hover:bg-teal-400 text-black font-semibold rounded-xl transition-all"
+                        >
+                          Browse Challenges
+                        </button>
+                      </div>
+                    </div>
+                  );
+                }
+
+                // Find the selected challenge or default to first
+                const selectedChallenge = activeChallenges.find(c => c.id === selectedChallengeId) || activeChallenges[0];
+                const rewards = selectedChallenge?.tierRewards || getTierRewards(selectedChallenge?.tier || 1000);
 
                 return (
                   <div className="bg-gradient-to-br from-[#1a3a3a] via-[#153030] to-[#102828] border border-[#2a5555]/50 rounded-2xl p-6 relative overflow-hidden">
@@ -2486,53 +2675,97 @@ export default function Dashboard() {
                     <div className="relative">
                       <div className="flex items-center justify-between mb-4">
                         <div>
-                          <h3 className="text-lg font-bold text-white mb-1">Your Challenge Account</h3>
-                          <p className="text-sm text-[#7cc4c4]">Complete streaks to unlock rewards</p>
+                          <h3 className="text-lg font-bold text-white mb-1">
+                            {activeChallenges.length === 1 ? 'Your Challenge Account' : 'Your Challenge Accounts'}
+                          </h3>
+                          <p className="text-sm text-[#7cc4c4]">
+                            {activeChallenges.length === 1
+                              ? `${selectedChallenge?.tierLabel || getTierLabel(selectedChallenge?.tier)} Challenge Active`
+                              : `${activeChallenges.length} active challenges`}
+                          </p>
                         </div>
                         <div className="text-right">
                           <div className="text-xs text-zinc-400">Max Reward</div>
-                          <div className="text-xl font-bold text-teal-400">${currentAccount.rewards[3].toLocaleString()}</div>
+                          <div className="text-xl font-bold text-teal-400">${rewards[3]?.toLocaleString()}</div>
                         </div>
                       </div>
 
-                      {/* Account Size Buttons - Compact */}
-                      <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
-                        {accountSizes.map((account) => (
-                          <button
-                            key={account.size}
-                            onClick={() => setSelectedAccountSize(account.size)}
-                            className={`p-3 rounded-xl border transition-all ${
-                              selectedAccountSize === account.size
-                                ? 'bg-teal-500/20 border-teal-500 shadow-lg shadow-teal-500/20'
-                                : 'bg-zinc-900/50 border-zinc-700/50 hover:border-teal-600/50'
-                            }`}
-                          >
-                            <div className={`text-base font-bold ${selectedAccountSize === account.size ? 'text-teal-400' : 'text-white'}`}>
-                              {account.label}
-                            </div>
-                            <div className="text-xs text-zinc-500">${account.cost}</div>
-                          </button>
-                        ))}
+                      {/* Challenge Switcher - Only show if more than one challenge */}
+                      {activeChallenges.length > 1 && (
+                        <div className={`grid gap-2 mb-4 ${activeChallenges.length <= 3 ? 'grid-cols-' + activeChallenges.length : 'grid-cols-3 md:grid-cols-5'}`}>
+                          {activeChallenges.map((challenge) => {
+                            const isSelected = challenge.id === (selectedChallengeId || activeChallenges[0]?.id);
+                            const label = challenge.tierLabel || getTierLabel(challenge.tier);
+                            return (
+                              <button
+                                key={challenge.id}
+                                onClick={() => setSelectedChallengeId(challenge.id)}
+                                className={`p-3 rounded-xl border transition-all ${
+                                  isSelected
+                                    ? 'bg-teal-500/20 border-teal-500 shadow-lg shadow-teal-500/20'
+                                    : 'bg-zinc-900/50 border-zinc-700/50 hover:border-teal-600/50'
+                                }`}
+                              >
+                                <div className={`text-base font-bold ${isSelected ? 'text-teal-400' : 'text-white'}`}>
+                                  {label}
+                                </div>
+                                <div className="text-xs text-zinc-500">
+                                  Streak: {challenge.currentStreak || 0}
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {/* Selected Challenge Details */}
+                      <div className="bg-zinc-900/40 rounded-xl p-4 mb-4">
+                        <div className="grid grid-cols-4 gap-4 text-center">
+                          <div>
+                            <div className="text-xs text-zinc-500 mb-1">Current Streak</div>
+                            <div className="text-lg font-bold text-teal-400">{selectedChallenge?.currentStreak || 0}</div>
+                          </div>
+                          <div>
+                            <div className="text-xs text-zinc-500 mb-1">Level</div>
+                            <div className="text-lg font-bold text-white">{selectedChallenge?.currentLevel || 1}/4</div>
+                          </div>
+                          <div>
+                            <div className="text-xs text-zinc-500 mb-1">Days Left</div>
+                            <div className="text-lg font-bold text-amber-400">{selectedChallenge?.daysRemaining ?? 30}</div>
+                          </div>
+                          <div>
+                            <div className="text-xs text-zinc-500 mb-1">Earned</div>
+                            <div className="text-lg font-bold text-emerald-400">${(selectedChallenge?.totalRewardsEarned || 0).toLocaleString()}</div>
+                          </div>
+                        </div>
                       </div>
 
                       {/* Level Rewards Preview */}
-                      <div className="mt-4 pt-4 border-t border-[#2a5555]/40">
+                      <div className="pt-4 border-t border-[#2a5555]/40">
                         <div className="flex justify-between text-xs">
                           <div className="text-center">
-                            <div className="text-emerald-400 font-semibold">${currentAccount.rewards[0]}</div>
-                            <div className="text-zinc-500">Lvl 1</div>
+                            <div className={`font-semibold ${selectedChallenge?.level1Completed ? 'text-emerald-400' : 'text-zinc-400'}`}>
+                              ${rewards[0]} {selectedChallenge?.level1Completed && '✓'}
+                            </div>
+                            <div className="text-zinc-500">Lvl 1 (5W)</div>
                           </div>
                           <div className="text-center">
-                            <div className="text-blue-400 font-semibold">${currentAccount.rewards[1].toLocaleString()}</div>
-                            <div className="text-zinc-500">Lvl 2</div>
+                            <div className={`font-semibold ${selectedChallenge?.level2Completed ? 'text-blue-400' : 'text-zinc-400'}`}>
+                              ${rewards[1]?.toLocaleString()} {selectedChallenge?.level2Completed && '✓'}
+                            </div>
+                            <div className="text-zinc-500">Lvl 2 (10W)</div>
                           </div>
                           <div className="text-center">
-                            <div className="text-purple-400 font-semibold">${currentAccount.rewards[2].toLocaleString()}</div>
-                            <div className="text-zinc-500">Lvl 3</div>
+                            <div className={`font-semibold ${selectedChallenge?.level3Completed ? 'text-purple-400' : 'text-zinc-400'}`}>
+                              ${rewards[2]?.toLocaleString()} {selectedChallenge?.level3Completed && '✓'}
+                            </div>
+                            <div className="text-zinc-500">Lvl 3 (15W)</div>
                           </div>
                           <div className="text-center">
-                            <div className="text-amber-400 font-semibold">${currentAccount.rewards[3].toLocaleString()}</div>
-                            <div className="text-zinc-500">Lvl 4</div>
+                            <div className={`font-semibold ${selectedChallenge?.level4Completed ? 'text-amber-400' : 'text-zinc-400'}`}>
+                              ${rewards[3]?.toLocaleString()} {selectedChallenge?.level4Completed && '✓'}
+                            </div>
+                            <div className="text-zinc-500">Lvl 4 (20W)</div>
                           </div>
                         </div>
                       </div>
@@ -2542,7 +2775,7 @@ export default function Dashboard() {
               })()}
 
               {/* Streak History / Recent Results */}
-              <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-6">
+              <div className={`bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-6 ${activeChallenges.length === 0 ? 'opacity-40 blur-[2px] pointer-events-none select-none' : ''}`}>
                 <div className="flex items-center justify-between mb-4">
                   <span className="text-zinc-300 font-medium">Recent Results</span>
                   <span className="text-xs text-zinc-500">Last 20 bets</span>
@@ -2591,7 +2824,7 @@ export default function Dashboard() {
             </div>
 
             {/* Middle Row: Challenge Info + Trading Objectives + Calendar */}
-            <div className="grid gap-6 lg:grid-cols-3">
+            <div className={`grid gap-6 lg:grid-cols-3 ${activeChallenges.length === 0 ? 'opacity-40 blur-[2px] pointer-events-none select-none' : ''}`}>
               {/* Challenge Info */}
               <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-5">
                 <h3 className="text-zinc-300 font-medium mb-4">Challenge Info</h3>
@@ -2755,7 +2988,7 @@ export default function Dashboard() {
             </div>
 
             {/* Sub-tab Switcher */}
-            <div className="flex gap-2 p-1 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl">
+            <div className={`flex gap-2 p-1 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl ${activeChallenges.length === 0 ? 'opacity-40 blur-[2px] pointer-events-none select-none' : ''}`}>
               <button
                 onClick={() => setBetsSubTab('active')}
                 className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${
@@ -2780,7 +3013,7 @@ export default function Dashboard() {
 
             {/* Active Picks Section */}
             {betsSubTab === 'active' && (
-              <div className="space-y-4">
+              <div className={`space-y-4 ${activeChallenges.length === 0 ? 'opacity-40 blur-[2px] pointer-events-none select-none' : ''}`}>
                 {loadingBets ? (
                   <div className="bg-surface border border-zinc-800/50 rounded-2xl p-12 text-center">
                     <div className="animate-pulse text-zinc-400">Loading your active picks...</div>
@@ -2871,7 +3104,7 @@ export default function Dashboard() {
 
             {/* History Section */}
             {betsSubTab === 'history' && (
-              <div className="space-y-4">
+              <div className={`space-y-4 ${activeChallenges.length === 0 ? 'opacity-40 blur-[2px] pointer-events-none select-none' : ''}`}>
                 {loadingBets ? (
                   <div className="bg-surface border border-zinc-800/50 rounded-2xl p-12 text-center">
                     <div className="animate-pulse text-zinc-400">Loading pick history...</div>
@@ -3402,7 +3635,7 @@ export default function Dashboard() {
                   </svg>
                 </div>
                 <h4 className="text-lg font-semibold text-teal-400 mb-2">Bet Placed Successfully!</h4>
-                <p className="text-zinc-400 text-sm">Track your bet in the Bet Analysis tab</p>
+                <p className="text-zinc-400 text-sm">Track your bet in the Dashboard</p>
               </div>
             ) : (
               /* Bet Form */
@@ -3605,7 +3838,7 @@ export default function Dashboard() {
                   </svg>
                 </div>
                 <h4 className="text-lg font-semibold text-teal-400 mb-2">Bet Placed Successfully!</h4>
-                <p className="text-zinc-400 text-sm">Track your bet in the Bet Analysis tab</p>
+                <p className="text-zinc-400 text-sm">Track your bet in the Dashboard</p>
               </div>
             ) : (
               /* Bet Form */
@@ -3818,7 +4051,7 @@ export default function Dashboard() {
                   </svg>
                 </div>
                 <h4 className="text-lg font-semibold text-teal-400 mb-2">Parlay Placed!</h4>
-                <p className="text-zinc-400 text-sm">Track your parlay in the Bet Analysis tab</p>
+                <p className="text-zinc-400 text-sm">Track your parlay in the Dashboard</p>
               </div>
             ) : (
               <>
@@ -4090,8 +4323,43 @@ export default function Dashboard() {
                 <input type="checkbox" className="mt-1 w-4 h-4 rounded border-zinc-600 bg-zinc-800 text-teal-500 focus:ring-teal-500 focus:ring-offset-0" />
                 <span className="text-xs text-zinc-400 group-hover:text-zinc-300 transition-colors">I understand I must complete consecutive win streaks to earn rewards. Losses reset my current streak but not my earned rewards.</span>
               </label>
-              <button className="w-full py-4 rounded-xl font-bold text-lg transition-all bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-teal-400 text-white shadow-lg shadow-teal-500/25 hover:shadow-teal-500/40 hover:scale-[1.02] active:scale-[0.98]" onClick={() => { alert(`Proceeding to payment for ${selectedChallenge.label} Challenge - $${selectedChallenge.cost}`); setPurchaseModalOpen(false); }}>
-                💳 Start Challenge - ${selectedChallenge.cost}
+              {challengeError && (
+                <div className="mb-4 p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400 text-sm">
+                  {challengeError}
+                </div>
+              )}
+              {!canCreateMoreChallenges && (
+                <div className="mb-4 p-3 bg-yellow-500/20 border border-yellow-500/50 rounded-lg text-yellow-400 text-sm">
+                  You have reached the maximum of {maxChallenges} active challenges. Complete or let one expire to start a new one.
+                </div>
+              )}
+              {activeChallenges.length > 0 && canCreateMoreChallenges && (
+                <div className="mb-4 p-3 bg-teal-500/20 border border-teal-500/50 rounded-lg text-teal-400 text-sm">
+                  You have {challengeCount}/{maxChallenges} active challenges. You can add {maxChallenges - challengeCount} more.
+                </div>
+              )}
+              <button
+                className={`w-full py-4 rounded-xl font-bold text-lg transition-all ${
+                  purchasingChallenge || !canCreateMoreChallenges
+                    ? 'bg-zinc-700 text-zinc-400 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-teal-400 text-white shadow-lg shadow-teal-500/25 hover:shadow-teal-500/40 hover:scale-[1.02] active:scale-[0.98]'
+                }`}
+                onClick={purchaseChallenge}
+                disabled={purchasingChallenge || !canCreateMoreChallenges}
+              >
+                {purchasingChallenge ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    Starting Challenge...
+                  </span>
+                ) : !canCreateMoreChallenges ? (
+                  'Max Challenges Reached'
+                ) : (
+                  `💳 Start Challenge - $${selectedChallenge.cost}`
+                )}
               </button>
               <p className="text-center text-xs text-zinc-500 mt-3 flex items-center justify-center gap-2">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>

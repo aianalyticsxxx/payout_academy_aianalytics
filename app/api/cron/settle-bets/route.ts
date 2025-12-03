@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { getEventScores, getSportKey } from '@/lib/sports/odds-api';
+import { processChallengeSettlement } from '@/lib/challenges/challenge-service';
 
 // Verify cron secret
 function verifyCronSecret(req: NextRequest): boolean {
@@ -90,6 +91,16 @@ export async function GET(req: NextRequest) {
 
             // Update user leaderboard
             await updateUserStats(bet.userId);
+
+            // Process challenge streak update for all active challenges
+            const challengeResults = await processChallengeSettlement(bet.id, result);
+            if (challengeResults && challengeResults.length > 0) {
+              for (const cr of challengeResults) {
+                if (cr.levelCompleted) {
+                  console.log(`[Cron] User completed challenge level ${cr.levelCompleted} on challenge ${cr.challengeId}`);
+                }
+              }
+            }
 
             settledCount++;
             settledBets.push(bet.id);
