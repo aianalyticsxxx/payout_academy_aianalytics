@@ -1091,21 +1091,47 @@ export default function Dashboard() {
           <div className="space-y-6">
             {/* Challenge Tiers Data */}
             {(() => {
+              // 4-Level Progression System - Same levels for all, different rewards per account size
+              const levelRequirements = [
+                { level: 1, streakRequired: 3, name: 'Bronze', color: 'from-amber-700 to-amber-600' },
+                { level: 2, streakRequired: 5, name: 'Silver', color: 'from-zinc-400 to-zinc-300' },
+                { level: 3, streakRequired: 7, name: 'Gold', color: 'from-yellow-500 to-yellow-400' },
+                { level: 4, streakRequired: 10, name: 'Diamond', color: 'from-cyan-400 to-blue-400' },
+              ];
+
               const challengeTiers = [
-                { size: 1000, cost: 19.99, label: '$1K', profit: 100, target: 5, resetFee: 9.99 },
-                { size: 5000, cost: 99, label: '$5K', profit: 500, target: 10, resetFee: 49 },
-                { size: 10000, cost: 199, label: '$10K', profit: 1000, target: 10, resetFee: 99 },
-                { size: 25000, cost: 399, label: '$25K', profit: 2500, target: 15, resetFee: 199 },
-                { size: 50000, cost: 699, label: '$50K', profit: 5000, target: 15, resetFee: 349 },
-                { size: 100000, cost: 999, label: '$100K', profit: 10000, target: 20, resetFee: 499 },
+                {
+                  size: 1000, cost: 19.99, label: '$1K', resetFee: 9.99,
+                  rewards: [25, 50, 100, 200] // Level 1-4 rewards
+                },
+                {
+                  size: 5000, cost: 99, label: '$5K', resetFee: 49,
+                  rewards: [125, 250, 500, 1000]
+                },
+                {
+                  size: 10000, cost: 199, label: '$10K', resetFee: 99,
+                  rewards: [250, 500, 1000, 2000]
+                },
+                {
+                  size: 25000, cost: 399, label: '$25K', resetFee: 199,
+                  rewards: [625, 1250, 2500, 5000]
+                },
+                {
+                  size: 50000, cost: 699, label: '$50K', resetFee: 349,
+                  rewards: [1250, 2500, 5000, 10000]
+                },
+                {
+                  size: 100000, cost: 999, label: '$100K', resetFee: 499,
+                  rewards: [2500, 5000, 10000, 20000]
+                },
               ];
 
               const faqs = [
-                { q: "What happens if I lose?", a: "Your challenge ends immediately. You can purchase a new challenge or use the discounted reset option at 50% of the original cost." },
-                { q: "How long do I have to complete the challenge?", a: "You have 30 days from your purchase date to complete your challenge and reach the profit target." },
-                { q: "Can I reset my challenge?", a: "Yes! If you fail, you can reset at 50% of the original cost. This gives you a fresh start without paying full price." },
-                { q: "When do I get paid after passing?", a: "Payouts are processed within 3-5 business days after you successfully pass the challenge." },
-                { q: "What counts as a win?", a: "A win is any bet that settles in your favor. You must achieve consecutive wins - any loss resets your streak." },
+                { q: "How do the 4 levels work?", a: "Each challenge has 4 levels to complete. Level 1 requires a 3-win streak, Level 2 requires 5 wins, Level 3 requires 7 wins, and Level 4 requires 10 consecutive wins. You earn rewards at each level!" },
+                { q: "What happens if I lose during a level?", a: "If you lose while attempting a level, your streak resets to zero but you keep any rewards already earned from completed levels. You can continue attempting the current level." },
+                { q: "Do I need to complete all 4 levels?", a: "No! You can cash out your earned rewards at any time. However, completing all 4 levels unlocks the maximum payout for your account size." },
+                { q: "How long do I have to complete all levels?", a: "You have 30 days from your purchase date to complete as many levels as you can. Any rewards earned during this time are yours to keep." },
+                { q: "Can I reset my challenge?", a: "Yes! If your 30 days expire, you can reset at 50% of the original cost. This gives you a fresh 30 days to continue earning rewards." },
               ];
 
               return (
@@ -1117,22 +1143,34 @@ export default function Dashboard() {
                       <div className="flex items-center gap-3 mb-4">
                         <span className="text-4xl">🎮</span>
                         <div>
-                          <h1 className="text-3xl md:text-4xl font-black text-white">PICK YOUR CHALLENGE</h1>
-                          <p className="text-[#7cc4c4] mt-2 text-lg">Prove your betting skills. Hit your profit target within the streak requirement to get funded.</p>
+                          <h1 className="text-3xl md:text-4xl font-black text-white">STREAK CHALLENGES</h1>
+                          <p className="text-[#7cc4c4] mt-2 text-lg">Complete 4 levels of winning streaks. Bigger account = Bigger rewards at each level!</p>
                         </div>
                       </div>
-                      <div className="flex flex-wrap gap-4 mt-6">
+
+                      {/* Level Preview */}
+                      <div className="grid grid-cols-4 gap-2 mt-6 mb-4">
+                        {levelRequirements.map((lvl) => (
+                          <div key={lvl.level} className="text-center p-3 bg-zinc-900/50 rounded-xl border border-zinc-800/50">
+                            <div className={`text-xs font-bold bg-gradient-to-r ${lvl.color} bg-clip-text text-transparent`}>LEVEL {lvl.level}</div>
+                            <div className="text-white font-bold text-sm">{lvl.streakRequired} Wins</div>
+                            <div className="text-zinc-500 text-xs">{lvl.name}</div>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="flex flex-wrap gap-4">
+                        <div className="flex items-center gap-2 bg-teal-500/10 px-4 py-2 rounded-lg border border-teal-500/30">
+                          <span className="text-teal-400">✓</span>
+                          <span className="text-zinc-300 text-sm">Keep Rewards Each Level</span>
+                        </div>
                         <div className="flex items-center gap-2 bg-teal-500/10 px-4 py-2 rounded-lg border border-teal-500/30">
                           <span className="text-teal-400">✓</span>
                           <span className="text-zinc-300 text-sm">AI-Powered Picks</span>
                         </div>
                         <div className="flex items-center gap-2 bg-teal-500/10 px-4 py-2 rounded-lg border border-teal-500/30">
                           <span className="text-teal-400">✓</span>
-                          <span className="text-zinc-300 text-sm">Instant Start</span>
-                        </div>
-                        <div className="flex items-center gap-2 bg-teal-500/10 px-4 py-2 rounded-lg border border-teal-500/30">
-                          <span className="text-teal-400">✓</span>
-                          <span className="text-zinc-300 text-sm">Real Payouts</span>
+                          <span className="text-zinc-300 text-sm">30 Day Access</span>
                         </div>
                       </div>
                     </div>
@@ -1155,72 +1193,85 @@ export default function Dashboard() {
                         )}
 
                         {/* Card Header */}
-                        <div className={`text-center mb-6 ${idx === 2 || idx === 3 ? 'mt-4' : ''}`}>
+                        <div className={`text-center mb-4 ${idx === 2 || idx === 3 ? 'mt-4' : ''}`}>
                           <div className="text-4xl font-black text-white mb-1">${tier.size.toLocaleString()}</div>
                           <div className="text-sm font-bold text-teal-400 tracking-widest uppercase">CHALLENGE</div>
                         </div>
 
-                        {/* Stats */}
-                        <div className="bg-zinc-900/50 rounded-xl p-4 mb-6 space-y-3">
-                          <div className="flex items-center justify-between">
-                            <span className="text-zinc-400 text-sm flex items-center gap-2">
-                              <span>💰</span> Profit Target
-                            </span>
-                            <span className="text-white font-semibold">${tier.profit.toLocaleString()}</span>
+                        {/* Level Rewards Grid */}
+                        <div className="bg-zinc-900/50 rounded-xl p-4 mb-4">
+                          <div className="text-xs text-zinc-400 text-center mb-3 uppercase tracking-wider">Rewards Per Level</div>
+                          <div className="grid grid-cols-2 gap-2">
+                            {levelRequirements.map((lvl, i) => (
+                              <div key={lvl.level} className="bg-zinc-800/50 rounded-lg p-2 text-center">
+                                <div className={`text-[10px] font-bold bg-gradient-to-r ${lvl.color} bg-clip-text text-transparent`}>
+                                  LVL {lvl.level} • {lvl.streakRequired}W
+                                </div>
+                                <div className="text-white font-bold text-sm">${tier.rewards[i].toLocaleString()}</div>
+                              </div>
+                            ))}
                           </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-zinc-400 text-sm flex items-center gap-2">
-                              <span>🎯</span> Win Streak
-                            </span>
-                            <span className="text-white font-semibold">{tier.target} consecutive</span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-zinc-400 text-sm flex items-center gap-2">
-                              <span>⏱️</span> Time Limit
-                            </span>
-                            <span className="text-white font-semibold">30 days</span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-zinc-400 text-sm flex items-center gap-2">
-                              <span>🔄</span> Reset Fee
-                            </span>
-                            <span className="text-white font-semibold">${tier.resetFee}</span>
-                          </div>
+                        </div>
+
+                        {/* Total Potential */}
+                        <div className="flex items-center justify-between px-3 py-2 bg-teal-500/10 rounded-lg border border-teal-500/30 mb-4">
+                          <span className="text-zinc-400 text-sm">Max Payout (All 4)</span>
+                          <span className="text-teal-400 font-bold">${tier.rewards.reduce((a, b) => a + b, 0).toLocaleString()}</span>
+                        </div>
+
+                        {/* Meta Info */}
+                        <div className="flex items-center justify-between text-xs text-zinc-500 mb-4">
+                          <span>⏱️ 30 days</span>
+                          <span>🔄 Reset: ${tier.resetFee}</span>
                         </div>
 
                         {/* Buy Button */}
                         <button
                           onClick={() => {
-                            setSelectedChallenge(tier);
+                            setSelectedChallenge({ ...tier, target: 10, profit: tier.rewards.reduce((a, b) => a + b, 0) });
                             setPurchaseModalOpen(true);
                           }}
                           className="w-full py-4 rounded-xl font-bold text-lg transition-all bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-teal-400 text-white shadow-lg shadow-teal-500/25 group-hover:shadow-teal-500/40"
                         >
-                          💳 BUY - ${tier.cost}
+                          💳 START - ${tier.cost}
                         </button>
                       </div>
                     ))}
                   </div>
 
-                  {/* How It Works */}
+                  {/* How It Works - Updated for Level System */}
                   <div className="bg-[#1a1a1a] border border-zinc-800/50 rounded-2xl p-6">
-                    <h2 className="text-2xl font-bold text-white mb-6 text-center">How It Works</h2>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      {[
-                        { step: 1, icon: '🎯', title: 'Pick Challenge', desc: 'Choose your account size' },
-                        { step: 2, icon: '📊', title: 'Trade Smart', desc: 'Use AI picks to build your streak' },
-                        { step: 3, icon: '✓', title: 'Pass Target', desc: 'Hit your profit target within streak' },
-                        { step: 4, icon: '💰', title: 'Get Funded', desc: 'Receive your funded account' },
-                      ].map((item, idx) => (
-                        <div key={idx} className="text-center">
-                          <div className="w-16 h-16 mx-auto mb-3 bg-gradient-to-br from-teal-500/20 to-teal-600/10 border border-teal-500/30 rounded-2xl flex items-center justify-center">
-                            <span className="text-2xl">{item.icon}</span>
+                    <h2 className="text-2xl font-bold text-white mb-6 text-center">How The Levels Work</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      {levelRequirements.map((lvl, idx) => (
+                        <div key={lvl.level} className="relative">
+                          {idx < 3 && (
+                            <div className="hidden md:block absolute top-1/2 -right-2 w-4 h-0.5 bg-gradient-to-r from-zinc-600 to-zinc-700"></div>
+                          )}
+                          <div className="text-center p-4 bg-zinc-900/50 rounded-xl border border-zinc-800/50">
+                            <div className={`w-12 h-12 mx-auto mb-3 rounded-xl bg-gradient-to-r ${lvl.color} flex items-center justify-center`}>
+                              <span className="text-white font-black text-lg">{lvl.level}</span>
+                            </div>
+                            <div className="text-white font-bold mb-1">{lvl.name}</div>
+                            <div className="text-teal-400 font-semibold">{lvl.streakRequired} Win Streak</div>
+                            <div className="text-zinc-500 text-xs mt-2">
+                              {lvl.level === 1 && 'Start here!'}
+                              {lvl.level === 2 && 'Keep going!'}
+                              {lvl.level === 3 && 'Almost there!'}
+                              {lvl.level === 4 && 'Ultimate reward!'}
+                            </div>
                           </div>
-                          <div className="text-xs text-teal-400 font-bold mb-1">STEP {item.step}</div>
-                          <div className="text-white font-semibold mb-1">{item.title}</div>
-                          <div className="text-zinc-500 text-xs">{item.desc}</div>
                         </div>
                       ))}
+                    </div>
+                    <div className="mt-6 p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl">
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl">💡</span>
+                        <div>
+                          <div className="text-emerald-400 font-semibold">Pro Tip</div>
+                          <div className="text-zinc-400 text-sm">Each level reward is paid out immediately! A loss only resets your current streak, not your earned rewards.</div>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
@@ -1249,7 +1300,7 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  {/* Challenge Rules */}
+                  {/* Challenge Rules - Updated */}
                   <div className="bg-zinc-900/30 border border-zinc-800/50 rounded-2xl p-6">
                     <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
                       <span>📋</span> Challenge Rules
@@ -1257,23 +1308,27 @@ export default function Dashboard() {
                     <ul className="space-y-2 text-zinc-400 text-sm">
                       <li className="flex items-start gap-2">
                         <span className="text-teal-400 mt-0.5">•</span>
-                        <span>You must achieve the required consecutive wins without any losses</span>
+                        <span>Complete levels by achieving consecutive win streaks (3 → 5 → 7 → 10 wins)</span>
                       </li>
                       <li className="flex items-start gap-2">
                         <span className="text-teal-400 mt-0.5">•</span>
-                        <span>A single loss resets your win streak to zero</span>
+                        <span>Each level reward is paid out when you complete it - rewards are cumulative!</span>
                       </li>
                       <li className="flex items-start gap-2">
                         <span className="text-teal-400 mt-0.5">•</span>
-                        <span>Challenge must be completed within 30 days of purchase</span>
+                        <span>A loss resets your current streak to zero, but you keep all previously earned rewards</span>
                       </li>
                       <li className="flex items-start gap-2">
                         <span className="text-teal-400 mt-0.5">•</span>
-                        <span>Payouts processed within 3-5 business days after passing</span>
+                        <span>You have 30 days to complete as many levels as possible</span>
                       </li>
                       <li className="flex items-start gap-2">
                         <span className="text-teal-400 mt-0.5">•</span>
-                        <span>Reset option available at 50% of original cost if you fail</span>
+                        <span>Payouts processed within 3-5 business days after completing each level</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-teal-400 mt-0.5">•</span>
+                        <span>Reset option available at 50% of original cost when your 30 days expire</span>
                       </li>
                     </ul>
                   </div>
@@ -3983,40 +4038,62 @@ export default function Dashboard() {
       {/* CHALLENGE PURCHASE MODAL */}
       {purchaseModalOpen && selectedChallenge && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setPurchaseModalOpen(false)}>
-          <div className="bg-gradient-to-b from-[#1a1a1a] to-[#111111] border border-zinc-800 rounded-2xl p-8 w-full max-w-md relative overflow-hidden" onClick={e => e.stopPropagation()}>
+          <div className="bg-gradient-to-b from-[#1a1a1a] to-[#111111] border border-zinc-800 rounded-2xl p-6 w-full max-w-md relative overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(45,180,180,0.12),transparent_60%)]"></div>
             <button onClick={() => setPurchaseModalOpen(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white transition-colors z-10">
               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
             <div className="relative">
-              <div className="text-center mb-6">
+              <div className="text-center mb-4">
                 <span className="text-4xl mb-2 block">🎮</span>
-                <h2 className="text-2xl font-bold text-white">Confirm Your Challenge</h2>
-                <p className="text-zinc-400 text-sm mt-1">You&apos;re about to start your trading journey</p>
+                <h2 className="text-2xl font-bold text-white">Start Your Challenge</h2>
+                <p className="text-zinc-400 text-sm mt-1">Complete 4 levels of winning streaks!</p>
               </div>
-              <div className="bg-zinc-900/70 border border-zinc-700/50 rounded-xl p-5 mb-6">
-                <div className="text-center mb-4">
+              <div className="bg-zinc-900/70 border border-zinc-700/50 rounded-xl p-4 mb-4">
+                <div className="text-center mb-3">
                   <div className="text-3xl font-black text-white">${selectedChallenge.size.toLocaleString()}</div>
-                  <div className="text-sm font-bold text-teal-400 tracking-widest uppercase">Challenge Account</div>
+                  <div className="text-sm font-bold text-teal-400 tracking-widest uppercase">Streak Challenge</div>
                 </div>
-                <div className="space-y-3 text-sm">
-                  <div className="flex justify-between items-center py-2 border-b border-zinc-800"><span className="text-zinc-400">💰 Profit Target</span><span className="text-white font-semibold">${selectedChallenge.profit.toLocaleString()}</span></div>
-                  <div className="flex justify-between items-center py-2 border-b border-zinc-800"><span className="text-zinc-400">🎯 Win Streak Required</span><span className="text-white font-semibold">{selectedChallenge.target} consecutive</span></div>
-                  <div className="flex justify-between items-center py-2 border-b border-zinc-800"><span className="text-zinc-400">⏱️ Time Limit</span><span className="text-white font-semibold">30 days</span></div>
-                  <div className="flex justify-between items-center py-2"><span className="text-zinc-400">🔄 Reset Fee</span><span className="text-zinc-300">${selectedChallenge.resetFee}</span></div>
+                {/* Level Breakdown */}
+                <div className="text-xs text-zinc-400 text-center mb-2 uppercase">Level Rewards</div>
+                <div className="grid grid-cols-4 gap-1 mb-3">
+                  {[
+                    { lvl: 1, wins: 3, color: 'from-amber-700 to-amber-600' },
+                    { lvl: 2, wins: 5, color: 'from-zinc-400 to-zinc-300' },
+                    { lvl: 3, wins: 7, color: 'from-yellow-500 to-yellow-400' },
+                    { lvl: 4, wins: 10, color: 'from-cyan-400 to-blue-400' },
+                  ].map((l, i) => {
+                    const rewards = selectedChallenge.size === 1000 ? [25, 50, 100, 200] :
+                                   selectedChallenge.size === 5000 ? [125, 250, 500, 1000] :
+                                   selectedChallenge.size === 10000 ? [250, 500, 1000, 2000] :
+                                   selectedChallenge.size === 25000 ? [625, 1250, 2500, 5000] :
+                                   selectedChallenge.size === 50000 ? [1250, 2500, 5000, 10000] :
+                                   [2500, 5000, 10000, 20000];
+                    return (
+                      <div key={l.lvl} className="bg-zinc-800/50 rounded-lg p-2 text-center">
+                        <div className={`text-[9px] font-bold bg-gradient-to-r ${l.color} bg-clip-text text-transparent`}>L{l.lvl}•{l.wins}W</div>
+                        <div className="text-white font-bold text-xs">${rewards[i]}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between items-center py-1.5 border-b border-zinc-800"><span className="text-zinc-400">💰 Max Payout</span><span className="text-teal-400 font-semibold">${selectedChallenge.profit.toLocaleString()}</span></div>
+                  <div className="flex justify-between items-center py-1.5 border-b border-zinc-800"><span className="text-zinc-400">⏱️ Time Limit</span><span className="text-white font-semibold">30 days</span></div>
+                  <div className="flex justify-between items-center py-1.5"><span className="text-zinc-400">🔄 Reset Fee</span><span className="text-zinc-300">${selectedChallenge.resetFee}</span></div>
                 </div>
               </div>
-              <div className="bg-teal-500/10 border border-teal-500/30 rounded-xl p-4 mb-6">
+              <div className="bg-teal-500/10 border border-teal-500/30 rounded-xl p-3 mb-4">
                 <div className="flex justify-between items-center"><span className="text-zinc-300 font-medium">Total</span><span className="text-2xl font-black text-teal-400">${selectedChallenge.cost.toFixed(2)}</span></div>
               </div>
-              <label className="flex items-start gap-3 mb-6 cursor-pointer group">
+              <label className="flex items-start gap-3 mb-4 cursor-pointer group">
                 <input type="checkbox" className="mt-1 w-4 h-4 rounded border-zinc-600 bg-zinc-800 text-teal-500 focus:ring-teal-500 focus:ring-offset-0" />
-                <span className="text-xs text-zinc-400 group-hover:text-zinc-300 transition-colors">I agree to the challenge rules and understand that if I fail to meet the profit target within the required win streak, I will need to purchase a new challenge or use the reset option.</span>
+                <span className="text-xs text-zinc-400 group-hover:text-zinc-300 transition-colors">I understand I must complete consecutive win streaks to earn rewards. Losses reset my current streak but not my earned rewards.</span>
               </label>
               <button className="w-full py-4 rounded-xl font-bold text-lg transition-all bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-teal-400 text-white shadow-lg shadow-teal-500/25 hover:shadow-teal-500/40 hover:scale-[1.02] active:scale-[0.98]" onClick={() => { alert(`Proceeding to payment for ${selectedChallenge.label} Challenge - $${selectedChallenge.cost}`); setPurchaseModalOpen(false); }}>
-                💳 Proceed to Payment
+                💳 Start Challenge - ${selectedChallenge.cost}
               </button>
-              <p className="text-center text-xs text-zinc-500 mt-4 flex items-center justify-center gap-2">
+              <p className="text-center text-xs text-zinc-500 mt-3 flex items-center justify-center gap-2">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
                 Secure checkout powered by Stripe
               </p>
