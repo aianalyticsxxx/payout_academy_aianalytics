@@ -2687,6 +2687,11 @@ export default function Dashboard() {
                 { level: 2, streak: 10, title: 'Lvl 2', description: '10 consecutive wins', reward: '$100', value: 100, icon: '💰', accent: 'blue' },
                 { level: 3, streak: 15, title: 'Lvl 3', description: '15 consecutive wins', reward: '$500', value: 500, icon: '💎', accent: 'purple' },
                 { level: 4, streak: 20, title: 'Lvl 4', description: '20 consecutive wins', reward: '$1,000', value: 1000, icon: '🏆', accent: 'amber' },
+                { level: 5, streak: 25, title: 'Lvl 5', description: '25 consecutive wins', reward: '$5,000', value: 5000, icon: '🔥', accent: 'orange' },
+                { level: 6, streak: 30, title: 'Lvl 6', description: '30 consecutive wins', reward: '$10,000', value: 10000, icon: '⭐', accent: 'yellow' },
+                { level: 7, streak: 35, title: 'Lvl 7', description: '35 consecutive wins', reward: '$25,000', value: 25000, icon: '💫', accent: 'cyan' },
+                { level: 8, streak: 40, title: 'Lvl 8', description: '40 consecutive wins', reward: '$50,000', value: 50000, icon: '👑', accent: 'pink' },
+                { level: 9, streak: 45, title: 'Lvl 9', description: '45 consecutive wins', reward: '$100,000', value: 100000, icon: '🚀', accent: 'rose' },
               ];
 
               // Accent colors for progress bar and badge only
@@ -2695,10 +2700,15 @@ export default function Dashboard() {
                 blue: { bar: 'bg-blue-500', badge: 'text-blue-400 bg-blue-500/20', glow: 'shadow-blue-500/20' },
                 purple: { bar: 'bg-purple-500', badge: 'text-purple-400 bg-purple-500/20', glow: 'shadow-purple-500/20' },
                 amber: { bar: 'bg-amber-500', badge: 'text-amber-400 bg-amber-500/20', glow: 'shadow-amber-500/20' },
+                orange: { bar: 'bg-orange-500', badge: 'text-orange-400 bg-orange-500/20', glow: 'shadow-orange-500/20' },
+                yellow: { bar: 'bg-yellow-500', badge: 'text-yellow-400 bg-yellow-500/20', glow: 'shadow-yellow-500/20' },
+                cyan: { bar: 'bg-cyan-500', badge: 'text-cyan-400 bg-cyan-500/20', glow: 'shadow-cyan-500/20' },
+                pink: { bar: 'bg-pink-500', badge: 'text-pink-400 bg-pink-500/20', glow: 'shadow-pink-500/20' },
+                rose: { bar: 'bg-rose-500', badge: 'text-rose-400 bg-rose-500/20', glow: 'shadow-rose-500/20' },
               };
 
               return (
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                   {rewards.map((reward) => {
                     const isUnlocked = bestStreak >= reward.streak;
                     const isClaimed = claimedRewards.includes(reward.level);
