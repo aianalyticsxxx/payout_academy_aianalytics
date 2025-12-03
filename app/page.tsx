@@ -241,6 +241,7 @@ export default function Dashboard() {
   const [payoutModalOpen, setPayoutModalOpen] = useState(false);
   const [payoutAmount, setPayoutAmount] = useState<number>(50);
   const [totalEarnings, setTotalEarnings] = useState<number>(0); // Track total earned from rewards
+  const [selectedAccountSize, setSelectedAccountSize] = useState<number>(1000); // Account size selection
   const [selectedCategory, setSelectedCategory] = useState<SportCategory>(SPORTS_CATEGORIES[0]);
   const [selectedLeague, setSelectedLeague] = useState<League>(SPORTS_CATEGORIES[0].leagues[0]);
   const [events, setEvents] = useState<SportEvent[]>([]);
@@ -2640,6 +2641,60 @@ export default function Dashboard() {
               </div>
             </div>
 
+            {/* Account Size Selection */}
+            {(() => {
+              const accountSizes = [
+                { size: 1000, cost: 19.99, label: '$1K', rewards: [3, 100, 500, 1000] },
+                { size: 5000, cost: 99, label: '$5K', rewards: [20, 350, 2000, 5000] },
+                { size: 10000, cost: 199, label: '$10K', rewards: [60, 700, 4500, 10000] },
+                { size: 25000, cost: 399, label: '$25K', rewards: [100, 1400, 10000, 25000] },
+                { size: 50000, cost: 699, label: '$50K', rewards: [150, 2800, 20000, 50000] },
+                { size: 100000, cost: 999, label: '$100K', rewards: [250, 5000, 50000, 100000] },
+              ];
+              const currentAccount = accountSizes.find(a => a.size === selectedAccountSize) || accountSizes[0];
+
+              return (
+                <div className="bg-gradient-to-br from-[#1a3a3a] via-[#153030] to-[#102828] border border-[#2a5555]/50 rounded-2xl p-6 relative overflow-hidden">
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(45,180,180,0.12),transparent_50%)]"></div>
+                  <div className="relative">
+                    <div className="flex items-center justify-between mb-6">
+                      <div>
+                        <h2 className="text-2xl font-bold text-white mb-2">Choose Your Account Size</h2>
+                        <p className="text-[#7cc4c4]">Higher accounts unlock bigger rewards</p>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm text-zinc-400">Current Account</div>
+                        <div className="text-2xl font-bold text-teal-400">${selectedAccountSize.toLocaleString()}</div>
+                      </div>
+                    </div>
+
+                    {/* Account Size Cards */}
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                      {accountSizes.map((account) => (
+                        <button
+                          key={account.size}
+                          onClick={() => setSelectedAccountSize(account.size)}
+                          className={`p-4 rounded-xl border transition-all ${
+                            selectedAccountSize === account.size
+                              ? 'bg-teal-500/20 border-teal-500 shadow-lg shadow-teal-500/20'
+                              : 'bg-zinc-900/50 border-zinc-700/50 hover:border-teal-600/50'
+                          }`}
+                        >
+                          <div className={`text-xl font-bold mb-1 ${selectedAccountSize === account.size ? 'text-teal-400' : 'text-white'}`}>
+                            {account.label}
+                          </div>
+                          <div className="text-sm text-zinc-400">${account.cost}</div>
+                          <div className="text-xs text-zinc-500 mt-2">
+                            Max: ${account.rewards[3].toLocaleString()}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* Rewards Header - Teal Theme */}
             <div className="bg-gradient-to-br from-[#1a3a3a] via-[#153030] to-[#102828] border border-[#2a5555]/50 rounded-2xl p-6 relative overflow-hidden">
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(45,180,180,0.12),transparent_50%)]"></div>
@@ -2658,6 +2713,17 @@ export default function Dashboard() {
 
             {/* Rewards Grid */}
             {(() => {
+              // Account sizes with their rewards
+              const accountSizes: Record<number, number[]> = {
+                1000: [3, 100, 500, 1000],
+                5000: [20, 350, 2000, 5000],
+                10000: [60, 700, 4500, 10000],
+                25000: [100, 1400, 10000, 25000],
+                50000: [150, 2800, 20000, 50000],
+                100000: [250, 5000, 50000, 100000],
+              };
+              const currentRewards = accountSizes[selectedAccountSize] || accountSizes[1000];
+
               // Calculate current streak (same logic as Bet Analysis)
               const settledBets = bets.filter(b => b.result !== 'pending').sort((a, b) =>
                 new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -2683,10 +2749,10 @@ export default function Dashboard() {
               }
 
               const rewards = [
-                { level: 1, streak: 5, title: 'Lvl 1', description: '5 consecutive wins', reward: '$3', value: 3, icon: '💵', accent: 'emerald' },
-                { level: 2, streak: 10, title: 'Lvl 2', description: '10 consecutive wins', reward: '$100', value: 100, icon: '💰', accent: 'blue' },
-                { level: 3, streak: 15, title: 'Lvl 3', description: '15 consecutive wins', reward: '$500', value: 500, icon: '💎', accent: 'purple' },
-                { level: 4, streak: 20, title: 'Lvl 4', description: '20 consecutive wins', reward: '$1,000', value: 1000, icon: '🏆', accent: 'amber' },
+                { level: 1, streak: 5, title: 'Lvl 1', description: '5 consecutive wins', reward: `$${currentRewards[0].toLocaleString()}`, value: currentRewards[0], icon: '💵', accent: 'emerald' },
+                { level: 2, streak: 10, title: 'Lvl 2', description: '10 consecutive wins', reward: `$${currentRewards[1].toLocaleString()}`, value: currentRewards[1], icon: '💰', accent: 'blue' },
+                { level: 3, streak: 15, title: 'Lvl 3', description: '15 consecutive wins', reward: `$${currentRewards[2].toLocaleString()}`, value: currentRewards[2], icon: '💎', accent: 'purple' },
+                { level: 4, streak: 20, title: 'Lvl 4', description: '20 consecutive wins', reward: `$${currentRewards[3].toLocaleString()}`, value: currentRewards[3], icon: '🏆', accent: 'amber' },
               ];
 
               // Accent colors for progress bar and badge only
