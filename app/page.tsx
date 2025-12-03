@@ -234,7 +234,10 @@ export default function Dashboard() {
   const router = useRouter();
 
   // State
-  const [activeTab, setActiveTab] = useState<'events' | 'ai' | 'bets' | 'rewards' | 'competition'>('events');
+  const [activeTab, setActiveTab] = useState<'events' | 'challenges' | 'ai' | 'bets' | 'rewards' | 'competition'>('events');
+  const [purchaseModalOpen, setPurchaseModalOpen] = useState(false);
+  const [selectedChallenge, setSelectedChallenge] = useState<{ size: number; cost: number; label: string; profit: number; target: number } | null>(null);
+  const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
   const [claimedRewards, setClaimedRewards] = useState<number[]>([]);
   const [rewardModalOpen, setRewardModalOpen] = useState(false);
   const [rewardToClaim, setRewardToClaim] = useState<number | null>(null);
@@ -770,6 +773,7 @@ export default function Dashboard() {
         <div className="max-w-7xl mx-auto flex overflow-x-auto">
           {[
             { id: 'events', label: 'Events', icon: '🎯' },
+            { id: 'challenges', label: 'Challenges', icon: '🎮' },
             { id: 'ai', label: 'AI Hub', icon: '🤖' },
             { id: 'bets', label: 'Bet Analysis', icon: '📊' },
             { id: 'rewards', label: 'Rewards', icon: '🎁' },
@@ -1079,6 +1083,203 @@ export default function Dashboard() {
                 })}
               </div>
             )}
+          </div>
+        )}
+
+        {/* CHALLENGES TAB */}
+        {activeTab === 'challenges' && (
+          <div className="space-y-6">
+            {/* Challenge Tiers Data */}
+            {(() => {
+              const challengeTiers = [
+                { size: 1000, cost: 19.99, label: '$1K', profit: 100, target: 5, resetFee: 9.99 },
+                { size: 5000, cost: 99, label: '$5K', profit: 500, target: 10, resetFee: 49 },
+                { size: 10000, cost: 199, label: '$10K', profit: 1000, target: 10, resetFee: 99 },
+                { size: 25000, cost: 399, label: '$25K', profit: 2500, target: 15, resetFee: 199 },
+                { size: 50000, cost: 699, label: '$50K', profit: 5000, target: 15, resetFee: 349 },
+                { size: 100000, cost: 999, label: '$100K', profit: 10000, target: 20, resetFee: 499 },
+              ];
+
+              const faqs = [
+                { q: "What happens if I lose?", a: "Your challenge ends immediately. You can purchase a new challenge or use the discounted reset option at 50% of the original cost." },
+                { q: "How long do I have to complete the challenge?", a: "You have 30 days from your purchase date to complete your challenge and reach the profit target." },
+                { q: "Can I reset my challenge?", a: "Yes! If you fail, you can reset at 50% of the original cost. This gives you a fresh start without paying full price." },
+                { q: "When do I get paid after passing?", a: "Payouts are processed within 3-5 business days after you successfully pass the challenge." },
+                { q: "What counts as a win?", a: "A win is any bet that settles in your favor. You must achieve consecutive wins - any loss resets your streak." },
+              ];
+
+              return (
+                <>
+                  {/* Hero Section */}
+                  <div className="bg-gradient-to-br from-[#1a3a3a] via-[#153030] to-[#102828] border border-[#2a5555]/50 rounded-2xl p-8 relative overflow-hidden">
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(45,180,180,0.15),transparent_50%)]"></div>
+                    <div className="relative">
+                      <div className="flex items-center gap-3 mb-4">
+                        <span className="text-4xl">🎮</span>
+                        <div>
+                          <h1 className="text-3xl md:text-4xl font-black text-white">PICK YOUR CHALLENGE</h1>
+                          <p className="text-[#7cc4c4] mt-2 text-lg">Prove your betting skills. Hit your profit target within the streak requirement to get funded.</p>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-4 mt-6">
+                        <div className="flex items-center gap-2 bg-teal-500/10 px-4 py-2 rounded-lg border border-teal-500/30">
+                          <span className="text-teal-400">✓</span>
+                          <span className="text-zinc-300 text-sm">AI-Powered Picks</span>
+                        </div>
+                        <div className="flex items-center gap-2 bg-teal-500/10 px-4 py-2 rounded-lg border border-teal-500/30">
+                          <span className="text-teal-400">✓</span>
+                          <span className="text-zinc-300 text-sm">Instant Start</span>
+                        </div>
+                        <div className="flex items-center gap-2 bg-teal-500/10 px-4 py-2 rounded-lg border border-teal-500/30">
+                          <span className="text-teal-400">✓</span>
+                          <span className="text-zinc-300 text-sm">Real Payouts</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Challenge Cards Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {challengeTiers.map((tier, idx) => (
+                      <div
+                        key={tier.size}
+                        className={`bg-gradient-to-br from-[#1a1a1a] via-[#151515] to-[#111111] border rounded-2xl p-6 relative overflow-hidden group transition-all hover:border-teal-600/50 ${
+                          idx === 2 || idx === 3 ? 'border-amber-500/50' : 'border-zinc-800/50'
+                        }`}
+                      >
+                        {/* Popular Badge */}
+                        {(idx === 2 || idx === 3) && (
+                          <div className="absolute -top-0 left-1/2 -translate-x-1/2 px-4 py-1 bg-gradient-to-r from-amber-500 to-orange-500 rounded-b-lg text-xs font-bold text-black uppercase tracking-wide">
+                            {idx === 2 ? 'MOST POPULAR' : 'BEST VALUE'}
+                          </div>
+                        )}
+
+                        {/* Card Header */}
+                        <div className={`text-center mb-6 ${idx === 2 || idx === 3 ? 'mt-4' : ''}`}>
+                          <div className="text-4xl font-black text-white mb-1">${tier.size.toLocaleString()}</div>
+                          <div className="text-sm font-bold text-teal-400 tracking-widest uppercase">CHALLENGE</div>
+                        </div>
+
+                        {/* Stats */}
+                        <div className="bg-zinc-900/50 rounded-xl p-4 mb-6 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-zinc-400 text-sm flex items-center gap-2">
+                              <span>💰</span> Profit Target
+                            </span>
+                            <span className="text-white font-semibold">${tier.profit.toLocaleString()}</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-zinc-400 text-sm flex items-center gap-2">
+                              <span>🎯</span> Win Streak
+                            </span>
+                            <span className="text-white font-semibold">{tier.target} consecutive</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-zinc-400 text-sm flex items-center gap-2">
+                              <span>⏱️</span> Time Limit
+                            </span>
+                            <span className="text-white font-semibold">30 days</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-zinc-400 text-sm flex items-center gap-2">
+                              <span>🔄</span> Reset Fee
+                            </span>
+                            <span className="text-white font-semibold">${tier.resetFee}</span>
+                          </div>
+                        </div>
+
+                        {/* Buy Button */}
+                        <button
+                          onClick={() => {
+                            setSelectedChallenge(tier);
+                            setPurchaseModalOpen(true);
+                          }}
+                          className="w-full py-4 rounded-xl font-bold text-lg transition-all bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-teal-400 text-white shadow-lg shadow-teal-500/25 group-hover:shadow-teal-500/40"
+                        >
+                          💳 BUY - ${tier.cost}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* How It Works */}
+                  <div className="bg-[#1a1a1a] border border-zinc-800/50 rounded-2xl p-6">
+                    <h2 className="text-2xl font-bold text-white mb-6 text-center">How It Works</h2>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      {[
+                        { step: 1, icon: '🎯', title: 'Pick Challenge', desc: 'Choose your account size' },
+                        { step: 2, icon: '📊', title: 'Trade Smart', desc: 'Use AI picks to build your streak' },
+                        { step: 3, icon: '✓', title: 'Pass Target', desc: 'Hit your profit target within streak' },
+                        { step: 4, icon: '💰', title: 'Get Funded', desc: 'Receive your funded account' },
+                      ].map((item, idx) => (
+                        <div key={idx} className="text-center">
+                          <div className="w-16 h-16 mx-auto mb-3 bg-gradient-to-br from-teal-500/20 to-teal-600/10 border border-teal-500/30 rounded-2xl flex items-center justify-center">
+                            <span className="text-2xl">{item.icon}</span>
+                          </div>
+                          <div className="text-xs text-teal-400 font-bold mb-1">STEP {item.step}</div>
+                          <div className="text-white font-semibold mb-1">{item.title}</div>
+                          <div className="text-zinc-500 text-xs">{item.desc}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* FAQ Accordion */}
+                  <div className="bg-[#1a1a1a] border border-zinc-800/50 rounded-2xl p-6">
+                    <h2 className="text-2xl font-bold text-white mb-6">Frequently Asked Questions</h2>
+                    <div className="space-y-3">
+                      {faqs.map((faq, idx) => (
+                        <div key={idx} className="border border-zinc-800/50 rounded-xl overflow-hidden">
+                          <button
+                            onClick={() => setExpandedFaq(expandedFaq === idx ? null : idx)}
+                            className="w-full px-5 py-4 flex items-center justify-between text-left hover:bg-zinc-900/50 transition-all"
+                          >
+                            <span className="text-white font-medium">{faq.q}</span>
+                            <span className={`text-teal-400 transition-transform ${expandedFaq === idx ? 'rotate-180' : ''}`}>
+                              ▼
+                            </span>
+                          </button>
+                          {expandedFaq === idx && (
+                            <div className="px-5 pb-4 text-zinc-400 text-sm">
+                              {faq.a}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Challenge Rules */}
+                  <div className="bg-zinc-900/30 border border-zinc-800/50 rounded-2xl p-6">
+                    <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                      <span>📋</span> Challenge Rules
+                    </h3>
+                    <ul className="space-y-2 text-zinc-400 text-sm">
+                      <li className="flex items-start gap-2">
+                        <span className="text-teal-400 mt-0.5">•</span>
+                        <span>You must achieve the required consecutive wins without any losses</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-teal-400 mt-0.5">•</span>
+                        <span>A single loss resets your win streak to zero</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-teal-400 mt-0.5">•</span>
+                        <span>Challenge must be completed within 30 days of purchase</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-teal-400 mt-0.5">•</span>
+                        <span>Payouts processed within 3-5 business days after passing</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-teal-400 mt-0.5">•</span>
+                        <span>Reset option available at 50% of original cost if you fail</span>
+                      </li>
+                    </ul>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         )}
 
@@ -3774,6 +3975,51 @@ export default function Dashboard() {
               >
                 View All Rewards →
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CHALLENGE PURCHASE MODAL */}
+      {purchaseModalOpen && selectedChallenge && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setPurchaseModalOpen(false)}>
+          <div className="bg-gradient-to-b from-[#1a1a1a] to-[#111111] border border-zinc-800 rounded-2xl p-8 w-full max-w-md relative overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(45,180,180,0.12),transparent_60%)]"></div>
+            <button onClick={() => setPurchaseModalOpen(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white transition-colors z-10">
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+            <div className="relative">
+              <div className="text-center mb-6">
+                <span className="text-4xl mb-2 block">🎮</span>
+                <h2 className="text-2xl font-bold text-white">Confirm Your Challenge</h2>
+                <p className="text-zinc-400 text-sm mt-1">You&apos;re about to start your trading journey</p>
+              </div>
+              <div className="bg-zinc-900/70 border border-zinc-700/50 rounded-xl p-5 mb-6">
+                <div className="text-center mb-4">
+                  <div className="text-3xl font-black text-white">${selectedChallenge.size.toLocaleString()}</div>
+                  <div className="text-sm font-bold text-teal-400 tracking-widest uppercase">Challenge Account</div>
+                </div>
+                <div className="space-y-3 text-sm">
+                  <div className="flex justify-between items-center py-2 border-b border-zinc-800"><span className="text-zinc-400">💰 Profit Target</span><span className="text-white font-semibold">${selectedChallenge.profit.toLocaleString()}</span></div>
+                  <div className="flex justify-between items-center py-2 border-b border-zinc-800"><span className="text-zinc-400">🎯 Win Streak Required</span><span className="text-white font-semibold">{selectedChallenge.target} consecutive</span></div>
+                  <div className="flex justify-between items-center py-2 border-b border-zinc-800"><span className="text-zinc-400">⏱️ Time Limit</span><span className="text-white font-semibold">30 days</span></div>
+                  <div className="flex justify-between items-center py-2"><span className="text-zinc-400">🔄 Reset Fee</span><span className="text-zinc-300">${selectedChallenge.resetFee}</span></div>
+                </div>
+              </div>
+              <div className="bg-teal-500/10 border border-teal-500/30 rounded-xl p-4 mb-6">
+                <div className="flex justify-between items-center"><span className="text-zinc-300 font-medium">Total</span><span className="text-2xl font-black text-teal-400">${selectedChallenge.cost.toFixed(2)}</span></div>
+              </div>
+              <label className="flex items-start gap-3 mb-6 cursor-pointer group">
+                <input type="checkbox" className="mt-1 w-4 h-4 rounded border-zinc-600 bg-zinc-800 text-teal-500 focus:ring-teal-500 focus:ring-offset-0" />
+                <span className="text-xs text-zinc-400 group-hover:text-zinc-300 transition-colors">I agree to the challenge rules and understand that if I fail to meet the profit target within the required win streak, I will need to purchase a new challenge or use the reset option.</span>
+              </label>
+              <button className="w-full py-4 rounded-xl font-bold text-lg transition-all bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-teal-400 text-white shadow-lg shadow-teal-500/25 hover:shadow-teal-500/40 hover:scale-[1.02] active:scale-[0.98]" onClick={() => { alert(`Proceeding to payment for ${selectedChallenge.label} Challenge - $${selectedChallenge.cost}`); setPurchaseModalOpen(false); }}>
+                💳 Proceed to Payment
+              </button>
+              <p className="text-center text-xs text-zinc-500 mt-4 flex items-center justify-center gap-2">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                Secure checkout powered by Stripe
+              </p>
             </div>
           </div>
         </div>
