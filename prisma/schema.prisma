@@ -85,6 +85,7 @@ model User {
   accounts      Account[]
   sessions      Session[]
   bets          Bet[]
+  parlays       Parlay[]
   bankrollHistory BankrollHistory[]
   leaderboardEntry GlobalLeaderboard?
   pushSubscription PushSubscription?
@@ -135,11 +136,65 @@ model BankrollHistory {
   change    Float    @default(0)
   note      String?
   createdAt DateTime @default(now())
-  
+
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([createdAt])
+}
+
+// ==========================================
+// PARLAYS
+// ==========================================
+
+model Parlay {
+  id           String      @id @default(cuid())
+  userId       String
+
+  // Parlay details
+  stake        Float
+  totalOdds    Float       // Combined odds (multiplied)
+
+  // Results
+  result       String      @default("pending") // pending, won, lost, push
+  profitLoss   Float?
+
+  // Meta
+  notes        String?
+  createdAt    DateTime    @default(now())
+  settledAt    DateTime?
+
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  legs         ParlayLeg[]
+
+  @@index([userId])
+  @@index([result])
+  @@index([createdAt])
+}
+
+model ParlayLeg {
+  id          String   @id @default(cuid())
+  parlayId    String
+
+  // Event details
+  eventId     String?
+  sport       String
+  league      String?
+  matchup     String
+
+  // Bet details
+  betType     String
+  selection   String
+  odds        String
+  oddsDecimal Float
+
+  // Results
+  result      String   @default("pending") // pending, won, lost, push
+
+  parlay      Parlay   @relation(fields: [parlayId], references: [id], onDelete: Cascade)
+
+  @@index([parlayId])
+  @@index([eventId])
 }
 
 // ==========================================

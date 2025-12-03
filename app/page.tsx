@@ -75,6 +75,30 @@ interface Bet {
   createdAt: string;
 }
 
+interface ParlayLeg {
+  id: string;
+  eventId?: string;
+  sport: string;
+  league?: string;
+  matchup: string;
+  betType: string;
+  selection: string;
+  odds: string;
+  oddsDecimal: number;
+  result: string;
+}
+
+interface Parlay {
+  id: string;
+  stake: number;
+  totalOdds: number;
+  result: string;
+  profitLoss?: number;
+  legs: ParlayLeg[];
+  createdAt: string;
+  settledAt?: string;
+}
+
 interface AIPrediction {
   id: string;
   eventId: string;
@@ -248,6 +272,23 @@ export default function Dashboard() {
   const [quickBetEvent, setQuickBetEvent] = useState<SportEvent | null>(null);
   const [quickBetSelection, setQuickBetSelection] = useState<{ type: string; name: string; odds: number } | null>(null);
 
+  // Parlay builder state
+  const [parlayLegs, setParlayLegs] = useState<Array<{
+    eventId: string;
+    sport: string;
+    league?: string;
+    matchup: string;
+    betType: string;
+    selection: string;
+    odds: string;
+    oddsDecimal: number;
+  }>>([]);
+  const [parlayModalOpen, setParlayModalOpen] = useState(false);
+  const [parlayStake, setParlayStake] = useState<number>(10);
+  const [placingParlay, setPlacingParlay] = useState(false);
+  const [parlaySuccess, setParlaySuccess] = useState(false);
+  const [parlays, setParlays] = useState<Parlay[]>([]);
+
   // Redirect if not authenticated
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -260,10 +301,11 @@ export default function Dashboard() {
     fetchEvents();
   }, [selectedLeague]);
 
-  // Fetch bets on mount
+  // Fetch bets and parlays on mount
   useEffect(() => {
     if (session) {
       fetchBets();
+      fetchParlays();
       fetchUserStats();
       fetchLeaderboard();
     }
@@ -500,6 +542,92 @@ export default function Dashboard() {
       fetchUserStats();
     } catch (error) {
       console.error('Failed to settle bet:', error);
+    }
+  };
+
+  // Parlay functions
+  const addToParlay = (event: SportEvent, selection: { type: string; name: string; odds: number }) => {
+    // Check if this event is already in the parlay
+    const exists = parlayLegs.some(leg => leg.eventId === event.id);
+    if (exists) {
+      // Remove it (toggle behavior)
+      setParlayLegs(parlayLegs.filter(leg => leg.eventId !== event.id));
+    } else {
+      // Add it
+      setParlayLegs([...parlayLegs, {
+        eventId: event.id,
+        sport: event.sportTitle,
+        league: event.league || selectedLeague.name,
+        matchup: `${event.awayTeam} @ ${event.homeTeam}`,
+        betType: selection.type === 'draw' ? 'Draw' : '1X2',
+        selection: selection.name,
+        odds: selection.odds.toFixed(2),
+        oddsDecimal: selection.odds,
+      }]);
+    }
+  };
+
+  const removeFromParlay = (eventId: string) => {
+    setParlayLegs(parlayLegs.filter(leg => leg.eventId !== eventId));
+  };
+
+  const calculateParlayOdds = () => {
+    return parlayLegs.reduce((acc, leg) => acc * leg.oddsDecimal, 1);
+  };
+
+  const fetchParlays = async () => {
+    try {
+      const res = await fetch('/api/parlays');
+      const data = await res.json();
+      setParlays(data.parlays || []);
+    } catch (error) {
+      console.error('Failed to fetch parlays:', error);
+    }
+  };
+
+  const handlePlaceParlay = async () => {
+    if (parlayLegs.length < 2) return;
+
+    setPlacingParlay(true);
+    try {
+      const res = await fetch('/api/parlays', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          stake: parlayStake,
+          legs: parlayLegs,
+        }),
+      });
+
+      if (res.ok) {
+        setParlaySuccess(true);
+        fetchParlays();
+        fetchUserStats();
+        setTimeout(() => {
+          setParlayModalOpen(false);
+          setParlaySuccess(false);
+          setParlayLegs([]);
+          setParlayStake(10);
+        }, 2000);
+      }
+    } catch (error) {
+      console.error('Failed to place parlay:', error);
+    } finally {
+      setPlacingParlay(false);
+    }
+  };
+
+  const settleParlay = async (parlayId: string, result: 'won' | 'lost' | 'push') => {
+    try {
+      await fetch('/api/parlays', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: parlayId, result }),
+      });
+      fetchParlays();
+      fetchUserStats();
+    } catch (error) {
+      console.error('Failed to settle parlay:', error);
     }
   };
 
@@ -2761,24 +2889,241 @@ export default function Dashboard() {
                 })()}
 
                 {/* Action Buttons */}
-                <div className="flex gap-3">
+                <div className="space-y-3">
+                  {/* Add to Parlay Button */}
                   <button
                     onClick={() => {
+                      addToParlay(quickBetEvent, quickBetSelection);
                       setBetModalOpen(false);
-                      setBetStake(10);
                       setQuickBetEvent(null);
                       setQuickBetSelection(null);
                     }}
+                    className={`w-full py-3 px-4 font-medium rounded-xl transition-colors flex items-center justify-center gap-2 ${
+                      parlayLegs.some(leg => leg.eventId === quickBetEvent.id)
+                        ? 'bg-purple-600 text-white'
+                        : 'bg-purple-900/50 border border-purple-700/50 text-purple-300 hover:bg-purple-800/50'
+                    }`}
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                    </svg>
+                    {parlayLegs.some(leg => leg.eventId === quickBetEvent.id)
+                      ? 'Remove from Parlay'
+                      : `Add to Parlay ${parlayLegs.length > 0 ? `(${parlayLegs.length} legs)` : ''}`
+                    }
+                  </button>
+
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => {
+                        setBetModalOpen(false);
+                        setBetStake(10);
+                        setQuickBetEvent(null);
+                        setQuickBetSelection(null);
+                      }}
+                      className="flex-1 py-3 px-4 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-medium rounded-xl transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleQuickBetPlace}
+                      disabled={placingBet}
+                      className="flex-1 py-3 px-4 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-semibold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {placingBet ? (
+                        <>
+                          <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                          </svg>
+                          <span>Placing...</span>
+                        </>
+                      ) : (
+                        <span>Straight Bet</span>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Floating Parlay Slip */}
+      {parlayLegs.length > 0 && !parlayModalOpen && (
+        <div className="fixed bottom-6 right-6 z-40">
+          <button
+            onClick={() => setParlayModalOpen(true)}
+            className="bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 text-white px-6 py-4 rounded-2xl shadow-2xl shadow-purple-900/50 flex items-center gap-3 transition-all hover:scale-105"
+          >
+            <div className="bg-white/20 rounded-full w-8 h-8 flex items-center justify-center font-bold">
+              {parlayLegs.length}
+            </div>
+            <div className="text-left">
+              <div className="font-semibold">Parlay Slip</div>
+              <div className="text-xs text-purple-200">
+                @{calculateParlayOdds().toFixed(2)} combined odds
+              </div>
+            </div>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+            </svg>
+          </button>
+        </div>
+      )}
+
+      {/* Parlay Modal */}
+      {parlayModalOpen && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-gradient-to-b from-purple-950 to-zinc-950 border border-purple-800/50 rounded-2xl p-6 w-full max-w-lg shadow-2xl shadow-purple-900/20 max-h-[90vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="bg-purple-500/20 rounded-full w-10 h-10 flex items-center justify-center">
+                  <span className="text-xl">🎯</span>
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-white">Parlay Slip</h3>
+                  <p className="text-sm text-purple-300">{parlayLegs.length} {parlayLegs.length === 1 ? 'leg' : 'legs'}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setParlayModalOpen(false)}
+                className="text-zinc-400 hover:text-white transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {parlaySuccess ? (
+              /* Success State */
+              <div className="text-center py-8">
+                <div className="w-16 h-16 bg-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <h4 className="text-lg font-semibold text-purple-400 mb-2">Parlay Placed!</h4>
+                <p className="text-zinc-400 text-sm">Track your parlay in the Bet Analysis tab</p>
+              </div>
+            ) : (
+              <>
+                {/* Parlay Legs */}
+                <div className="space-y-3 mb-6">
+                  {parlayLegs.map((leg, index) => (
+                    <div key={leg.eventId} className="bg-purple-950/50 border border-purple-900/30 rounded-xl p-4">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="text-xs text-purple-400 mb-1">Leg {index + 1}</div>
+                          <div className="font-medium text-white text-sm">{leg.matchup}</div>
+                          <div className="flex items-center gap-2 mt-2">
+                            <span className="bg-purple-900/50 text-purple-300 px-2 py-0.5 rounded text-xs">{leg.betType}</span>
+                            <span className="text-zinc-300 text-sm">{leg.selection}</span>
+                            <span className="font-mono font-bold text-amber-400 text-sm">@{leg.odds}</span>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => removeFromParlay(leg.eventId)}
+                          className="text-zinc-500 hover:text-red-400 transition-colors p-1"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {parlayLegs.length < 2 && (
+                  <div className="bg-amber-900/20 border border-amber-800/30 rounded-xl p-4 mb-6">
+                    <div className="flex items-center gap-2 text-amber-400">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                      <span className="text-sm">Add at least 2 legs to place a parlay</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Combined Odds */}
+                <div className="bg-purple-900/30 border border-purple-800/30 rounded-xl p-4 mb-6">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-zinc-300">Combined Odds</span>
+                    <span className="font-mono font-bold text-2xl text-purple-400">@{calculateParlayOdds().toFixed(2)}</span>
+                  </div>
+                </div>
+
+                {/* Stake Input */}
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-zinc-300 mb-2">Stake Amount ($)</label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 font-semibold">$</span>
+                    <input
+                      type="number"
+                      min="1"
+                      step="5"
+                      value={parlayStake}
+                      onChange={(e) => setParlayStake(Math.max(1, Number(e.target.value)))}
+                      className="w-full pl-8 pr-4 py-3 bg-zinc-900/80 border border-purple-800/30 rounded-xl text-white font-mono text-lg focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500"
+                    />
+                  </div>
+                  {/* Quick stake buttons */}
+                  <div className="flex gap-2 mt-3">
+                    {[10, 25, 50, 100].map(amount => (
+                      <button
+                        key={amount}
+                        onClick={() => setParlayStake(amount)}
+                        className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
+                          parlayStake === amount
+                            ? 'bg-purple-600 text-white'
+                            : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                        }`}
+                      >
+                        ${amount}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Potential Return */}
+                {(() => {
+                  const potentialReturn = parlayStake * calculateParlayOdds();
+                  const profit = potentialReturn - parlayStake;
+
+                  return (
+                    <div className="bg-purple-900/30 border border-purple-800/30 rounded-xl p-4 mb-6">
+                      <div className="flex justify-between items-center">
+                        <span className="text-zinc-300">Potential Return</span>
+                        <div className="text-right">
+                          <div className="text-2xl font-bold text-purple-400 font-mono">${potentialReturn.toFixed(2)}</div>
+                          <div className="text-xs text-purple-500">+${profit.toFixed(2)} profit</div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Action Buttons */}
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => {
+                      setParlayLegs([]);
+                      setParlayModalOpen(false);
+                    }}
                     className="flex-1 py-3 px-4 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-medium rounded-xl transition-colors"
                   >
-                    Cancel
+                    Clear All
                   </button>
                   <button
-                    onClick={handleQuickBetPlace}
-                    disabled={placingBet}
-                    className="flex-1 py-3 px-4 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-semibold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    onClick={handlePlaceParlay}
+                    disabled={placingParlay || parlayLegs.length < 2}
+                    className="flex-1 py-3 px-4 bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 text-white font-semibold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
-                    {placingBet ? (
+                    {placingParlay ? (
                       <>
                         <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
@@ -2787,7 +3132,7 @@ export default function Dashboard() {
                         <span>Placing...</span>
                       </>
                     ) : (
-                      <span>Confirm Bet</span>
+                      <span>Place Parlay</span>
                     )}
                   </button>
                 </div>
