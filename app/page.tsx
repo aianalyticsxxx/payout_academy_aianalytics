@@ -2212,6 +2212,79 @@ export default function Dashboard() {
                 );
               })()}
 
+              {/* Account Size Selection - Bet Analysis Tab */}
+              {(() => {
+                const accountSizes = [
+                  { size: 1000, cost: 19.99, label: '$1K', rewards: [3, 100, 500, 1000] },
+                  { size: 5000, cost: 99, label: '$5K', rewards: [20, 350, 2000, 5000] },
+                  { size: 10000, cost: 199, label: '$10K', rewards: [60, 700, 4500, 10000] },
+                  { size: 25000, cost: 399, label: '$25K', rewards: [100, 1400, 10000, 25000] },
+                  { size: 50000, cost: 699, label: '$50K', rewards: [150, 2800, 20000, 50000] },
+                  { size: 100000, cost: 999, label: '$100K', rewards: [250, 5000, 50000, 100000] },
+                ];
+                const currentAccount = accountSizes.find(a => a.size === selectedAccountSize) || accountSizes[0];
+
+                return (
+                  <div className="bg-gradient-to-br from-[#1a3a3a] via-[#153030] to-[#102828] border border-[#2a5555]/50 rounded-2xl p-6 relative overflow-hidden">
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(45,180,180,0.12),transparent_50%)]"></div>
+                    <div className="relative">
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <h3 className="text-lg font-bold text-white mb-1">Your Challenge Account</h3>
+                          <p className="text-sm text-[#7cc4c4]">Complete streaks to unlock rewards</p>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-xs text-zinc-400">Max Reward</div>
+                          <div className="text-xl font-bold text-teal-400">${currentAccount.rewards[3].toLocaleString()}</div>
+                        </div>
+                      </div>
+
+                      {/* Account Size Buttons - Compact */}
+                      <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
+                        {accountSizes.map((account) => (
+                          <button
+                            key={account.size}
+                            onClick={() => setSelectedAccountSize(account.size)}
+                            className={`p-3 rounded-xl border transition-all ${
+                              selectedAccountSize === account.size
+                                ? 'bg-teal-500/20 border-teal-500 shadow-lg shadow-teal-500/20'
+                                : 'bg-zinc-900/50 border-zinc-700/50 hover:border-teal-600/50'
+                            }`}
+                          >
+                            <div className={`text-base font-bold ${selectedAccountSize === account.size ? 'text-teal-400' : 'text-white'}`}>
+                              {account.label}
+                            </div>
+                            <div className="text-xs text-zinc-500">${account.cost}</div>
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Level Rewards Preview */}
+                      <div className="mt-4 pt-4 border-t border-[#2a5555]/40">
+                        <div className="flex justify-between text-xs">
+                          <div className="text-center">
+                            <div className="text-emerald-400 font-semibold">${currentAccount.rewards[0]}</div>
+                            <div className="text-zinc-500">Lvl 1</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-blue-400 font-semibold">${currentAccount.rewards[1].toLocaleString()}</div>
+                            <div className="text-zinc-500">Lvl 2</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-purple-400 font-semibold">${currentAccount.rewards[2].toLocaleString()}</div>
+                            <div className="text-zinc-500">Lvl 3</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-amber-400 font-semibold">${currentAccount.rewards[3].toLocaleString()}</div>
+                            <div className="text-zinc-500">Lvl 4</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* Streak History / Recent Results */}
               <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-6">
                 <div className="flex items-center justify-between mb-4">
