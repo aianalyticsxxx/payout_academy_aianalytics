@@ -1349,36 +1349,48 @@ export default function Dashboard() {
                       <div className="grid grid-cols-2 gap-6 mt-6 mb-4">
                         <button
                           onClick={() => setChallengesViewDifficulty('beginner')}
-                          className={`p-4 rounded-xl border-2 transition-all text-center ${
+                          className={`relative p-[2px] rounded-xl transition-all text-center ${
                             challengesViewDifficulty === 'beginner'
-                              ? 'border-teal-400 bg-teal-500/10 shadow-[0_0_20px_rgba(20,184,166,0.5),inset_0_0_20px_rgba(20,184,166,0.1)]'
-                              : 'border-zinc-700 bg-transparent hover:border-zinc-600'
+                              ? 'bg-gradient-to-b from-teal-500/50 to-teal-600/20 shadow-[0_0_20px_rgba(20,184,166,0.5)]'
+                              : 'bg-gradient-to-b from-teal-500/30 to-teal-600/10'
                           }`}
                         >
-                          <div className="flex items-center justify-center gap-2 mb-1">
-                            <span className="text-xl">🎯</span>
-                            <span className="text-lg font-bold text-white">Beginner</span>
-                          </div>
-                          <div className="text-xs text-zinc-400 mb-1">Perfect for getting started</div>
-                          <div className="text-sm font-bold text-teal-400">
-                            Min odds: 1.5
+                          <div className={`p-4 rounded-xl ${
+                            challengesViewDifficulty === 'beginner'
+                              ? 'bg-teal-500/10'
+                              : 'bg-zinc-900/90 hover:bg-zinc-900/70'
+                          }`}>
+                            <div className="flex items-center justify-center gap-2 mb-1">
+                              <span className="text-xl">🎯</span>
+                              <span className="text-lg font-bold text-white">Beginner</span>
+                            </div>
+                            <div className="text-xs text-zinc-400 mb-1">Perfect for getting started</div>
+                            <div className="text-sm font-bold text-teal-400">
+                              Min odds: 1.5
+                            </div>
                           </div>
                         </button>
                         <button
                           onClick={() => setChallengesViewDifficulty('pro')}
-                          className={`p-4 rounded-xl border-2 transition-all text-center ${
+                          className={`relative p-[2px] rounded-xl transition-all text-center ${
                             challengesViewDifficulty === 'pro'
-                              ? 'border-yellow-400 bg-yellow-500/10 shadow-[0_0_20px_rgba(250,204,21,0.5),inset_0_0_20px_rgba(250,204,21,0.1)]'
-                              : 'border-zinc-700 bg-transparent hover:border-zinc-600'
+                              ? 'bg-gradient-to-b from-yellow-400/50 to-yellow-500/20 shadow-[0_0_20px_rgba(250,204,21,0.5)]'
+                              : 'bg-gradient-to-b from-yellow-400/30 to-yellow-500/10'
                           }`}
                         >
-                          <div className="flex items-center justify-center gap-2 mb-1">
-                            <span className="text-xl">⚡</span>
-                            <span className="text-lg font-bold text-white">Pro</span>
-                          </div>
-                          <div className="text-xs text-zinc-400 mb-1">High risk, high intensity</div>
-                          <div className="text-sm font-bold text-yellow-400">
-                            Min odds: 2.0
+                          <div className={`p-4 rounded-xl ${
+                            challengesViewDifficulty === 'pro'
+                              ? 'bg-yellow-400/10'
+                              : 'bg-zinc-900/90 hover:bg-zinc-900/70'
+                          }`}>
+                            <div className="flex items-center justify-center gap-2 mb-1">
+                              <span className="text-xl">⚡</span>
+                              <span className="text-lg font-bold text-white">Pro</span>
+                            </div>
+                            <div className="text-xs text-zinc-400 mb-1">High risk, high intensity</div>
+                            <div className="text-sm font-bold text-yellow-400">
+                              Min odds: 2.0
+                            </div>
                           </div>
                         </button>
                       </div>
