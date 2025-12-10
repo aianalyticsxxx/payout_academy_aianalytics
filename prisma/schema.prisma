@@ -67,18 +67,23 @@ model User {
   emailVerified DateTime?
   image         String?
   hashedPassword String?
-  
+
   // Custom profile fields
   username      String?   @unique
   avatar        String    @default("🎲")
   tier          String    @default("Bronze")
-  
+
+  // Role-based access control
+  role          String    @default("USER") // USER, ADMIN, SUPER_ADMIN
+  roleUpdatedAt DateTime?
+  roleUpdatedBy String?
+
   // Subscription
   stripeCustomerId       String?   @unique
   stripeSubscriptionId   String?
   stripePriceId          String?
   stripeCurrentPeriodEnd DateTime?
-  
+
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -90,6 +95,7 @@ model User {
   leaderboardEntry GlobalLeaderboard?
   pushSubscription PushSubscription?
   challenges    Challenge[]
+  adminLogs     AdminLog[]  @relation("AdminActions")
 }
 
 // ==========================================
@@ -417,4 +423,57 @@ model ChallengeReward {
   challenge     Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
 
   @@index([challengeId])
+  @@index([status])
+}
+
+// ==========================================
+// CRM & ADMIN
+// ==========================================
+
+model DailyMetrics {
+  id                    String   @id @default(cuid())
+  date                  DateTime @unique @db.Date
+
+  // User metrics
+  totalUsers            Int      @default(0)
+  newUsers              Int      @default(0)
+  activeUsers           Int      @default(0)
+
+  // Revenue metrics
+  challengesPurchased   Int      @default(0)
+  revenueTotal          Float    @default(0)
+  revenueByTier         Json     // { "1000": 60, "5000": 198, ... }
+
+  // Betting metrics
+  totalBets             Int      @default(0)
+  totalParlays          Int      @default(0)
+  totalStaked           Float    @default(0)
+
+  // Challenge metrics
+  activeChallenges      Int      @default(0)
+  completedChallenges   Int      @default(0)
+  expiredChallenges     Int      @default(0)
+  rewardsPaid           Float    @default(0)
+  rewardsPending        Float    @default(0)
+
+  createdAt             DateTime @default(now())
+
+  @@index([date])
+}
+
+model AdminLog {
+  id          String   @id @default(cuid())
+  adminId     String
+  action      String   // VIEW_DASHBOARD, SETTLE_BET, UPDATE_USER, PAY_REWARD, etc.
+  targetType  String?  // USER, BET, CHALLENGE, REWARD
+  targetId    String?
+  metadata    Json?
+  ipAddress   String?
+  createdAt   DateTime @default(now())
+
+  admin       User     @relation("AdminActions", fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([adminId, createdAt])
+  @@index([action, createdAt])
+  @@index([targetType, targetId])
 }

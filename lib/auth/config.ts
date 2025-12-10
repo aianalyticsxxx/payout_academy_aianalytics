@@ -76,23 +76,26 @@ export const authOptions: NextAuthOptions = {
         token.username = (user as any).username;
         token.avatar = (user as any).avatar;
         token.tier = (user as any).tier;
+        token.role = (user as any).role || 'USER';
       }
-      
+
       // Update token when session is updated
       if (trigger === 'update' && session) {
         token.username = session.username;
         token.avatar = session.avatar;
+        token.role = session.role;
       }
-      
+
       return token;
     },
-    
+
     async session({ session, token }) {
       if (session.user) {
         (session.user as any).id = token.id;
         (session.user as any).username = token.username;
         (session.user as any).avatar = token.avatar;
         (session.user as any).tier = token.tier;
+        (session.user as any).role = token.role || 'USER';
       }
       return session;
     },
