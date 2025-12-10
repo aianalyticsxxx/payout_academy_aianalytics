@@ -1318,7 +1318,7 @@ export default function Dashboard() {
                       <div className="grid grid-cols-2 gap-6 mt-6 mb-4">
                         <button
                           onClick={() => setChallengesViewDifficulty('beginner')}
-                          className={`p-4 rounded-xl border transition-all text-center ${
+                          className={`p-4 rounded-xl border-2 transition-all text-center ${
                             challengesViewDifficulty === 'beginner'
                               ? 'border-teal-400 bg-teal-500/10 shadow-[0_0_20px_rgba(20,184,166,0.5),inset_0_0_20px_rgba(20,184,166,0.1)]'
                               : 'border-zinc-800/50 bg-transparent hover:border-zinc-700'
@@ -1335,7 +1335,7 @@ export default function Dashboard() {
                         </button>
                         <button
                           onClick={() => setChallengesViewDifficulty('pro')}
-                          className={`p-4 rounded-xl border transition-all text-center ${
+                          className={`p-4 rounded-xl border-2 transition-all text-center ${
                             challengesViewDifficulty === 'pro'
                               ? 'border-yellow-400 bg-yellow-500/10 shadow-[0_0_20px_rgba(250,204,21,0.5),inset_0_0_20px_rgba(250,204,21,0.1)]'
                               : 'border-zinc-800/50 bg-transparent hover:border-zinc-700'
