@@ -55,8 +55,8 @@ export async function GET(req: NextRequest) {
 
     // Calculate additional stats for each challenge
     const challengesData = activeChallenges.map((challenge) => {
-      const tier = getTierBySize(challenge.tier);
       const difficulty = (challenge.difficulty || 'beginner') as DifficultyType;
+      const tier = getTierBySize(challenge.tier, difficulty);
       const levelRequirements = getLevelRequirements(difficulty);
       const nextTarget = getNextLevelTarget(challenge.currentStreak, difficulty);
       const daysRemaining = Math.max(
@@ -141,7 +141,7 @@ export async function POST(req: NextRequest) {
     // Create the challenge
     const challenge = await createChallenge(userId, tier, difficulty as DifficultyType);
 
-    const tierData = getTierBySize(tier);
+    const tierData = getTierBySize(tier, difficulty as DifficultyType);
     const difficultyData = DIFFICULTY_CONFIG[difficulty as DifficultyType];
 
     return NextResponse.json(

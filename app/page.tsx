@@ -1177,32 +1177,63 @@ export default function Dashboard() {
                 { level: 4, streakRequired: 9, name: 'Diamond', color: 'from-cyan-400 to-blue-400' },
               ];
 
-              const challengeTiers = [
+              // Beginner difficulty tiers
+              const beginnerTiers = [
                 {
-                  size: 1000, cost: 24.99, label: '€1K', resetFee: 12.49,
+                  size: 1000, cost: 20, label: '€1K', resetFee: 10,
                   rewards: [3, 100, 500, 1000] // Level 1-4 rewards
                 },
                 {
                   size: 5000, cost: 99, label: '€5K', resetFee: 49,
-                  rewards: [20, 350, 2000, 5000]
+                  rewards: [20, 500, 2000, 5000]
                 },
                 {
                   size: 10000, cost: 199, label: '€10K', resetFee: 99,
-                  rewards: [60, 700, 4500, 10000]
+                  rewards: [60, 1000, 4500, 10000]
                 },
                 {
                   size: 25000, cost: 399, label: '€25K', resetFee: 199,
-                  rewards: [100, 1400, 10000, 25000]
+                  rewards: [100, 2000, 10000, 25000]
                 },
                 {
                   size: 50000, cost: 699, label: '€50K', resetFee: 349,
-                  rewards: [150, 2800, 20000, 50000]
+                  rewards: [150, 3500, 20000, 50000]
                 },
                 {
                   size: 100000, cost: 999, label: '€100K', resetFee: 499,
-                  rewards: [250, 5000, 50000, 100000]
+                  rewards: [250, 5000, 30000, 100000]
                 },
               ];
+
+              // Pro difficulty tiers (higher level 2 and level 3 rewards)
+              const proTiers = [
+                {
+                  size: 1000, cost: 20, label: '€1K', resetFee: 10,
+                  rewards: [3, 120, 550, 1000]
+                },
+                {
+                  size: 5000, cost: 99, label: '€5K', resetFee: 49,
+                  rewards: [20, 600, 2200, 5000]
+                },
+                {
+                  size: 10000, cost: 199, label: '€10K', resetFee: 99,
+                  rewards: [60, 1200, 4950, 10000]
+                },
+                {
+                  size: 25000, cost: 399, label: '€25K', resetFee: 199,
+                  rewards: [100, 2400, 11000, 25000]
+                },
+                {
+                  size: 50000, cost: 699, label: '€50K', resetFee: 349,
+                  rewards: [150, 4200, 22000, 50000]
+                },
+                {
+                  size: 100000, cost: 999, label: '€100K', resetFee: 499,
+                  rewards: [250, 6000, 33000, 100000]
+                },
+              ];
+
+              const challengeTiers = challengesViewDifficulty === 'pro' ? proTiers : beginnerTiers;
 
               const faqs = [
                 { q: "How do the 4 levels work?", a: "Requirements depend on difficulty: Beginner (3, 6, 10, 15 wins with min odds 1.5) or Pro (2, 4, 6, 9 wins with min odds 2.0). You earn rewards at each level!" },
@@ -1321,7 +1352,7 @@ export default function Dashboard() {
                           className={`p-4 rounded-xl border-2 transition-all text-center ${
                             challengesViewDifficulty === 'beginner'
                               ? 'border-teal-400 bg-teal-500/10 shadow-[0_0_20px_rgba(20,184,166,0.5),inset_0_0_20px_rgba(20,184,166,0.1)]'
-                              : 'border-zinc-800/50 bg-transparent hover:border-zinc-700'
+                              : 'border-zinc-700 bg-transparent hover:border-zinc-600'
                           }`}
                         >
                           <div className="flex items-center justify-center gap-2 mb-1">
@@ -1329,7 +1360,7 @@ export default function Dashboard() {
                             <span className="text-lg font-bold text-white">Beginner</span>
                           </div>
                           <div className="text-xs text-zinc-400 mb-1">Perfect for getting started</div>
-                          <div className="text-xs font-semibold text-teal-400">
+                          <div className="text-sm font-bold text-teal-400">
                             Min odds: 1.5
                           </div>
                         </button>
@@ -1338,7 +1369,7 @@ export default function Dashboard() {
                           className={`p-4 rounded-xl border-2 transition-all text-center ${
                             challengesViewDifficulty === 'pro'
                               ? 'border-yellow-400 bg-yellow-500/10 shadow-[0_0_20px_rgba(250,204,21,0.5),inset_0_0_20px_rgba(250,204,21,0.1)]'
-                              : 'border-zinc-800/50 bg-transparent hover:border-zinc-700'
+                              : 'border-zinc-700 bg-transparent hover:border-zinc-600'
                           }`}
                         >
                           <div className="flex items-center justify-center gap-2 mb-1">
@@ -1346,7 +1377,7 @@ export default function Dashboard() {
                             <span className="text-lg font-bold text-white">Pro</span>
                           </div>
                           <div className="text-xs text-zinc-400 mb-1">High risk, high intensity</div>
-                          <div className="text-xs font-semibold text-yellow-400">
+                          <div className="text-sm font-bold text-yellow-400">
                             Min odds: 2.0
                           </div>
                         </button>
@@ -1404,9 +1435,11 @@ export default function Dashboard() {
 
                         {/* Level Rewards Grid */}
                         <div className="bg-zinc-900/50 rounded-xl p-4 mb-4">
-                          <div className="text-xs text-zinc-400 text-center mb-3 uppercase tracking-wider">Rewards Per Level (Beginner)</div>
+                          <div className="text-xs text-zinc-400 text-center mb-3 uppercase tracking-wider">
+                            Rewards Per Level ({challengesViewDifficulty === 'pro' ? 'Pro' : 'Beginner'})
+                          </div>
                           <div className="grid grid-cols-2 gap-2">
-                            {beginnerLevels.map((lvl, i) => (
+                            {(challengesViewDifficulty === 'pro' ? proLevels : beginnerLevels).map((lvl, i) => (
                               <div key={lvl.level} className="bg-zinc-800/50 rounded-lg p-2 text-center">
                                 <div className={`text-[10px] font-bold bg-gradient-to-r ${lvl.color} bg-clip-text text-transparent`}>
                                   LVL {lvl.level} • {lvl.streakRequired}W

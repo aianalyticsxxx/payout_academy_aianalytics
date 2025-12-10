@@ -2,16 +2,29 @@
 // CHALLENGE CONSTANTS
 // ==========================================
 
-export const CHALLENGE_TIERS = [
-  { size: 1000, cost: 24.99, label: '€1K', resetFee: 12.49, rewards: [3, 100, 500, 1000] },
-  { size: 5000, cost: 99, label: '€5K', resetFee: 49, rewards: [20, 350, 2000, 5000] },
-  { size: 10000, cost: 199, label: '€10K', resetFee: 99, rewards: [60, 700, 4500, 10000] },
-  { size: 25000, cost: 399, label: '€25K', resetFee: 199, rewards: [100, 1400, 10000, 25000] },
-  { size: 50000, cost: 699, label: '€50K', resetFee: 349, rewards: [150, 2800, 20000, 50000] },
-  { size: 100000, cost: 999, label: '€100K', resetFee: 499, rewards: [250, 5000, 50000, 100000] },
+// Beginner difficulty rewards
+export const BEGINNER_CHALLENGE_TIERS = [
+  { size: 1000, cost: 20, label: '€1K', resetFee: 10, rewards: [3, 100, 500, 1000] },
+  { size: 5000, cost: 99, label: '€5K', resetFee: 49, rewards: [20, 500, 2000, 5000] },
+  { size: 10000, cost: 199, label: '€10K', resetFee: 99, rewards: [60, 1000, 4500, 10000] },
+  { size: 25000, cost: 399, label: '€25K', resetFee: 199, rewards: [100, 2000, 10000, 25000] },
+  { size: 50000, cost: 699, label: '€50K', resetFee: 349, rewards: [150, 3500, 20000, 50000] },
+  { size: 100000, cost: 999, label: '€100K', resetFee: 499, rewards: [250, 5000, 30000, 100000] },
 ] as const;
 
-export type ChallengeTier = typeof CHALLENGE_TIERS[number];
+// Pro difficulty rewards (higher level 2 and level 3 rewards)
+export const PRO_CHALLENGE_TIERS = [
+  { size: 1000, cost: 20, label: '€1K', resetFee: 10, rewards: [3, 120, 550, 1000] },
+  { size: 5000, cost: 99, label: '€5K', resetFee: 49, rewards: [20, 600, 2200, 5000] },
+  { size: 10000, cost: 199, label: '€10K', resetFee: 99, rewards: [60, 1200, 4950, 10000] },
+  { size: 25000, cost: 399, label: '€25K', resetFee: 199, rewards: [100, 2400, 11000, 25000] },
+  { size: 50000, cost: 699, label: '€50K', resetFee: 349, rewards: [150, 4200, 22000, 50000] },
+  { size: 100000, cost: 999, label: '€100K', resetFee: 499, rewards: [250, 6000, 33000, 100000] },
+] as const;
+
+export const CHALLENGE_TIERS = BEGINNER_CHALLENGE_TIERS; // Default to beginner for backward compatibility
+
+export type ChallengeTier = typeof BEGINNER_CHALLENGE_TIERS[number] | typeof PRO_CHALLENGE_TIERS[number];
 
 // BEGINNER DIFFICULTY - Original requirements with min odds 1.5
 export const BEGINNER_LEVEL_REQUIREMENTS = [
@@ -59,12 +72,17 @@ export const MAX_ACTIVE_CHALLENGES = 5;
 // HELPER FUNCTIONS
 // ==========================================
 
-export function getTierBySize(size: number): ChallengeTier | undefined {
-  return CHALLENGE_TIERS.find(t => t.size === size);
+export function getTiersByDifficulty(difficulty: DifficultyType = 'beginner') {
+  return difficulty === 'pro' ? PRO_CHALLENGE_TIERS : BEGINNER_CHALLENGE_TIERS;
 }
 
-export function getRewardForLevel(tierSize: number, level: number): number {
-  const tier = getTierBySize(tierSize);
+export function getTierBySize(size: number, difficulty: DifficultyType = 'beginner'): ChallengeTier | undefined {
+  const tiers = getTiersByDifficulty(difficulty);
+  return tiers.find(t => t.size === size);
+}
+
+export function getRewardForLevel(tierSize: number, level: number, difficulty: DifficultyType = 'beginner'): number {
+  const tier = getTierBySize(tierSize, difficulty);
   if (!tier || level < 1 || level > 4) return 0;
   return tier.rewards[level - 1];
 }
@@ -104,8 +122,8 @@ export function getNextLevelTarget(currentStreak: number, difficulty: Difficulty
   return null; // All levels completed
 }
 
-export function getTotalRewardsForTier(tierSize: number): number {
-  const tier = getTierBySize(tierSize);
+export function getTotalRewardsForTier(tierSize: number, difficulty: DifficultyType = 'beginner'): number {
+  const tier = getTierBySize(tierSize, difficulty);
   if (!tier) return 0;
   return tier.rewards.reduce((sum, r) => sum + r, 0);
 }

@@ -92,7 +92,7 @@ export async function canCreateChallenge(userId: string): Promise<{ canCreate: b
 // ==========================================
 
 export async function createChallenge(userId: string, tierSize: number, difficulty: DifficultyType = 'beginner') {
-  const tier = getTierBySize(tierSize);
+  const tier = getTierBySize(tierSize, difficulty);
   if (!tier) {
     throw new Error(`Invalid tier size: ${tierSize}`);
   }
@@ -262,8 +262,8 @@ export async function processChallengeSettlement(
           newLevel = Math.min(levelReq.level + 1, 4);
           levelWasCompleted = true;
 
-          // Get reward amount
-          const rewardAmount = getRewardForLevel(challenge.tier, levelReq.level);
+          // Get reward amount based on challenge difficulty
+          const rewardAmount = getRewardForLevel(challenge.tier, levelReq.level, challenge.difficulty as DifficultyType);
 
           // Create reward and update challenge in transaction
           await prisma.$transaction([
