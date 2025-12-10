@@ -9,6 +9,9 @@ import {
   LEVEL_REQUIREMENTS,
   CHALLENGE_DURATION_DAYS,
   MAX_ACTIVE_CHALLENGES,
+  DifficultyType,
+  DIFFICULTY_CONFIG,
+  getLevelRequirements,
 } from './constants';
 
 // ==========================================
@@ -88,10 +91,15 @@ export async function canCreateChallenge(userId: string): Promise<{ canCreate: b
 // CREATE CHALLENGE
 // ==========================================
 
-export async function createChallenge(userId: string, tierSize: number) {
+export async function createChallenge(userId: string, tierSize: number, difficulty: DifficultyType = 'beginner') {
   const tier = getTierBySize(tierSize);
   if (!tier) {
     throw new Error(`Invalid tier size: ${tierSize}`);
+  }
+
+  // Validate difficulty
+  if (!DIFFICULTY_CONFIG[difficulty]) {
+    throw new Error(`Invalid difficulty: ${difficulty}`);
   }
 
   // Check if user has reached max active challenges
@@ -109,6 +117,8 @@ export async function createChallenge(userId: string, tierSize: number) {
       tier: tier.size,
       cost: tier.cost,
       resetFee: tier.resetFee,
+      difficulty,
+      minOdds: DIFFICULTY_CONFIG[difficulty].minOdds,
       status: 'active',
       currentStreak: 0,
       currentLevel: 1,
@@ -125,6 +135,14 @@ export async function linkBetToChallenge(betId: string, userId: string) {
   const challenges = await getActiveChallenges(userId);
   if (challenges.length === 0) return [];
 
+  // Get the bet details to check odds
+  const bet = await prisma.bet.findUnique({
+    where: { id: betId },
+    select: { oddsDecimal: true },
+  });
+
+  if (!bet) return [];
+
   const results = [];
 
   for (const challenge of challenges) {
@@ -139,6 +157,12 @@ export async function linkBetToChallenge(betId: string, userId: string) {
     if (existing) {
       results.push(existing);
       continue;
+    }
+
+    // Check if bet meets minimum odds requirement
+    if (bet.oddsDecimal < challenge.minOdds) {
+      console.log(`Bet ${betId} does not meet minimum odds (${bet.oddsDecimal} < ${challenge.minOdds}) for challenge ${challenge.id}`);
+      continue; // Skip this challenge
     }
 
     const challengeBet = await prisma.challengeBet.create({
@@ -223,9 +247,12 @@ export async function processChallengeSettlement(
     // Handle win - increment streak and check for level completion
     newStreak += 1;
 
+    // Get level requirements based on challenge difficulty
+    const levelRequirements = getLevelRequirements(challenge.difficulty as DifficultyType);
+
     // Check for level completion
     let levelWasCompleted = false;
-    for (const levelReq of LEVEL_REQUIREMENTS) {
+    for (const levelReq of levelRequirements) {
       if (newStreak === levelReq.streakRequired) {
         const levelField = `level${levelReq.level}Completed` as keyof typeof challenge;
         const isAlreadyCompleted = challenge[levelField];

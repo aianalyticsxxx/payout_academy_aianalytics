@@ -81,8 +81,7 @@ export default function RegisterPage() {
       <div className="w-full max-w-md">
         {/* Logo - Text Wordmark */}
         <div className="text-center mb-10">
-          <h1 className="text-3xl font-bold text-teal-400 tracking-tight">PAYOUT ACADEMY</h1>
-          <p className="text-zinc-500 text-sm tracking-widest mt-1">Analytics</p>
+          <h1 className="text-3xl font-bold text-teal-400 tracking-tight">ZALOGCHE</h1>
           <p className="text-zinc-400 mt-4">Create your free account</p>
         </div>
 

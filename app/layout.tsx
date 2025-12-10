@@ -14,12 +14,12 @@ const dmSans = DM_Sans({
 });
 
 export const metadata: Metadata = {
-  title: 'Payout Academy Analytics',
+  title: 'Zalogche',
   description: 'Premium AI-powered sports betting analysis with 7-model swarm intelligence',
   keywords: ['sports betting', 'AI', 'analytics', 'predictions', 'professional betting'],
-  authors: [{ name: 'Payout Academy Analytics' }],
+  authors: [{ name: 'Zalogche' }],
   openGraph: {
-    title: 'Payout Academy Analytics',
+    title: 'Zalogche',
     description: 'Premium AI-powered sports betting analysis',
     type: 'website',
   },

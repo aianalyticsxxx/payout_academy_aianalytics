@@ -1,8 +1,8 @@
 'use client';
 
 // ==========================================
-// PAYOUT ACADEMY - MAIN DASHBOARD
-// PlayerProfit-inspired Deep Teal Theme
+// ZALOGCHE - MAIN DASHBOARD
+// Teal Theme with AI Swarm Intelligence
 // ==========================================
 
 import { useState, useEffect } from 'react';
@@ -237,6 +237,8 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<'events' | 'challenges' | 'ai' | 'bets' | 'rewards' | 'competition'>('bets');
   const [purchaseModalOpen, setPurchaseModalOpen] = useState(false);
   const [selectedChallenge, setSelectedChallenge] = useState<{ size: number; cost: number; label: string; profit: number; target: number; resetFee: number } | null>(null);
+  const [selectedDifficulty, setSelectedDifficulty] = useState<'beginner' | 'pro'>('beginner');
+  const [challengesViewDifficulty, setChallengesViewDifficulty] = useState<'beginner' | 'pro'>('beginner');
   const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
   const [claimedRewards, setClaimedRewards] = useState<number[]>([]);
   const [rewardModalOpen, setRewardModalOpen] = useState(false);
@@ -429,7 +431,7 @@ export default function Dashboard() {
       const res = await fetch('/api/challenges', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tier: selectedChallenge.size }),
+        body: JSON.stringify({ tier: selectedChallenge.size, difficulty: selectedDifficulty }),
       });
 
       const data = await res.json();
@@ -820,7 +822,7 @@ export default function Dashboard() {
       <header className="p-4 md:p-6 bg-surface border-b border-zinc-800/50">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-teal-400 tracking-tight">PAYOUT ACADEMY</h1>
+            <h1 className="text-2xl md:text-3xl font-bold text-teal-400 tracking-tight">ZALOGCHE</h1>
             <p className="text-zinc-500 text-sm tracking-widest">Analytics</p>
           </div>
           <div className="flex items-center gap-4">
@@ -1160,43 +1162,50 @@ export default function Dashboard() {
           <div className="space-y-6">
             {/* Challenge Tiers Data */}
             {(() => {
-              // 4-Level Progression System - Same levels for all, different rewards per account size
-              const levelRequirements = [
-                { level: 1, streakRequired: 5, name: 'Bronze', color: 'from-amber-700 to-amber-600' },
-                { level: 2, streakRequired: 10, name: 'Silver', color: 'from-zinc-400 to-zinc-300' },
-                { level: 3, streakRequired: 15, name: 'Gold', color: 'from-yellow-500 to-yellow-400' },
-                { level: 4, streakRequired: 20, name: 'Diamond', color: 'from-cyan-400 to-blue-400' },
+              // 4-Level Progression System - Beginner difficulty (default)
+              const beginnerLevels = [
+                { level: 1, streakRequired: 3, name: 'Bronze', color: 'from-amber-700 to-amber-600' },
+                { level: 2, streakRequired: 6, name: 'Silver', color: 'from-zinc-400 to-zinc-300' },
+                { level: 3, streakRequired: 10, name: 'Gold', color: 'from-yellow-500 to-yellow-400' },
+                { level: 4, streakRequired: 15, name: 'Diamond', color: 'from-cyan-400 to-blue-400' },
+              ];
+
+              const proLevels = [
+                { level: 1, streakRequired: 2, name: 'Bronze', color: 'from-amber-700 to-amber-600' },
+                { level: 2, streakRequired: 4, name: 'Silver', color: 'from-zinc-400 to-zinc-300' },
+                { level: 3, streakRequired: 6, name: 'Gold', color: 'from-yellow-500 to-yellow-400' },
+                { level: 4, streakRequired: 9, name: 'Diamond', color: 'from-cyan-400 to-blue-400' },
               ];
 
               const challengeTiers = [
                 {
-                  size: 1000, cost: 24.99, label: '$1K', resetFee: 12.49,
+                  size: 1000, cost: 24.99, label: '€1K', resetFee: 12.49,
                   rewards: [3, 100, 500, 1000] // Level 1-4 rewards
                 },
                 {
-                  size: 5000, cost: 99, label: '$5K', resetFee: 49,
+                  size: 5000, cost: 99, label: '€5K', resetFee: 49,
                   rewards: [20, 350, 2000, 5000]
                 },
                 {
-                  size: 10000, cost: 199, label: '$10K', resetFee: 99,
+                  size: 10000, cost: 199, label: '€10K', resetFee: 99,
                   rewards: [60, 700, 4500, 10000]
                 },
                 {
-                  size: 25000, cost: 399, label: '$25K', resetFee: 199,
+                  size: 25000, cost: 399, label: '€25K', resetFee: 199,
                   rewards: [100, 1400, 10000, 25000]
                 },
                 {
-                  size: 50000, cost: 699, label: '$50K', resetFee: 349,
+                  size: 50000, cost: 699, label: '€50K', resetFee: 349,
                   rewards: [150, 2800, 20000, 50000]
                 },
                 {
-                  size: 100000, cost: 999, label: '$100K', resetFee: 499,
+                  size: 100000, cost: 999, label: '€100K', resetFee: 499,
                   rewards: [250, 5000, 50000, 100000]
                 },
               ];
 
               const faqs = [
-                { q: "How do the 4 levels work?", a: "Each challenge has 4 levels to complete. Level 1 requires a 5-win streak, Level 2 requires 10 wins, Level 3 requires 15 wins, and Level 4 requires 20 consecutive wins. You earn rewards at each level!" },
+                { q: "How do the 4 levels work?", a: "Requirements depend on difficulty: Beginner (3, 6, 10, 15 wins with min odds 1.5) or Pro (2, 4, 6, 9 wins with min odds 2.0). You earn rewards at each level!" },
                 { q: "What happens if I lose during a level?", a: "If you lose while attempting a level, your streak resets to zero but you keep any rewards already earned from completed levels. You can continue attempting the current level." },
                 { q: "Do I need to complete all 4 levels?", a: "No! You can cash out your earned rewards at any time. However, completing all 4 levels unlocks the maximum payout for your account size." },
                 { q: "How long do I have to complete all levels?", a: "You have 30 days from your purchase date to complete as many levels as you can. Any rewards earned during this time are yours to keep." },
@@ -1223,8 +1232,10 @@ export default function Dashboard() {
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                           {activeChallenges.map((challenge) => {
                             const tier = challengeTiers.find(t => t.size === challenge.tier);
-                            const nextLevel = levelRequirements.find(l => challenge.currentStreak < l.streakRequired);
-                            const currentLevelReq = levelRequirements.find(l => l.level === challenge.currentLevel);
+                            // Use the challenge's actual difficulty to get level requirements
+                            const challengeLevels = challenge.difficulty === 'pro' ? proLevels : beginnerLevels;
+                            const nextLevel = challengeLevels.find(l => challenge.currentStreak < l.streakRequired);
+                            const currentLevelReq = challengeLevels.find(l => l.level === challenge.currentLevel);
                             const streakProgress = nextLevel
                               ? (challenge.currentStreak / nextLevel.streakRequired) * 100
                               : 100;
@@ -1237,9 +1248,9 @@ export default function Dashboard() {
                                 <div className="flex items-center justify-between mb-3">
                                   <div className="flex items-center gap-2">
                                     <span className={`px-2 py-1 rounded text-xs font-bold bg-gradient-to-r ${currentLevelReq?.color || 'from-zinc-500 to-zinc-400'} text-white`}>
-                                      Level {challenge.currentLevel}
+                                      {challenge.difficulty === 'pro' ? '⚡' : '🎯'} Level {challenge.currentLevel}
                                     </span>
-                                    <span className="text-white font-bold">{tier?.label || `$${challenge.tier/1000}K`}</span>
+                                    <span className="text-white font-bold">{tier?.label || `€${challenge.tier/1000}K`}</span>
                                   </div>
                                   <span className="text-zinc-400 text-xs">{challenge.daysRemaining}d left</span>
                                 </div>
@@ -1249,7 +1260,7 @@ export default function Dashboard() {
                                   <div className="flex items-center justify-between text-xs mb-1">
                                     <span className="text-zinc-400">Current Streak</span>
                                     <span className="text-teal-400 font-bold">
-                                      {challenge.currentStreak}/{nextLevel?.streakRequired || 20} wins
+                                      {challenge.currentStreak}/{nextLevel?.streakRequired || challengeLevels[challengeLevels.length - 1].streakRequired} wins
                                     </span>
                                   </div>
                                   <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
@@ -1281,7 +1292,7 @@ export default function Dashboard() {
                                 {/* Rewards Earned */}
                                 <div className="flex items-center justify-between pt-3 border-t border-zinc-800">
                                   <span className="text-zinc-400 text-xs">Earned</span>
-                                  <span className="text-emerald-400 font-bold">${(challenge.totalRewardsEarned || 0).toLocaleString()}</span>
+                                  <span className="text-emerald-400 font-bold">€{(challenge.totalRewardsEarned || 0).toLocaleString()}</span>
                                 </div>
                               </div>
                             );
@@ -1303,9 +1314,47 @@ export default function Dashboard() {
                         </div>
                       </div>
 
+                      {/* Difficulty Toggle */}
+                      <div className="grid grid-cols-2 gap-6 mt-6 mb-4">
+                        <button
+                          onClick={() => setChallengesViewDifficulty('beginner')}
+                          className={`p-4 rounded-xl border transition-all text-center ${
+                            challengesViewDifficulty === 'beginner'
+                              ? 'border-teal-400 bg-teal-500/10 shadow-[0_0_20px_rgba(20,184,166,0.5),inset_0_0_20px_rgba(20,184,166,0.1)]'
+                              : 'border-zinc-800/50 bg-transparent hover:border-zinc-700'
+                          }`}
+                        >
+                          <div className="flex items-center justify-center gap-2 mb-1">
+                            <span className="text-xl">🎯</span>
+                            <span className="text-lg font-bold text-white">Beginner</span>
+                          </div>
+                          <div className="text-xs text-zinc-400 mb-1">Perfect for getting started</div>
+                          <div className="text-xs font-semibold text-teal-400">
+                            Min odds: 1.5
+                          </div>
+                        </button>
+                        <button
+                          onClick={() => setChallengesViewDifficulty('pro')}
+                          className={`p-4 rounded-xl border transition-all text-center ${
+                            challengesViewDifficulty === 'pro'
+                              ? 'border-yellow-400 bg-yellow-500/10 shadow-[0_0_20px_rgba(250,204,21,0.5),inset_0_0_20px_rgba(250,204,21,0.1)]'
+                              : 'border-zinc-800/50 bg-transparent hover:border-zinc-700'
+                          }`}
+                        >
+                          <div className="flex items-center justify-center gap-2 mb-1">
+                            <span className="text-xl">⚡</span>
+                            <span className="text-lg font-bold text-white">Pro</span>
+                          </div>
+                          <div className="text-xs text-zinc-400 mb-1">High risk, high intensity</div>
+                          <div className="text-xs font-semibold text-yellow-400">
+                            Min odds: 2.0
+                          </div>
+                        </button>
+                      </div>
+
                       {/* Level Preview */}
                       <div className="grid grid-cols-4 gap-2 mt-6 mb-4">
-                        {levelRequirements.map((lvl) => (
+                        {(challengesViewDifficulty === 'beginner' ? beginnerLevels : proLevels).map((lvl) => (
                           <div key={lvl.level} className="text-center p-3 bg-zinc-900/50 rounded-xl border border-zinc-800/50">
                             <div className={`text-xs font-bold bg-gradient-to-r ${lvl.color} bg-clip-text text-transparent`}>LEVEL {lvl.level}</div>
                             <div className="text-white font-bold text-sm">{lvl.streakRequired} Wins</div>
@@ -1349,20 +1398,20 @@ export default function Dashboard() {
 
                         {/* Card Header */}
                         <div className={`text-center mb-4 ${idx === 2 || idx === 3 ? 'mt-4' : ''}`}>
-                          <div className="text-4xl font-black text-white mb-1">${tier.size.toLocaleString()}</div>
+                          <div className="text-4xl font-black text-white mb-1">€{tier.size.toLocaleString()}</div>
                           <div className="text-sm font-bold text-teal-400 tracking-widest uppercase">CHALLENGE</div>
                         </div>
 
                         {/* Level Rewards Grid */}
                         <div className="bg-zinc-900/50 rounded-xl p-4 mb-4">
-                          <div className="text-xs text-zinc-400 text-center mb-3 uppercase tracking-wider">Rewards Per Level</div>
+                          <div className="text-xs text-zinc-400 text-center mb-3 uppercase tracking-wider">Rewards Per Level (Beginner)</div>
                           <div className="grid grid-cols-2 gap-2">
-                            {levelRequirements.map((lvl, i) => (
+                            {beginnerLevels.map((lvl, i) => (
                               <div key={lvl.level} className="bg-zinc-800/50 rounded-lg p-2 text-center">
                                 <div className={`text-[10px] font-bold bg-gradient-to-r ${lvl.color} bg-clip-text text-transparent`}>
                                   LVL {lvl.level} • {lvl.streakRequired}W
                                 </div>
-                                <div className="text-white font-bold text-sm">${tier.rewards[i].toLocaleString()}</div>
+                                <div className="text-white font-bold text-sm">€{tier.rewards[i].toLocaleString()}</div>
                               </div>
                             ))}
                           </div>
@@ -1371,13 +1420,13 @@ export default function Dashboard() {
                         {/* Total Potential */}
                         <div className="flex items-center justify-between px-3 py-2 bg-teal-500/10 rounded-lg border border-teal-500/30 mb-4">
                           <span className="text-zinc-400 text-sm">Max Payout (All 4)</span>
-                          <span className="text-teal-400 font-bold">${tier.rewards.reduce((a, b) => a + b, 0).toLocaleString()}</span>
+                          <span className="text-teal-400 font-bold">€{tier.rewards.reduce((a, b) => a + b, 0).toLocaleString()}</span>
                         </div>
 
                         {/* Meta Info */}
                         <div className="flex items-center justify-between text-xs text-zinc-500 mb-4">
                           <span>⏱️ 30 days</span>
-                          <span>🔄 Reset: ${tier.resetFee}</span>
+                          <span>🔄 Reset: €{tier.resetFee}</span>
                         </div>
 
                         {/* Buy Button */}
@@ -1388,7 +1437,7 @@ export default function Dashboard() {
                           }}
                           className="w-full py-4 rounded-xl font-bold text-lg transition-all bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-teal-400 text-white shadow-lg shadow-teal-500/25 group-hover:shadow-teal-500/40"
                         >
-                          💳 START - ${tier.cost}
+                          💳 START - €{tier.cost}
                         </button>
                       </div>
                     ))}
@@ -1396,9 +1445,11 @@ export default function Dashboard() {
 
                   {/* How It Works - Updated for Level System */}
                   <div className="bg-[#1a1a1a] border border-zinc-800/50 rounded-2xl p-6">
-                    <h2 className="text-2xl font-bold text-white mb-6 text-center">How The Levels Work</h2>
+                    <h2 className="text-2xl font-bold text-white mb-6 text-center">
+                      How The Levels Work ({challengesViewDifficulty === 'beginner' ? 'Beginner' : 'Pro'})
+                    </h2>
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                      {levelRequirements.map((lvl, idx) => (
+                      {(challengesViewDifficulty === 'beginner' ? beginnerLevels : proLevels).map((lvl, idx) => (
                         <div key={lvl.level} className="relative">
                           {idx < 3 && (
                             <div className="hidden md:block absolute top-1/2 -right-2 w-4 h-0.5 bg-gradient-to-r from-zinc-600 to-zinc-700"></div>
@@ -2435,7 +2486,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* BETS TAB - PlayerProfit Style Dashboard */}
+        {/* BETS TAB - Main Dashboard */}
         {activeTab === 'bets' && (
           <div className="space-y-6">
             {/* Top Row: Win Streak Challenge */}
@@ -2686,7 +2737,7 @@ export default function Dashboard() {
                         </div>
                         <div className="text-right">
                           <div className="text-xs text-zinc-400">Max Reward</div>
-                          <div className="text-xl font-bold text-teal-400">${rewards[3]?.toLocaleString()}</div>
+                          <div className="text-xl font-bold text-teal-400">€{rewards[3]?.toLocaleString()}</div>
                         </div>
                       </div>
 
@@ -2735,7 +2786,7 @@ export default function Dashboard() {
                           </div>
                           <div>
                             <div className="text-xs text-zinc-500 mb-1">Earned</div>
-                            <div className="text-lg font-bold text-emerald-400">${(selectedChallenge?.totalRewardsEarned || 0).toLocaleString()}</div>
+                            <div className="text-lg font-bold text-emerald-400">€{(selectedChallenge?.totalRewardsEarned || 0).toLocaleString()}</div>
                           </div>
                         </div>
                       </div>
@@ -2843,7 +2894,7 @@ export default function Dashboard() {
                   </div>
                   <div>
                     <div className="text-xs text-zinc-500 mb-1">Account Size</div>
-                    <div className="text-white font-medium text-sm">$1,000</div>
+                    <div className="text-white font-medium text-sm">€1,000</div>
                   </div>
                   <div>
                     <div className="text-xs text-zinc-500 mb-1">Inactivity</div>
@@ -3067,7 +3118,7 @@ export default function Dashboard() {
                           </div>
                           <div>
                             <div className="text-xs text-zinc-500 mb-1">Stake</div>
-                            <div className="font-medium text-white">${bet.stake}</div>
+                            <div className="font-medium text-white">€{bet.stake}</div>
                           </div>
                         </div>
 
@@ -3075,7 +3126,7 @@ export default function Dashboard() {
                           <div>
                             <div className="text-xs text-zinc-500 mb-1">Potential Return</div>
                             <div className="text-xl font-bold text-emerald-400 font-mono">
-                              ${(bet.stake * parseFloat(bet.odds)).toFixed(2)}
+                              €{(bet.stake * parseFloat(bet.odds)).toFixed(2)}
                             </div>
                           </div>
                           <div className="flex gap-2">
@@ -3183,7 +3234,7 @@ export default function Dashboard() {
                 <div className="flex items-center justify-between mb-4">
                   <div>
                     <div className="text-sm text-emerald-400 font-medium mb-1">Available Balance</div>
-                    <div className="text-4xl font-bold text-white">${totalEarnings.toLocaleString()}</div>
+                    <div className="text-4xl font-bold text-white">€{totalEarnings.toLocaleString()}</div>
                   </div>
                   <div className="w-16 h-16 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center">
                     <span className="text-3xl">💰</span>
@@ -3226,7 +3277,7 @@ export default function Dashboard() {
                       </div>
                       <div className="text-right">
                         <div className="text-sm text-zinc-400">Current Account</div>
-                        <div className="text-2xl font-bold text-teal-400">${selectedAccountSize.toLocaleString()}</div>
+                        <div className="text-2xl font-bold text-teal-400">€{selectedAccountSize.toLocaleString()}</div>
                       </div>
                     </div>
 
@@ -3245,9 +3296,9 @@ export default function Dashboard() {
                           <div className={`text-xl font-bold mb-1 ${selectedAccountSize === account.size ? 'text-teal-400' : 'text-white'}`}>
                             {account.label}
                           </div>
-                          <div className="text-sm text-zinc-400">${account.cost}</div>
+                          <div className="text-sm text-zinc-400">€{account.cost}</div>
                           <div className="text-xs text-zinc-500 mt-2">
-                            Max: ${account.rewards[3].toLocaleString()}
+                            Max: €{account.rewards[3].toLocaleString()}
                           </div>
                         </button>
                       ))}
@@ -3601,7 +3652,7 @@ export default function Dashboard() {
 
       {/* Footer */}
       <footer className="mt-12 py-8 border-t border-zinc-800/50 text-center">
-        <p className="text-teal-400 font-semibold tracking-tight">PAYOUT ACADEMY</p>
+        <p className="text-teal-400 font-semibold tracking-tight">ZALOGCHE</p>
         <p className="text-zinc-500 text-xs mt-1">Analytics • For Entertainment Only • Gamble Responsibly</p>
       </footer>
 
@@ -3709,9 +3760,9 @@ export default function Dashboard() {
 
                 {/* Stake Input */}
                 <div className="mb-6">
-                  <label className="block text-sm font-medium text-zinc-300 mb-2">Stake Amount ($)</label>
+                  <label className="block text-sm font-medium text-zinc-300 mb-2">Stake Amount (€)</label>
                   <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 font-semibold">$</span>
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 font-semibold">€</span>
                     <input
                       type="number"
                       min="1"
@@ -3763,8 +3814,8 @@ export default function Dashboard() {
                       <div className="flex justify-between items-center">
                         <span className="text-zinc-300">Potential Return</span>
                         <div className="text-right">
-                          <div className="text-2xl font-bold text-teal-400 font-mono">${potentialReturn.toFixed(2)}</div>
-                          <div className="text-xs text-teal-500">+${profit.toFixed(2)} profit</div>
+                          <div className="text-2xl font-bold text-teal-400 font-mono">€{potentialReturn.toFixed(2)}</div>
+                          <div className="text-xs text-teal-500">+€{profit.toFixed(2)} profit</div>
                         </div>
                       </div>
                     </div>
@@ -3884,9 +3935,9 @@ export default function Dashboard() {
 
                 {/* Stake Input */}
                 <div className="mb-6">
-                  <label className="block text-sm font-medium text-zinc-300 mb-2">Stake Amount ($)</label>
+                  <label className="block text-sm font-medium text-zinc-300 mb-2">Stake Amount (€)</label>
                   <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 font-semibold">$</span>
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 font-semibold">€</span>
                     <input
                       type="number"
                       min="1"
@@ -3924,8 +3975,8 @@ export default function Dashboard() {
                       <div className="flex justify-between items-center">
                         <span className="text-zinc-300">Potential Return</span>
                         <div className="text-right">
-                          <div className="text-2xl font-bold text-teal-400 font-mono">${potentialReturn.toFixed(2)}</div>
-                          <div className="text-xs text-teal-500">+${profit.toFixed(2)} profit</div>
+                          <div className="text-2xl font-bold text-teal-400 font-mono">€{potentialReturn.toFixed(2)}</div>
+                          <div className="text-xs text-teal-500">+€{profit.toFixed(2)} profit</div>
                         </div>
                       </div>
                     </div>
@@ -4103,9 +4154,9 @@ export default function Dashboard() {
 
                 {/* Stake Input */}
                 <div className="mb-6">
-                  <label className="block text-sm font-medium text-zinc-300 mb-2">Stake Amount ($)</label>
+                  <label className="block text-sm font-medium text-zinc-300 mb-2">Stake Amount (€)</label>
                   <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 font-semibold">$</span>
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 font-semibold">€</span>
                     <input
                       type="number"
                       min="1"
@@ -4143,8 +4194,8 @@ export default function Dashboard() {
                       <div className="flex justify-between items-center">
                         <span className="text-zinc-300">Potential Return</span>
                         <div className="text-right">
-                          <div className="text-2xl font-bold text-teal-400 font-mono">${potentialReturn.toFixed(2)}</div>
-                          <div className="text-xs text-teal-500">+${profit.toFixed(2)} profit</div>
+                          <div className="text-2xl font-bold text-teal-400 font-mono">€{potentialReturn.toFixed(2)}</div>
+                          <div className="text-xs text-teal-500">+€{profit.toFixed(2)} profit</div>
                         </div>
                       </div>
                     </div>
@@ -4282,20 +4333,62 @@ export default function Dashboard() {
                 <h2 className="text-2xl font-bold text-white">Start Your Challenge</h2>
                 <p className="text-zinc-400 text-sm mt-1">Complete 4 levels of winning streaks!</p>
               </div>
+
+              {/* Difficulty Selector */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-zinc-300 mb-2 text-center">Choose Difficulty</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => setSelectedDifficulty('beginner')}
+                    className={`p-4 rounded-xl border transition-all ${
+                      selectedDifficulty === 'beginner'
+                        ? 'bg-teal-500/20 border-teal-500 shadow-lg shadow-teal-500/20'
+                        : 'bg-zinc-900/50 border-zinc-700/50 hover:border-teal-600/50'
+                    }`}
+                  >
+                    <div className="text-2xl mb-1">🎯</div>
+                    <div className={`font-bold mb-1 ${selectedDifficulty === 'beginner' ? 'text-teal-400' : 'text-white'}`}>Beginner</div>
+                    <div className="text-xs text-zinc-400 mb-2">Min odds 1.5x</div>
+                    <div className="text-xs text-zinc-500">3, 6, 10, 15 wins</div>
+                  </button>
+                  <button
+                    onClick={() => setSelectedDifficulty('pro')}
+                    className={`p-4 rounded-xl border transition-all ${
+                      selectedDifficulty === 'pro'
+                        ? 'bg-amber-500/20 border-amber-500 shadow-lg shadow-amber-500/20'
+                        : 'bg-zinc-900/50 border-zinc-700/50 hover:border-amber-600/50'
+                    }`}
+                  >
+                    <div className="text-2xl mb-1">⚡</div>
+                    <div className={`font-bold mb-1 ${selectedDifficulty === 'pro' ? 'text-amber-400' : 'text-white'}`}>Pro</div>
+                    <div className="text-xs text-zinc-400 mb-2">Min odds 2.0x</div>
+                    <div className="text-xs text-zinc-500">2, 4, 6, 9 wins</div>
+                  </button>
+                </div>
+              </div>
+
               <div className="bg-zinc-900/70 border border-zinc-700/50 rounded-xl p-4 mb-4">
                 <div className="text-center mb-3">
-                  <div className="text-3xl font-black text-white">${selectedChallenge.size.toLocaleString()}</div>
+                  <div className="text-3xl font-black text-white">€{selectedChallenge.size.toLocaleString()}</div>
                   <div className="text-sm font-bold text-teal-400 tracking-widest uppercase">Streak Challenge</div>
                 </div>
                 {/* Level Breakdown */}
                 <div className="text-xs text-zinc-400 text-center mb-2 uppercase">Level Rewards</div>
                 <div className="grid grid-cols-4 gap-1 mb-3">
-                  {[
-                    { lvl: 1, wins: 3, color: 'from-amber-700 to-amber-600' },
-                    { lvl: 2, wins: 5, color: 'from-zinc-400 to-zinc-300' },
-                    { lvl: 3, wins: 7, color: 'from-yellow-500 to-yellow-400' },
-                    { lvl: 4, wins: 10, color: 'from-cyan-400 to-blue-400' },
-                  ].map((l, i) => {
+                  {(selectedDifficulty === 'beginner'
+                    ? [
+                        { lvl: 1, wins: 3, color: 'from-amber-700 to-amber-600' },
+                        { lvl: 2, wins: 6, color: 'from-zinc-400 to-zinc-300' },
+                        { lvl: 3, wins: 10, color: 'from-yellow-500 to-yellow-400' },
+                        { lvl: 4, wins: 15, color: 'from-cyan-400 to-blue-400' },
+                      ]
+                    : [
+                        { lvl: 1, wins: 2, color: 'from-amber-700 to-amber-600' },
+                        { lvl: 2, wins: 4, color: 'from-zinc-400 to-zinc-300' },
+                        { lvl: 3, wins: 6, color: 'from-yellow-500 to-yellow-400' },
+                        { lvl: 4, wins: 9, color: 'from-cyan-400 to-blue-400' },
+                      ]
+                  ).map((l, i) => {
                     const rewards = selectedChallenge.size === 1000 ? [3, 100, 500, 1000] :
                                    selectedChallenge.size === 5000 ? [20, 350, 2000, 5000] :
                                    selectedChallenge.size === 10000 ? [60, 700, 4500, 10000] :
@@ -4305,19 +4398,19 @@ export default function Dashboard() {
                     return (
                       <div key={l.lvl} className="bg-zinc-800/50 rounded-lg p-2 text-center">
                         <div className={`text-[9px] font-bold bg-gradient-to-r ${l.color} bg-clip-text text-transparent`}>L{l.lvl}•{l.wins}W</div>
-                        <div className="text-white font-bold text-xs">${rewards[i]}</div>
+                        <div className="text-white font-bold text-xs">€{rewards[i]}</div>
                       </div>
                     );
                   })}
                 </div>
                 <div className="space-y-2 text-sm">
-                  <div className="flex justify-between items-center py-1.5 border-b border-zinc-800"><span className="text-zinc-400">💰 Max Payout</span><span className="text-teal-400 font-semibold">${selectedChallenge.profit.toLocaleString()}</span></div>
+                  <div className="flex justify-between items-center py-1.5 border-b border-zinc-800"><span className="text-zinc-400">💰 Max Payout</span><span className="text-teal-400 font-semibold">€{selectedChallenge.profit.toLocaleString()}</span></div>
                   <div className="flex justify-between items-center py-1.5 border-b border-zinc-800"><span className="text-zinc-400">⏱️ Time Limit</span><span className="text-white font-semibold">30 days</span></div>
-                  <div className="flex justify-between items-center py-1.5"><span className="text-zinc-400">🔄 Reset Fee</span><span className="text-zinc-300">${selectedChallenge.resetFee}</span></div>
+                  <div className="flex justify-between items-center py-1.5"><span className="text-zinc-400">🔄 Reset Fee</span><span className="text-zinc-300">€{selectedChallenge.resetFee}</span></div>
                 </div>
               </div>
               <div className="bg-teal-500/10 border border-teal-500/30 rounded-xl p-3 mb-4">
-                <div className="flex justify-between items-center"><span className="text-zinc-300 font-medium">Total</span><span className="text-2xl font-black text-teal-400">${selectedChallenge.cost.toFixed(2)}</span></div>
+                <div className="flex justify-between items-center"><span className="text-zinc-300 font-medium">Total</span><span className="text-2xl font-black text-teal-400">€{selectedChallenge.cost.toFixed(2)}</span></div>
               </div>
               <label className="flex items-start gap-3 mb-4 cursor-pointer group">
                 <input type="checkbox" className="mt-1 w-4 h-4 rounded border-zinc-600 bg-zinc-800 text-teal-500 focus:ring-teal-500 focus:ring-offset-0" />

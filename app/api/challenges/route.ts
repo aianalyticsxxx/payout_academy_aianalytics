@@ -17,6 +17,9 @@ import {
   LEVEL_REQUIREMENTS,
   getNextLevelTarget,
   MAX_ACTIVE_CHALLENGES,
+  DIFFICULTY_CONFIG,
+  DifficultyType,
+  getLevelRequirements,
 } from '@/lib/challenges/constants';
 import { z } from 'zod';
 
@@ -29,6 +32,7 @@ const CreateChallengeSchema = z.object({
     (val) => CHALLENGE_TIERS.some((t) => t.size === val),
     { message: 'Invalid tier size' }
   ),
+  difficulty: z.enum(['beginner', 'pro']).optional().default('beginner'),
 });
 
 // ==========================================
@@ -52,7 +56,9 @@ export async function GET(req: NextRequest) {
     // Calculate additional stats for each challenge
     const challengesData = activeChallenges.map((challenge) => {
       const tier = getTierBySize(challenge.tier);
-      const nextTarget = getNextLevelTarget(challenge.currentStreak);
+      const difficulty = (challenge.difficulty || 'beginner') as DifficultyType;
+      const levelRequirements = getLevelRequirements(difficulty);
+      const nextTarget = getNextLevelTarget(challenge.currentStreak, difficulty);
       const daysRemaining = Math.max(
         0,
         Math.ceil(
@@ -62,11 +68,12 @@ export async function GET(req: NextRequest) {
 
       return {
         ...challenge,
-        tierLabel: tier?.label || `$${challenge.tier / 1000}K`,
+        tierLabel: tier?.label || `€${challenge.tier / 1000}K`,
         tierRewards: tier?.rewards || [],
         daysRemaining,
         nextLevelTarget: nextTarget,
-        levelRequirements: LEVEL_REQUIREMENTS,
+        levelRequirements,
+        difficultyConfig: DIFFICULTY_CONFIG[difficulty],
         completedLevels: [
           challenge.level1Completed,
           challenge.level2Completed,
@@ -95,6 +102,7 @@ export async function GET(req: NextRequest) {
       history,
       tiers: CHALLENGE_TIERS,
       levels: LEVEL_REQUIREMENTS,
+      difficulties: DIFFICULTY_CONFIG,
     });
   } catch (error) {
     console.error('Get challenge error:', error);
@@ -128,17 +136,18 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { tier } = result.data;
+    const { tier, difficulty } = result.data;
 
     // Create the challenge
-    const challenge = await createChallenge(userId, tier);
+    const challenge = await createChallenge(userId, tier, difficulty as DifficultyType);
 
     const tierData = getTierBySize(tier);
+    const difficultyData = DIFFICULTY_CONFIG[difficulty as DifficultyType];
 
     return NextResponse.json(
       {
         challenge,
-        message: `${tierData?.label || '$' + tier / 1000 + 'K'} Challenge created successfully!`,
+        message: `${difficultyData.icon} ${difficultyData.name} ${tierData?.label || '€' + tier / 1000 + 'K'} Challenge created successfully!`,
       },
       { status: 201 }
     );
