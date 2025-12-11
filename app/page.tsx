@@ -3349,292 +3349,317 @@ export default function Dashboard() {
         {/* REWARDS TAB - Integrated with Challenge System */}
         {activeTab === 'rewards' && (
           <div className="space-y-6">
-            {/* Available Balance & Payout Button */}
-            <div className="bg-gradient-to-br from-emerald-950/60 via-emerald-900/40 to-emerald-950/60 border border-emerald-700/40 rounded-2xl p-6 relative overflow-hidden">
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(16,185,129,0.15),transparent_50%)]"></div>
-              <div className="relative">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <div className="text-sm text-emerald-400 font-medium mb-1">Available to Withdraw</div>
-                    <div className="text-4xl font-bold text-white">€{availableBalance.toLocaleString()}</div>
+            {/* Wallet Overview */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Available Balance Card */}
+              <div className="bg-gradient-to-br from-emerald-950/80 via-emerald-900/60 to-emerald-950/80 border border-emerald-600/30 rounded-2xl p-6 relative overflow-hidden">
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,rgba(16,185,129,0.2),transparent_60%)]"></div>
+                <div className="relative">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+                      <span className="text-lg">💰</span>
+                    </div>
+                    <span className="text-emerald-400 text-sm font-medium">Available Balance</span>
                   </div>
+                  <div className="text-4xl font-bold text-white mb-4">€{availableBalance.toLocaleString()}</div>
                   <button
                     onClick={() => setPayoutModalOpen(true)}
                     disabled={availableBalance < 10}
-                    className="px-6 py-3 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-semibold rounded-xl transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    className="w-full py-3 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-semibold rounded-xl transition-all shadow-lg shadow-emerald-500/25 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
                     <span>💸</span>
-                    Request Payout
+                    <span>Withdraw Funds</span>
                   </button>
+                  {availableBalance < 10 && availableBalance > 0 && (
+                    <div className="text-xs text-emerald-400/70 text-center mt-2">Minimum withdrawal: €10</div>
+                  )}
                 </div>
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="bg-emerald-900/30 rounded-xl p-3 text-center">
-                    <div className="text-lg font-bold text-white">{activeChallenges.length}</div>
-                    <div className="text-xs text-emerald-400">Active Accounts</div>
-                  </div>
-                  <div className="bg-emerald-900/30 rounded-xl p-3 text-center">
-                    <div className="text-lg font-bold text-white">
-                      {activeChallenges.reduce((sum, c) => {
-                        return sum + [c.level1Completed, c.level2Completed, c.level3Completed, c.level4Completed].filter(Boolean).length;
-                      }, 0)}
+              </div>
+
+              {/* Pending Rewards Card */}
+              <div className="bg-gradient-to-br from-amber-950/60 via-amber-900/40 to-amber-950/60 border border-amber-600/30 rounded-2xl p-6 relative overflow-hidden">
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,rgba(245,158,11,0.15),transparent_60%)]"></div>
+                <div className="relative">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center">
+                      <span className="text-lg">⏳</span>
                     </div>
-                    <div className="text-xs text-emerald-400">Levels Completed</div>
+                    <span className="text-amber-400 text-sm font-medium">Pending Rewards</span>
                   </div>
-                  <div className="bg-emerald-900/30 rounded-xl p-3 text-center">
-                    <div className="text-lg font-bold text-white">
-                      {activeChallenges.filter(c => c.level4Completed).length}
+                  <div className="text-4xl font-bold text-white mb-4">
+                    €{activeChallenges.reduce((sum, c) => sum + (c.totalPendingAmount || 0), 0).toLocaleString()}
+                  </div>
+                  {activeChallenges.reduce((sum, c) => sum + (c.totalPendingAmount || 0), 0) > 0 ? (
+                    <button
+                      onClick={() => claimRewards()}
+                      disabled={claimingRewards}
+                      className="w-full py-3 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white font-semibold rounded-xl transition-all shadow-lg shadow-amber-500/25 disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      <span>{claimingRewards ? '⏳' : '✨'}</span>
+                      <span>{claimingRewards ? 'Claiming...' : 'Claim All Rewards'}</span>
+                    </button>
+                  ) : (
+                    <div className="w-full py-3 bg-zinc-800/50 text-zinc-500 font-medium rounded-xl text-center">
+                      No pending rewards
                     </div>
-                    <div className="text-xs text-emerald-400">Max Payouts</div>
+                  )}
+                  <div className="text-xs text-amber-400/70 text-center mt-2">
+                    {activeChallenges.reduce((sum, c) => sum + (c.pendingRewards?.length || 0), 0)} level(s) ready to claim
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Per-Account Rewards */}
-            {activeChallenges.length === 0 ? (
-              <div className="bg-[#111111] border border-zinc-800/50 rounded-2xl p-8 text-center">
-                <div className="text-4xl mb-4">🎯</div>
-                <h3 className="text-xl font-bold text-white mb-2">No Active Challenges</h3>
-                <p className="text-zinc-400 mb-4">Start a challenge to begin earning rewards!</p>
-                <button
-                  onClick={() => setActiveTab('challenges')}
-                  className="px-6 py-3 bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-teal-400 text-white font-semibold rounded-xl transition-all"
-                >
-                  Browse Challenges
-                </button>
+            {/* Quick Stats Bar */}
+            <div className="grid grid-cols-4 gap-3">
+              <div className="bg-[#111]/80 border border-zinc-800/50 rounded-xl p-4 text-center">
+                <div className="text-2xl font-bold text-white">{activeChallenges.length}</div>
+                <div className="text-xs text-zinc-500 mt-1">Active Challenges</div>
               </div>
-            ) : (
-              <div className="space-y-4">
-                {activeChallenges.map((challenge) => {
-                  const difficultyLabel = challenge.difficulty === 'pro' ? 'Pro' : 'Beginner';
-                  const tierLabel = `€${(challenge.tier / 1000)}K`;
-                  const rewards = challenge.tierRewards || [0, 0, 0, 0];
-                  const levelReqs = challenge.levelRequirements || [
-                    { streakRequired: 3 }, { streakRequired: 6 }, { streakRequired: 10 }, { streakRequired: 15 }
-                  ];
+              <div className="bg-[#111]/80 border border-zinc-800/50 rounded-xl p-4 text-center">
+                <div className="text-2xl font-bold text-teal-400">
+                  {activeChallenges.reduce((sum, c) => sum + [c.level1Completed, c.level2Completed, c.level3Completed, c.level4Completed].filter(Boolean).length, 0)}
+                </div>
+                <div className="text-xs text-zinc-500 mt-1">Levels Complete</div>
+              </div>
+              <div className="bg-[#111]/80 border border-zinc-800/50 rounded-xl p-4 text-center">
+                <div className="text-2xl font-bold text-emerald-400">
+                  €{activeChallenges.reduce((sum, c) => sum + (c.totalRewardsEarned || 0), 0).toLocaleString()}
+                </div>
+                <div className="text-xs text-zinc-500 mt-1">Total Earned</div>
+              </div>
+              <div className="bg-[#111]/80 border border-zinc-800/50 rounded-xl p-4 text-center">
+                <div className="text-2xl font-bold text-cyan-400">
+                  {activeChallenges.filter(c => c.level4Completed).length}
+                </div>
+                <div className="text-xs text-zinc-500 mt-1">Max Payouts</div>
+              </div>
+            </div>
 
-                  const levels = [
-                    { level: 1, completed: challenge.level1Completed, reward: rewards[0], streak: levelReqs[0]?.streakRequired || 3, icon: '🥉', color: 'amber' },
-                    { level: 2, completed: challenge.level2Completed, reward: rewards[1], streak: levelReqs[1]?.streakRequired || 6, icon: '🥈', color: 'zinc' },
-                    { level: 3, completed: challenge.level3Completed, reward: rewards[2], streak: levelReqs[2]?.streakRequired || 10, icon: '🥇', color: 'yellow' },
-                    { level: 4, completed: challenge.level4Completed, reward: rewards[3], streak: levelReqs[3]?.streakRequired || 15, icon: '💎', color: 'cyan' },
-                  ];
+            {/* Challenge Accounts Section */}
+            <div className="bg-[#111]/80 border border-zinc-800/50 rounded-2xl overflow-hidden">
+              <div className="p-4 border-b border-zinc-800/50 flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                  <span>🏆</span> Your Challenge Accounts
+                </h3>
+                <span className="text-sm text-zinc-500">{activeChallenges.length} active</span>
+              </div>
 
-                  const completedCount = levels.filter(l => l.completed).length;
-                  const totalPossible = rewards.reduce((a: number, b: number) => a + b, 0);
-                  const earned = challenge.totalRewardsEarned || 0;
+              {activeChallenges.length === 0 ? (
+                <div className="p-8 text-center">
+                  <div className="text-4xl mb-4">🎯</div>
+                  <h3 className="text-xl font-bold text-white mb-2">No Active Challenges</h3>
+                  <p className="text-zinc-400 mb-4">Start a challenge to begin earning rewards!</p>
+                  <button
+                    onClick={() => setActiveTab('challenges')}
+                    className="px-6 py-3 bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-teal-400 text-white font-semibold rounded-xl transition-all"
+                  >
+                    Browse Challenges
+                  </button>
+                </div>
+              ) : (
+                <div className="divide-y divide-zinc-800/50">
+                  {activeChallenges.map((challenge) => {
+                    const difficultyLabel = challenge.difficulty === 'pro' ? 'Pro' : 'Beginner';
+                    const tierLabel = `€${(challenge.tier / 1000)}K`;
+                    const rewards = challenge.tierRewards || [0, 0, 0, 0];
+                    const levelReqs = challenge.levelRequirements || [
+                      { streakRequired: 3 }, { streakRequired: 6 }, { streakRequired: 10 }, { streakRequired: 15 }
+                    ];
 
-                  return (
-                    <div key={challenge.id} className="bg-gradient-to-br from-[#1a3a3a] via-[#153030] to-[#102828] border border-[#2a5555]/50 rounded-2xl overflow-hidden">
-                      {/* Account Header */}
-                      <div className="p-4 border-b border-[#2a5555]/30 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                            challenge.difficulty === 'pro' ? 'bg-amber-500/20' : 'bg-teal-500/20'
-                          }`}>
-                            <span className="text-xl">{challenge.difficulty === 'pro' ? '⚡' : '🎯'}</span>
+                    const levels = [
+                      { level: 1, completed: challenge.level1Completed, reward: rewards[0], streak: levelReqs[0]?.streakRequired || 3 },
+                      { level: 2, completed: challenge.level2Completed, reward: rewards[1], streak: levelReqs[1]?.streakRequired || 6 },
+                      { level: 3, completed: challenge.level3Completed, reward: rewards[2], streak: levelReqs[2]?.streakRequired || 10 },
+                      { level: 4, completed: challenge.level4Completed, reward: rewards[3], streak: levelReqs[3]?.streakRequired || 15 },
+                    ];
+
+                    const completedCount = levels.filter(l => l.completed).length;
+                    const totalPossible = rewards.reduce((a: number, b: number) => a + b, 0);
+                    const earned = challenge.totalRewardsEarned || 0;
+                    const hasPending = (challenge.totalPendingAmount || 0) > 0;
+                    const nextLevel = levels.find(l => !l.completed);
+
+                    return (
+                      <div key={challenge.id} className="p-4 hover:bg-zinc-900/30 transition-colors">
+                        {/* Header Row */}
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                              challenge.difficulty === 'pro'
+                                ? 'bg-gradient-to-br from-amber-500/30 to-orange-600/20 border border-amber-500/30'
+                                : 'bg-gradient-to-br from-teal-500/30 to-cyan-600/20 border border-teal-500/30'
+                            }`}>
+                              <span className="text-lg">{challenge.difficulty === 'pro' ? '⚡' : '🎯'}</span>
+                            </div>
+                            <div>
+                              <div className="font-bold text-white flex items-center gap-2">
+                                {tierLabel} {difficultyLabel}
+                                {hasPending && (
+                                  <span className="px-2 py-0.5 text-[10px] bg-amber-500/20 text-amber-400 rounded-full animate-pulse">
+                                    REWARD READY
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-xs text-zinc-500">
+                                🔥 {challenge.currentStreak} win streak
+                                {nextLevel && ` • ${nextLevel.streak - challenge.currentStreak} to Level ${nextLevel.level}`}
+                              </div>
+                            </div>
                           </div>
-                          <div>
-                            <div className="font-bold text-white">{tierLabel} {difficultyLabel}</div>
-                            <div className="text-xs text-zinc-400">Account {challenge.id.slice(-6).toLowerCase()}</div>
+                          <div className="text-right">
+                            <div className="text-lg font-bold text-emerald-400">€{earned.toLocaleString()}</div>
+                            <div className="text-xs text-zinc-500">of €{totalPossible.toLocaleString()}</div>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <div className="text-sm text-zinc-400">Earned</div>
-                          <div className="text-lg font-bold text-emerald-400">€{earned.toLocaleString()}</div>
-                        </div>
-                      </div>
 
-                      {/* Current Progress */}
-                      <div className="p-4 border-b border-[#2a5555]/30 bg-black/20">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm text-zinc-400">Current Streak</span>
-                          <span className="text-lg font-bold text-teal-400">{challenge.currentStreak} wins</span>
-                        </div>
-                        <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-gradient-to-r from-teal-600 to-teal-400 rounded-full transition-all"
-                            style={{
-                              width: `${Math.min(100, (challenge.currentStreak / (levels.find(l => !l.completed)?.streak || 15)) * 100)}%`
-                            }}
-                          ></div>
-                        </div>
-                        {levels.find(l => !l.completed) && (
-                          <div className="text-xs text-zinc-500 mt-1">
-                            {levels.find(l => !l.completed)!.streak - challenge.currentStreak} more wins to Level {levels.find(l => !l.completed)!.level}
+                        {/* Progress Bar */}
+                        <div className="mb-3">
+                          <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden flex">
+                            {levels.map((lvl, idx) => {
+                              const isPending = lvl.completed && (challenge.pendingRewards || []).find((r: any) => r.level === lvl.level);
+                              const isPaid = lvl.completed && (challenge.paidRewards || []).find((r: any) => r.level === lvl.level);
+                              return (
+                                <div
+                                  key={lvl.level}
+                                  className={`h-full transition-all ${
+                                    isPending ? 'bg-amber-500' :
+                                    lvl.completed ? 'bg-emerald-500' :
+                                    'bg-zinc-700'
+                                  }`}
+                                  style={{ width: '25%' }}
+                                />
+                              );
+                            })}
                           </div>
-                        )}
-                      </div>
+                        </div>
 
-                      {/* Level Rewards Grid */}
-                      <div className="p-4">
-                        <div className="grid grid-cols-4 gap-2">
+                        {/* Level Pills */}
+                        <div className="flex gap-2 mb-3">
                           {levels.map((lvl) => {
-                            // Check if this level has a pending reward
-                            const pendingReward = (challenge.pendingRewards || []).find(
-                              (r: any) => r.level === lvl.level
-                            );
-                            const paidReward = (challenge.paidRewards || []).find(
-                              (r: any) => r.level === lvl.level
-                            );
-                            const isPending = lvl.completed && pendingReward;
-                            const isPaid = lvl.completed && paidReward;
+                            const isPending = lvl.completed && (challenge.pendingRewards || []).find((r: any) => r.level === lvl.level);
+                            const isPaid = lvl.completed && (challenge.paidRewards || []).find((r: any) => r.level === lvl.level);
 
                             return (
                               <div
                                 key={lvl.level}
-                                className={`p-3 rounded-xl text-center transition-all ${
+                                className={`flex-1 py-2 px-2 rounded-lg text-center text-xs transition-all ${
                                   isPending
-                                    ? 'bg-amber-900/30 border border-amber-500/50'
+                                    ? 'bg-teal-500/30 border border-teal-400/60 text-white animate-pulse'
                                     : lvl.completed
-                                      ? 'bg-emerald-900/30 border border-emerald-600/30'
-                                      : 'bg-zinc-900/50 border border-zinc-800/50'
+                                      ? 'bg-teal-500/20 border border-teal-500/40 text-teal-400'
+                                      : 'bg-zinc-800/50 border border-zinc-700/50 text-zinc-500'
                                 }`}
                               >
-                                <div className="text-xl mb-1">{lvl.icon}</div>
-                                <div className={`text-xs font-medium mb-1 ${
-                                  isPending ? 'text-amber-400' : lvl.completed ? 'text-emerald-400' : 'text-zinc-500'
-                                }`}>
-                                  Level {lvl.level}
-                                </div>
-                                <div className={`text-sm font-bold ${lvl.completed ? 'text-white' : 'text-zinc-400'}`}>
-                                  €{lvl.reward.toLocaleString()}
-                                </div>
-                                <div className={`text-[10px] mt-1 ${
-                                  isPending ? 'text-amber-400' : lvl.completed ? 'text-emerald-400' : 'text-zinc-600'
-                                }`}>
-                                  {isPending ? '⏳ Pending' : isPaid ? '✓ Paid' : lvl.completed ? '✓ Complete' : `${lvl.streak} wins`}
+                                <div className={`font-bold ${isPending ? 'text-white' : ''}`}>€{lvl.reward.toLocaleString()}</div>
+                                <div className={`text-[10px] ${isPending ? 'text-teal-300' : 'opacity-80'}`}>
+                                  {isPending ? '⏳ Claim' : isPaid ? '✓ Paid' : lvl.completed ? '✓ Done' : `${lvl.streak}W`}
                                 </div>
                               </div>
                             );
                           })}
                         </div>
 
-                        {/* Claim Reward Button */}
-                        {(challenge.totalPendingAmount || 0) > 0 && (
+                        {/* Claim Button (if pending) */}
+                        {hasPending && (
                           <button
                             onClick={() => claimRewards(challenge.id)}
                             disabled={claimingRewards}
-                            className="w-full mt-4 py-3 px-4 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white font-semibold rounded-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                            className="w-full py-2.5 bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-teal-400 text-white text-sm font-semibold rounded-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 shadow-lg shadow-teal-500/20"
                           >
                             <span>{claimingRewards ? '⏳' : '💰'}</span>
-                            <span>{claimingRewards ? 'Claiming...' : `Claim €${(challenge.totalPendingAmount || 0).toLocaleString()} Reward`}</span>
+                            <span>{claimingRewards ? 'Claiming...' : `Claim €${(challenge.totalPendingAmount || 0).toLocaleString()}`}</span>
                           </button>
                         )}
-
-                        {/* Progress Summary */}
-                        <div className="mt-4 flex items-center justify-between text-sm">
-                          <span className="text-zinc-400">{completedCount}/4 Levels Complete</span>
-                          <span className="text-zinc-400">
-                            €{earned.toLocaleString()} / €{totalPossible.toLocaleString()}
-                          </span>
-                        </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* How Rewards Work */}
-            <div className="bg-[#111111] border border-zinc-800/50 rounded-2xl p-6">
-              <h3 className="text-lg font-semibold text-white mb-4">How Rewards Work</h3>
-              <div className="space-y-3">
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-teal-500/20 flex items-center justify-center flex-shrink-0">
-                    <span className="text-sm">1</span>
-                  </div>
-                  <div>
-                    <div className="text-white font-medium">Win Consecutive Bets</div>
-                    <div className="text-sm text-zinc-400">Build your streak by winning bets with minimum odds (1.5x Beginner, 2.0x Pro)</div>
-                  </div>
+                    );
+                  })}
                 </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-teal-500/20 flex items-center justify-center flex-shrink-0">
-                    <span className="text-sm">2</span>
-                  </div>
-                  <div>
-                    <div className="text-white font-medium">Complete Levels</div>
-                    <div className="text-sm text-zinc-400">Reach streak milestones to complete levels and unlock rewards</div>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-teal-500/20 flex items-center justify-center flex-shrink-0">
-                    <span className="text-sm">3</span>
-                  </div>
-                  <div>
-                    <div className="text-white font-medium">Get Paid Instantly</div>
-                    <div className="text-sm text-zinc-400">Rewards are credited automatically when you complete each level</div>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center flex-shrink-0">
-                    <span className="text-sm">!</span>
-                  </div>
-                  <div>
-                    <div className="text-white font-medium">Keep What You Earn</div>
-                    <div className="text-sm text-zinc-400">A loss resets your streak but you keep all previously earned rewards</div>
-                  </div>
-                </div>
-              </div>
+              )}
             </div>
 
-            {/* Payout History */}
-            <div className="bg-[#111111] border border-zinc-800/50 rounded-2xl overflow-hidden">
-              <div className="p-4 border-b border-zinc-800/50 flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-white">Payout History</h3>
-                {loadingPayouts && (
-                  <div className="w-5 h-5 border-2 border-teal-500/30 border-t-teal-500 rounded-full animate-spin"></div>
-                )}
-              </div>
-              {payoutHistory.length === 0 ? (
-                <div className="p-8 text-center text-zinc-400">
-                  <div className="text-3xl mb-2">📋</div>
-                  <div>No payout requests yet</div>
-                  <div className="text-sm text-zinc-500 mt-1">Your withdrawal history will appear here</div>
+            {/* How It Works + Payout History Row */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* How Rewards Work - Compact */}
+              <div className="bg-[#111]/80 border border-zinc-800/50 rounded-2xl p-5">
+                <h3 className="text-base font-semibold text-white mb-4 flex items-center gap-2">
+                  <span>📖</span> How It Works
+                </h3>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-7 h-7 rounded-lg bg-teal-500/20 flex items-center justify-center flex-shrink-0 text-teal-400 text-xs font-bold">1</div>
+                    <div className="text-sm">
+                      <span className="text-white font-medium">Win bets</span>
+                      <span className="text-zinc-500"> at min 1.5x (2.0x Pro) odds</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="w-7 h-7 rounded-lg bg-teal-500/20 flex items-center justify-center flex-shrink-0 text-teal-400 text-xs font-bold">2</div>
+                    <div className="text-sm">
+                      <span className="text-white font-medium">Build streaks</span>
+                      <span className="text-zinc-500"> to unlock level rewards</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="w-7 h-7 rounded-lg bg-teal-500/20 flex items-center justify-center flex-shrink-0 text-teal-400 text-xs font-bold">3</div>
+                    <div className="text-sm">
+                      <span className="text-white font-medium">Claim rewards</span>
+                      <span className="text-zinc-500"> and withdraw anytime</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 pt-2 border-t border-zinc-800/50">
+                    <div className="w-7 h-7 rounded-lg bg-amber-500/20 flex items-center justify-center flex-shrink-0 text-amber-400 text-xs font-bold">!</div>
+                    <div className="text-sm text-zinc-400">
+                      Losses reset streak but you <span className="text-white">keep earned rewards</span>
+                    </div>
+                  </div>
                 </div>
-              ) : (
-                <div className="divide-y divide-zinc-800/50">
-                  {payoutHistory.map((payout) => (
-                    <div key={payout.id} className="p-4 flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                          payout.status === 'completed' ? 'bg-emerald-500/20' :
-                          payout.status === 'pending' ? 'bg-amber-500/20' :
-                          payout.status === 'processing' ? 'bg-blue-500/20' :
-                          'bg-red-500/20'
-                        }`}>
+              </div>
+
+              {/* Payout History - Compact */}
+              <div className="bg-[#111]/80 border border-zinc-800/50 rounded-2xl overflow-hidden">
+                <div className="p-4 border-b border-zinc-800/50 flex items-center justify-between">
+                  <h3 className="text-base font-semibold text-white flex items-center gap-2">
+                    <span>📜</span> Withdrawal History
+                  </h3>
+                  {loadingPayouts && (
+                    <div className="w-4 h-4 border-2 border-teal-500/30 border-t-teal-500 rounded-full animate-spin"></div>
+                  )}
+                </div>
+                {payoutHistory.length === 0 ? (
+                  <div className="p-6 text-center text-zinc-500">
+                    <div className="text-2xl mb-2">📋</div>
+                    <div className="text-sm">No withdrawals yet</div>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-zinc-800/50 max-h-[200px] overflow-y-auto">
+                    {payoutHistory.slice(0, 5).map((payout) => (
+                      <div key={payout.id} className="px-4 py-3 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
                           <span className="text-lg">
                             {payout.paymentMethod === 'bank' ? '🏦' :
                              payout.paymentMethod === 'paypal' ? '💳' : '₿'}
                           </span>
-                        </div>
-                        <div>
-                          <div className="font-medium text-white">€{payout.amount.toLocaleString()}</div>
-                          <div className="text-xs text-zinc-500">
-                            {new Date(payout.createdAt).toLocaleDateString('en-US', {
-                              month: 'short', day: 'numeric', year: 'numeric'
-                            })}
+                          <div>
+                            <div className="font-medium text-white text-sm">€{payout.amount.toLocaleString()}</div>
+                            <div className="text-[10px] text-zinc-600">
+                              {new Date(payout.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                      <div className="text-right">
-                        <span className={`inline-block px-2 py-1 rounded-lg text-xs font-medium ${
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${
                           payout.status === 'completed' ? 'bg-emerald-500/20 text-emerald-400' :
                           payout.status === 'pending' ? 'bg-amber-500/20 text-amber-400' :
                           payout.status === 'processing' ? 'bg-blue-500/20 text-blue-400' :
                           'bg-red-500/20 text-red-400'
                         }`}>
-                          {payout.status.charAt(0).toUpperCase() + payout.status.slice(1)}
+                          {payout.status.toUpperCase()}
                         </span>
-                        {payout.status === 'rejected' && payout.rejectionReason && (
-                          <div className="text-xs text-red-400 mt-1">{payout.rejectionReason}</div>
-                        )}
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Success Toast */}
