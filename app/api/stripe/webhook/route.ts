@@ -7,6 +7,7 @@ import { headers } from 'next/headers';
 import { stripe } from '@/lib/stripe';
 import { createChallenge } from '@/lib/challenges/challenge-service';
 import { DifficultyType } from '@/lib/challenges/constants';
+import { processReferralReward, clearReferralDiscount } from '@/lib/referral/process-referral';
 import Stripe from 'stripe';
 
 export async function POST(req: NextRequest) {
@@ -54,6 +55,20 @@ export async function POST(req: NextRequest) {
           // Create the challenge now that payment is confirmed
           const challenge = await createChallenge(userId, tier, difficulty);
           console.log('Challenge created after payment:', challenge.id);
+
+          // Process referral reward (10% of purchase to referrer)
+          // Use original price for referrer reward calculation, not discounted price
+          const originalPrice = session.metadata.originalPrice
+            ? parseFloat(session.metadata.originalPrice)
+            : challenge.cost;
+          const referralResult = await processReferralReward(userId, challenge.id, originalPrice);
+          if (referralResult.rewarded) {
+            console.log(`Referral reward: €${referralResult.rewardAmount} to ${referralResult.referrerId}`);
+          }
+
+          // Clear the user's referral discount after first purchase
+          await clearReferralDiscount(userId);
+          console.log(`Cleared referral discount for user ${userId}`)
         } catch (error) {
           console.error('Failed to create challenge after payment:', error);
           // Note: Payment was successful but challenge creation failed
@@ -85,10 +100,3 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ received: true });
 }
-
-// Disable body parsing for webhooks (raw body needed for signature verification)
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};

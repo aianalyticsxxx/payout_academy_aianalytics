@@ -4,14 +4,18 @@
 
 import Stripe from 'stripe';
 
-if (!process.env.STRIPE_SECRET_KEY) {
-  throw new Error('STRIPE_SECRET_KEY is not set');
-}
+// Only initialize Stripe if the key is available (allows build without Stripe)
+export const stripe = process.env.STRIPE_SECRET_KEY
+  ? new Stripe(process.env.STRIPE_SECRET_KEY, {
+      apiVersion: '2024-06-20',
+      typescript: true,
+    })
+  : (null as unknown as Stripe);
 
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: '2024-06-20',
-  typescript: true,
-});
+// Helper to check if Stripe is configured
+export function isStripeConfigured(): boolean {
+  return !!process.env.STRIPE_SECRET_KEY;
+}
 
 // Helper to get or create a Stripe customer for a user
 export async function getOrCreateStripeCustomer(

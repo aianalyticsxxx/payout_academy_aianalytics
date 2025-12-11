@@ -8,6 +8,7 @@ import { authOptions } from '@/lib/auth/config';
 import { stripe, getOrCreateStripeCustomer } from '@/lib/stripe';
 import { canCreateChallenge } from '@/lib/challenges/challenge-service';
 import { getTierBySize, DifficultyType, DIFFICULTY_CONFIG } from '@/lib/challenges/constants';
+import { getUserReferralDiscount } from '@/lib/referral/process-referral';
 import { z } from 'zod';
 
 const CheckoutSchema = z.object({
@@ -59,33 +60,44 @@ export async function POST(req: NextRequest) {
 
     const difficultyConfig = DIFFICULTY_CONFIG[difficulty as DifficultyType];
 
+    // Check for referral discount
+    const referralDiscount = await getUserReferralDiscount(userId);
+    const originalPrice = tierData.cost;
+    const discountAmount = referralDiscount > 0 ? originalPrice * referralDiscount : 0;
+    const finalPrice = originalPrice - discountAmount;
+
+    // Build line items
+    const lineItems: any[] = [
+      {
+        price_data: {
+          currency: 'usd',
+          product_data: {
+            name: `${difficultyConfig.icon} ${tierData.label} ${difficultyConfig.name} Challenge`,
+            description: `Streak challenge with ${tierData.rewards.reduce((a, b) => a + b, 0).toLocaleString()} max payout. Min odds: ${difficultyConfig.minOdds}x`,
+            metadata: {
+              tier: tier.toString(),
+              difficulty,
+            },
+          },
+          unit_amount: Math.round(finalPrice * 100), // Convert to cents
+        },
+        quantity: 1,
+      },
+    ];
+
     // Create Stripe Checkout Session
     const checkoutSession = await stripe.checkout.sessions.create({
       customer: customerId,
       payment_method_types: ['card'],
       mode: 'payment',
-      line_items: [
-        {
-          price_data: {
-            currency: 'usd',
-            product_data: {
-              name: `${difficultyConfig.icon} ${tierData.label} ${difficultyConfig.name} Challenge`,
-              description: `Streak challenge with ${tierData.rewards.reduce((a, b) => a + b, 0).toLocaleString()} max payout. Min odds: ${difficultyConfig.minOdds}x`,
-              metadata: {
-                tier: tier.toString(),
-                difficulty,
-              },
-            },
-            unit_amount: Math.round(tierData.cost * 100), // Convert to cents
-          },
-          quantity: 1,
-        },
-      ],
+      line_items: lineItems,
       metadata: {
         userId,
         tier: tier.toString(),
         difficulty,
         type: 'challenge_purchase',
+        referralDiscount: referralDiscount.toString(),
+        originalPrice: originalPrice.toString(),
       },
       success_url: `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/?challenge_success=true&tier=${tier}&difficulty=${difficulty}`,
       cancel_url: `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/?challenge_cancelled=true`,

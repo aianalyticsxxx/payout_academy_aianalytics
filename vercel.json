@@ -7,11 +7,15 @@
   "crons": [
     {
       "path": "/api/cron/settle-bets",
-      "schedule": "0 6 * * *"
+      "schedule": "* * * * *"
     },
     {
       "path": "/api/cron/expire-challenges",
-      "schedule": "0 0 * * *"
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/update-leaderboard",
+      "schedule": "*/30 * * * *"
     }
   ]
 }

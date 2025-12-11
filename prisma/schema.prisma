@@ -125,6 +125,12 @@ model User {
   stripePriceId          String?
   stripeCurrentPeriodEnd DateTime?
 
+  // Referral system
+  referralCode      String?   @unique  // User's unique referral code
+  referredBy        String?            // ID of user who referred this user
+  referralRewards   Float     @default(0)  // Total earned from referrals
+  referralDiscount  Float     @default(0)  // Discount earned from being referred (10% off first purchase)
+
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -140,6 +146,8 @@ model User {
   adminLogs     AdminLog[]  @relation("AdminActions")
   pendingPayments PendingPayment[]
   payoutRequests PayoutRequest[]
+  referrals     Referral[]  @relation("Referrer")
+  referredUsers Referral[]  @relation("Referred")
 }
 
 // ==========================================
@@ -589,4 +597,34 @@ model PayoutRequest {
   @@index([userId])
   @@index([status])
   @@index([createdAt])
+}
+
+// ==========================================
+// REFERRAL SYSTEM
+// ==========================================
+
+model Referral {
+  id              String   @id @default(cuid())
+
+  referrerId      String   // User who referred
+  referredId      String   // User who was referred
+
+  // Reward tracking
+  status          String   @default("pending") // pending, qualified, paid
+  rewardAmount    Float    @default(0)  // Reward earned (paid when referred user makes first purchase)
+
+  // The challenge that triggered the reward
+  challengeId     String?  // First challenge purchased by referred user
+
+  createdAt       DateTime @default(now())
+  qualifiedAt     DateTime?  // When referred user made first purchase
+  paidAt          DateTime?  // When reward was paid to referrer
+
+  referrer        User     @relation("Referrer", fields: [referrerId], references: [id], onDelete: Cascade)
+  referred        User     @relation("Referred", fields: [referredId], references: [id], onDelete: Cascade)
+
+  @@unique([referrerId, referredId])
+  @@index([referrerId])
+  @@index([referredId])
+  @@index([status])
 }

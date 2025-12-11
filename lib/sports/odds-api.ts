@@ -102,10 +102,12 @@ export async function getUpcomingEvents(
     dateFormat?: 'iso' | 'unix';
   } = {}
 ): Promise<OddsEvent[]> {
+  // Note: The /sports/{sport}/odds endpoint only supports featured markets (h2h, spreads, totals)
+  // Advanced markets (alternates, periods, player props) require per-event API calls
   const {
-    regions = 'eu,uk',  // European regions for European sportsbooks
-    markets = 'h2h,totals',  // 1X2 (h2h) and Over/Under (totals)
-    oddsFormat = 'decimal',  // European decimal odds format
+    regions = 'eu,uk,us',
+    markets = 'h2h,spreads,totals',  // Only featured markets supported by this endpoint
+    oddsFormat = 'decimal',
     dateFormat = 'iso',
   } = options;
 
@@ -162,21 +164,116 @@ export async function getLiveEvents(sportKey: string): Promise<OddsEvent[]> {
   try {
     const url = new URL(`${BASE_URL}/sports/${sportKey}/odds-live`);
     url.searchParams.set('apiKey', API_KEY);
-    url.searchParams.set('regions', 'eu,uk');  // European regions
-    url.searchParams.set('markets', 'h2h,totals');
+    url.searchParams.set('regions', 'eu,uk,us');
+    url.searchParams.set('markets', 'h2h,spreads,totals');  // Only featured markets
     url.searchParams.set('oddsFormat', 'decimal');
 
     const res = await fetch(url.toString());
-    
+
     if (!res.ok) {
       throw new Error(`API error: ${res.status}`);
     }
-    
+
     return await res.json();
   } catch (error) {
     console.error('Failed to fetch live events:', error);
     return [];
   }
+}
+
+// Get event odds with specific markets (including player props)
+export async function getEventOdds(
+  sportKey: string,
+  eventId: string,
+  marketKeys?: string[]
+): Promise<OddsEvent | null> {
+  if (!API_KEY) {
+    console.error('ODDS_API_KEY not configured');
+    return null;
+  }
+
+  const cacheKey = `odds-api:event:${eventId}:${marketKeys?.join(',') || 'featured'}`;
+  const cached = await getCached<OddsEvent>(cacheKey);
+  if (cached) return cached;
+
+  // Only featured markets are supported by the Odds API standard tier
+  // Advanced markets (alternates, periods, player props) require premium tier
+  const featuredMarkets = ['h2h', 'spreads', 'totals'];
+  const markets = marketKeys?.filter(m => featuredMarkets.includes(m)) || featuredMarkets;
+
+  try {
+    const url = new URL(`${BASE_URL}/sports/${sportKey}/events/${eventId}/odds`);
+    url.searchParams.set('apiKey', API_KEY);
+    url.searchParams.set('regions', 'eu,uk,us');
+    url.searchParams.set('markets', markets.join(','));
+    url.searchParams.set('oddsFormat', 'decimal');
+
+    const res = await fetch(url.toString());
+
+    if (!res.ok) {
+      throw new Error(`API error: ${res.status}`);
+    }
+
+    const event = await res.json();
+    await setCache(cacheKey, event, 120); // Cache for 2 minutes
+    return event;
+  } catch (error) {
+    console.error('Failed to fetch event odds:', error);
+    return null;
+  }
+}
+
+// Get player props for an event
+// NOTE: Player props require premium API tier - this function returns null for standard tier
+export async function getEventPlayerProps(
+  sportKey: string,
+  eventId: string
+): Promise<OddsEvent | null> {
+  // Player props are not available on the standard API tier
+  // Return null to indicate no props available
+  // If you upgrade to premium tier, this function can be enabled
+  console.log(`[Odds API] Player props require premium tier - skipping for ${eventId}`);
+  return null;
+
+  /* Premium tier implementation (uncomment if upgraded):
+  if (!API_KEY) {
+    console.error('ODDS_API_KEY not configured');
+    return null;
+  }
+
+  const cacheKey = `odds-api:props:${eventId}`;
+  const cached = await getCached<OddsEvent>(cacheKey);
+  if (cached) return cached;
+
+  // Get player prop markets for this sport
+  const allMarkets = getMarketsForSport(sportKey);
+  const propMarkets = allMarkets.filter(m =>
+    m.startsWith('player_') || m.startsWith('batter_') || m.startsWith('pitcher_')
+  );
+
+  if (propMarkets.length === 0) return null;
+
+  try {
+    const url = new URL(`${BASE_URL}/sports/${sportKey}/events/${eventId}/odds`);
+    url.searchParams.set('apiKey', API_KEY);
+    url.searchParams.set('regions', 'us'); // Props mainly from US books
+    url.searchParams.set('markets', propMarkets.join(','));
+    url.searchParams.set('oddsFormat', 'decimal');
+
+    const res = await fetch(url.toString());
+
+    if (!res.ok) {
+      throw new Error(`API error: ${res.status}`);
+    }
+
+    const event = await res.json();
+    await setCache(cacheKey, event, 120); // Cache for 2 minutes
+    return event;
+  } catch (error) {
+    console.error('Failed to fetch player props:', error);
+    return null;
+  }
+  */
 }
 
 export async function getEventScores(
@@ -317,6 +414,170 @@ export function calculateValueBet(
     edge,
     expectedValue,
   };
+}
+
+// ==========================================
+// MARKET DEFINITIONS (bet365-style)
+// ==========================================
+
+export const MARKETS = {
+  // Core markets (all sports)
+  CORE: ['h2h', 'spreads', 'totals'],
+
+  // Soccer markets
+  SOCCER: [
+    'h2h',
+    'h2h_3_way',        // 1X2
+    'spreads',          // Asian Handicap
+    'totals',           // Over/Under Goals
+    'btts',             // Both Teams To Score
+    'draw_no_bet',      // Draw No Bet
+    'h2h_h1',           // First Half Winner
+    'h2h_h2',           // Second Half Winner
+    'totals_h1',        // First Half Over/Under
+    'alternate_totals', // Alternate Goal Lines
+    'alternate_spreads', // Alternate Handicaps
+    'team_totals',      // Team Total Goals
+  ],
+
+  // Basketball markets (NBA, NCAAB)
+  BASKETBALL: [
+    'h2h',
+    'spreads',
+    'totals',
+    'alternate_spreads',
+    'alternate_totals',
+    'team_totals',
+    'h2h_q1', 'h2h_q2', 'h2h_q3', 'h2h_q4',  // Quarter winners
+    'h2h_h1', 'h2h_h2',                       // Half winners
+    'spreads_q1', 'spreads_q2', 'spreads_q3', 'spreads_q4',
+    'totals_q1', 'totals_q2', 'totals_q3', 'totals_q4',
+    'totals_h1', 'totals_h2',
+    // Player props
+    'player_points',
+    'player_rebounds',
+    'player_assists',
+    'player_threes',
+    'player_blocks',
+    'player_steals',
+    'player_turnovers',
+    'player_points_rebounds_assists',
+    'player_points_rebounds',
+    'player_points_assists',
+    'player_rebounds_assists',
+    'player_double_double',
+    'player_first_basket',
+  ],
+
+  // American Football markets (NFL, NCAAF)
+  FOOTBALL: [
+    'h2h',
+    'spreads',
+    'totals',
+    'alternate_spreads',
+    'alternate_totals',
+    'team_totals',
+    'h2h_q1', 'h2h_q2', 'h2h_q3', 'h2h_q4',
+    'h2h_h1', 'h2h_h2',
+    'spreads_h1', 'spreads_h2',
+    'totals_h1', 'totals_h2',
+    // Player props
+    'player_pass_tds',
+    'player_pass_yds',
+    'player_pass_completions',
+    'player_pass_attempts',
+    'player_pass_interceptions',
+    'player_rush_yds',
+    'player_rush_attempts',
+    'player_rush_longest',
+    'player_receptions',
+    'player_reception_yds',
+    'player_anytime_td',
+    'player_first_td',
+    'player_last_td',
+  ],
+
+  // Ice Hockey markets (NHL)
+  HOCKEY: [
+    'h2h',
+    'h2h_3_way',        // Regulation time only
+    'spreads',          // Puck Line
+    'totals',
+    'alternate_spreads',
+    'alternate_totals',
+    'team_totals',
+    'h2h_p1', 'h2h_p2', 'h2h_p3',  // Period winners
+    'totals_p1', 'totals_p2', 'totals_p3',
+    // Player props
+    'player_points',
+    'player_goals',
+    'player_assists',
+    'player_shots_on_goal',
+    'player_power_play_points',
+  ],
+
+  // Baseball markets (MLB)
+  BASEBALL: [
+    'h2h',
+    'spreads',          // Run Line
+    'totals',
+    'alternate_spreads',
+    'alternate_totals',
+    'team_totals',
+    'h2h_1st_1_innings',
+    'h2h_1st_3_innings',
+    'h2h_1st_5_innings',
+    'h2h_1st_7_innings',
+    'totals_1st_5_innings',
+    // Player props
+    'batter_home_runs',
+    'batter_hits',
+    'batter_total_bases',
+    'batter_rbis',
+    'batter_runs_scored',
+    'batter_singles',
+    'batter_doubles',
+    'batter_triples',
+    'batter_walks',
+    'batter_strikeouts',
+    'batter_stolen_bases',
+    'pitcher_strikeouts',
+    'pitcher_hits_allowed',
+    'pitcher_walks',
+    'pitcher_earned_runs',
+    'pitcher_outs',
+  ],
+
+  // Tennis markets
+  TENNIS: [
+    'h2h',
+    'spreads',          // Game Handicap
+    'totals',           // Total Games
+    'alternate_spreads',
+    'alternate_totals',
+    'h2h_set_1',
+    'h2h_set_2',
+  ],
+
+  // MMA/UFC markets
+  MMA: [
+    'h2h',
+    'totals',           // Total Rounds
+    'method_of_victory',
+    'go_the_distance',
+  ],
+};
+
+// Get markets for a specific sport
+export function getMarketsForSport(sportKey: string): string[] {
+  if (sportKey.includes('soccer')) return MARKETS.SOCCER;
+  if (sportKey.includes('basketball')) return MARKETS.BASKETBALL;
+  if (sportKey.includes('americanfootball')) return MARKETS.FOOTBALL;
+  if (sportKey.includes('icehockey')) return MARKETS.HOCKEY;
+  if (sportKey.includes('baseball')) return MARKETS.BASEBALL;
+  if (sportKey.includes('tennis')) return MARKETS.TENNIS;
+  if (sportKey.includes('mma') || sportKey.includes('boxing')) return MARKETS.MMA;
+  return MARKETS.CORE;
 }
 
 // ==========================================

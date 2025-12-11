@@ -19,6 +19,7 @@ const navItems: NavItem[] = [
   { href: '/crm/users', label: 'Users', icon: '👥' },
   { href: '/crm/challenges', label: 'Challenges', icon: '🎯' },
   { href: '/crm/bets', label: 'Betting', icon: '🎲' },
+  { href: '/crm/referrals', label: 'Referrals', icon: '🔗' },
   { href: '/crm/ai', label: 'AI Performance', icon: '🤖' },
   { href: '/crm/revenue', label: 'Revenue', icon: '💰' },
   { href: '/crm/operations', label: 'Operations', icon: '⚙️' },

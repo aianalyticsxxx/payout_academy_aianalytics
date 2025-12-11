@@ -22,10 +22,10 @@ export async function logAdminAction(params: AdminLogParams) {
       data: {
         adminId: params.adminId,
         action: params.action,
-        targetType: params.targetType || null,
-        targetId: params.targetId || null,
-        metadata: params.metadata || null,
-        ipAddress: params.ipAddress || null,
+        targetType: params.targetType,
+        targetId: params.targetId,
+        metadata: params.metadata,
+        ipAddress: params.ipAddress,
       },
     });
   } catch (error) {

@@ -22,8 +22,10 @@ export async function getActiveChallenges(userId: string) {
   return prisma.challenge.findMany({
     where: {
       userId,
-      status: 'active',
-      expiresAt: { gt: new Date() },
+      OR: [
+        { status: 'active', expiresAt: { gt: new Date() } },
+        { status: 'completed', rewards: { some: { status: 'pending' } } },
+      ],
     },
     include: {
       rewards: true,
@@ -41,8 +43,10 @@ export async function getActiveChallenge(userId: string) {
   return prisma.challenge.findFirst({
     where: {
       userId,
-      status: 'active',
-      expiresAt: { gt: new Date() },
+      OR: [
+        { status: 'active', expiresAt: { gt: new Date() } },
+        { status: 'completed', rewards: { some: { status: 'pending' } } },
+      ],
     },
     include: {
       rewards: true,

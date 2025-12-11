@@ -52,6 +52,13 @@ export default function UserDetailPage() {
   const [data, setData] = useState<UserDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
+  const [showCreditModal, setShowCreditModal] = useState(false);
+  const [creditAction, setCreditAction] = useState<'award' | 'reset' | 'extend'>('award');
+  const [selectedTier, setSelectedTier] = useState(1000);
+  const [selectedDifficulty, setSelectedDifficulty] = useState('beginner');
+  const [creditReason, setCreditReason] = useState('');
+  const [selectedChallenge, setSelectedChallenge] = useState('');
+  const [extendDays, setExtendDays] = useState(7);
 
   useEffect(() => {
     fetchData();
@@ -100,6 +107,49 @@ export default function UserDetailPage() {
     } catch (error) {
       console.error('Failed to update role:', error);
       alert('Failed to update role');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleCreditAction = async () => {
+    try {
+      setUpdating(true);
+      let body: any = { reason: creditReason };
+
+      if (creditAction === 'award') {
+        body.action = 'award_challenge';
+        body.tier = selectedTier;
+        body.difficulty = selectedDifficulty;
+      } else if (creditAction === 'reset') {
+        body.action = 'reset_challenge';
+        body.challengeId = selectedChallenge;
+      } else if (creditAction === 'extend') {
+        body.action = 'extend_challenge';
+        body.challengeId = selectedChallenge;
+        body.days = extendDays;
+      }
+
+      const response = await fetch(`/api/crm/users/${userId}/credit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        alert(result.error || 'Action failed');
+        return;
+      }
+
+      alert(result.message);
+      setShowCreditModal(false);
+      setCreditReason('');
+      await fetchData();
+    } catch (error) {
+      console.error('Credit action error:', error);
+      alert('Action failed');
     } finally {
       setUpdating(false);
     }
@@ -274,26 +324,159 @@ export default function UserDetailPage() {
           </div>
         </div>
 
-        {/* Role Management */}
-        <div className="bg-surface border border-zinc-800 rounded-xl p-4">
-          <p className="text-sm text-zinc-500 mb-2">User Role</p>
-          <div className="flex items-center gap-2">
-            <select
-              value={data.user.role}
-              onChange={(e) => updateRole(e.target.value)}
-              disabled={updating}
-              className="bg-zinc-800 text-white px-3 py-2 rounded-lg border border-zinc-700 focus:border-teal-500 outline-none"
-            >
-              <option value="USER">USER</option>
-              <option value="ADMIN">ADMIN</option>
-              <option value="SUPER_ADMIN">SUPER_ADMIN</option>
-            </select>
-            {updating && (
-              <span className="text-zinc-400 text-sm">Updating...</span>
-            )}
+        {/* Role Management & Actions */}
+        <div className="flex flex-col gap-4">
+          <div className="bg-surface border border-zinc-800 rounded-xl p-4">
+            <p className="text-sm text-zinc-500 mb-2">User Role</p>
+            <div className="flex items-center gap-2">
+              <select
+                value={data.user.role}
+                onChange={(e) => updateRole(e.target.value)}
+                disabled={updating}
+                className="bg-zinc-800 text-white px-3 py-2 rounded-lg border border-zinc-700 focus:border-teal-500 outline-none"
+              >
+                <option value="USER">USER</option>
+                <option value="ADMIN">ADMIN</option>
+                <option value="SUPER_ADMIN">SUPER_ADMIN</option>
+              </select>
+              {updating && (
+                <span className="text-zinc-400 text-sm">Updating...</span>
+              )}
+            </div>
           </div>
+
+          <button
+            onClick={() => setShowCreditModal(true)}
+            className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-medium transition-colors"
+          >
+            Manage Credits
+          </button>
         </div>
       </div>
+
+      {/* Credit Management Modal */}
+      {showCreditModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-surface border border-zinc-800 rounded-xl p-6 w-full max-w-md">
+            <h3 className="text-xl font-bold text-white mb-4">Credit Management</h3>
+
+            {/* Action Tabs */}
+            <div className="flex gap-2 mb-4">
+              {[
+                { key: 'award', label: 'Award Challenge' },
+                { key: 'reset', label: 'Reset Challenge' },
+                { key: 'extend', label: 'Extend Time' },
+              ].map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => setCreditAction(tab.key as any)}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                    creditAction === tab.key
+                      ? 'bg-teal-600 text-white'
+                      : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Award Challenge Form */}
+            {creditAction === 'award' && (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm text-zinc-400 mb-1">Challenge Tier</label>
+                  <select
+                    value={selectedTier}
+                    onChange={(e) => setSelectedTier(Number(e.target.value))}
+                    className="w-full bg-zinc-800 text-white px-3 py-2 rounded-lg border border-zinc-700"
+                  >
+                    <option value={1000}>€1K Challenge</option>
+                    <option value={5000}>€5K Challenge</option>
+                    <option value={10000}>€10K Challenge</option>
+                    <option value={25000}>€25K Challenge</option>
+                    <option value={50000}>€50K Challenge</option>
+                    <option value={100000}>€100K Challenge</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm text-zinc-400 mb-1">Difficulty</label>
+                  <select
+                    value={selectedDifficulty}
+                    onChange={(e) => setSelectedDifficulty(e.target.value)}
+                    className="w-full bg-zinc-800 text-white px-3 py-2 rounded-lg border border-zinc-700"
+                  >
+                    <option value="beginner">Beginner (1.5+ odds)</option>
+                    <option value="pro">Pro (2.0+ odds)</option>
+                  </select>
+                </div>
+              </div>
+            )}
+
+            {/* Reset/Extend Challenge Form */}
+            {(creditAction === 'reset' || creditAction === 'extend') && (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm text-zinc-400 mb-1">Select Challenge</label>
+                  <select
+                    value={selectedChallenge}
+                    onChange={(e) => setSelectedChallenge(e.target.value)}
+                    className="w-full bg-zinc-800 text-white px-3 py-2 rounded-lg border border-zinc-700"
+                  >
+                    <option value="">Select a challenge...</option>
+                    {data.challenges.map((c: any) => (
+                      <option key={c.id} value={c.id}>
+                        €{c.tier / 1000}K - Level {c.currentLevel} - {c.status}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {creditAction === 'extend' && (
+                  <div>
+                    <label className="block text-sm text-zinc-400 mb-1">Days to Extend</label>
+                    <input
+                      type="number"
+                      value={extendDays}
+                      onChange={(e) => setExtendDays(Number(e.target.value))}
+                      min={1}
+                      max={90}
+                      className="w-full bg-zinc-800 text-white px-3 py-2 rounded-lg border border-zinc-700"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Reason */}
+            <div className="mt-4">
+              <label className="block text-sm text-zinc-400 mb-1">Reason (logged)</label>
+              <textarea
+                value={creditReason}
+                onChange={(e) => setCreditReason(e.target.value)}
+                placeholder="Reason for this action..."
+                className="w-full bg-zinc-800 text-white px-3 py-2 rounded-lg border border-zinc-700 h-20 resize-none"
+              />
+            </div>
+
+            {/* Actions */}
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => setShowCreditModal(false)}
+                className="px-4 py-2 bg-zinc-800 text-zinc-300 rounded-lg hover:bg-zinc-700"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreditAction}
+                disabled={updating || (creditAction !== 'award' && !selectedChallenge)}
+                className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50"
+              >
+                {updating ? 'Processing...' : 'Confirm'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">

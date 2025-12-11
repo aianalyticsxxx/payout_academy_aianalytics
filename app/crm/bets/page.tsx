@@ -32,6 +32,11 @@ export default function BetsPage() {
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState('30d');
   const [activeTab, setActiveTab] = useState<'recent' | 'highstake' | 'unsettled'>('recent');
+  const [settlingBetId, setSettlingBetId] = useState<string | null>(null);
+  const [showSettleModal, setShowSettleModal] = useState(false);
+  const [selectedBet, setSelectedBet] = useState<any>(null);
+  const [settleResult, setSettleResult] = useState<'won' | 'lost' | 'push' | 'void'>('won');
+  const [settleReason, setSettleReason] = useState('');
 
   useEffect(() => {
     fetchData();
@@ -55,6 +60,47 @@ export default function BetsPage() {
       style: 'currency',
       currency: 'USD',
     }).format(amount);
+  };
+
+  const handleManualSettle = async () => {
+    if (!selectedBet) return;
+
+    try {
+      setSettlingBetId(selectedBet.id);
+      const response = await fetch(`/api/crm/bets/${selectedBet.id}/settle`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          result: settleResult,
+          reason: settleReason,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        alert(result.error || 'Settlement failed');
+        return;
+      }
+
+      alert(`Bet settled as ${settleResult}`);
+      setShowSettleModal(false);
+      setSelectedBet(null);
+      setSettleReason('');
+      await fetchData();
+    } catch (error) {
+      console.error('Settlement error:', error);
+      alert('Settlement failed');
+    } finally {
+      setSettlingBetId(null);
+    }
+  };
+
+  const openSettleModal = (bet: any) => {
+    setSelectedBet(bet);
+    setSettleResult('won');
+    setSettleReason('');
+    setShowSettleModal(true);
   };
 
   const sportLabels: Record<string, string> = {
@@ -130,6 +176,28 @@ export default function BetsPage() {
           <span className={pl && pl >= 0 ? 'text-green-400' : 'text-red-400'}>
             {formatCurrency(pl || 0)}
           </span>
+        )
+      ),
+    },
+  ];
+
+  // Additional columns for unsettled bets with settle action
+  const unsettledBetColumns = [
+    ...betColumns,
+    {
+      key: 'id',
+      label: 'Action',
+      render: (id: string, row: any) => (
+        row.result === 'pending' || row.result === 'PENDING' ? (
+          <button
+            onClick={() => openSettleModal(row)}
+            disabled={settlingBetId === id}
+            className="px-3 py-1 bg-teal-600 hover:bg-teal-700 text-white text-sm rounded-lg font-medium disabled:opacity-50"
+          >
+            {settlingBetId === id ? 'Settling...' : 'Settle'}
+          </button>
+        ) : (
+          <span className="text-zinc-500">—</span>
         )
       ),
     },
@@ -322,7 +390,7 @@ export default function BetsPage() {
         </CardHeader>
         <CardContent>
           <DataTable
-            columns={betColumns}
+            columns={activeTab === 'unsettled' ? unsettledBetColumns : betColumns}
             data={
               activeTab === 'recent'
                 ? data?.recentBets || []
@@ -335,6 +403,98 @@ export default function BetsPage() {
           />
         </CardContent>
       </Card>
+
+      {/* Manual Settlement Modal */}
+      {showSettleModal && selectedBet && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-surface border border-zinc-800 rounded-xl p-6 w-full max-w-md">
+            <h3 className="text-xl font-bold text-white mb-4">Manual Settlement</h3>
+
+            {/* Bet Details */}
+            <div className="bg-zinc-800/50 rounded-lg p-4 mb-4">
+              <div className="text-sm text-zinc-400 mb-1">Bet Details</div>
+              <div className="text-white font-medium">{selectedBet.matchup}</div>
+              <div className="text-teal-400">{selectedBet.selection}</div>
+              <div className="flex justify-between mt-2 text-sm">
+                <span className="text-zinc-400">Stake: {formatCurrency(selectedBet.stake)}</span>
+                <span className="text-zinc-400">Odds: {selectedBet.odds}</span>
+              </div>
+            </div>
+
+            {/* Result Selection */}
+            <div className="mb-4">
+              <label className="block text-sm text-zinc-400 mb-2">Settlement Result</label>
+              <div className="grid grid-cols-4 gap-2">
+                {[
+                  { key: 'won', label: 'Won', color: 'bg-green-600 hover:bg-green-700' },
+                  { key: 'lost', label: 'Lost', color: 'bg-red-600 hover:bg-red-700' },
+                  { key: 'push', label: 'Push', color: 'bg-yellow-600 hover:bg-yellow-700' },
+                  { key: 'void', label: 'Void', color: 'bg-zinc-600 hover:bg-zinc-700' },
+                ].map((opt) => (
+                  <button
+                    key={opt.key}
+                    onClick={() => setSettleResult(opt.key as any)}
+                    className={`py-2 rounded-lg text-sm font-medium transition-all ${
+                      settleResult === opt.key
+                        ? opt.color + ' text-white ring-2 ring-white/30'
+                        : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Reason */}
+            <div className="mb-4">
+              <label className="block text-sm text-zinc-400 mb-1">Reason (logged)</label>
+              <textarea
+                value={settleReason}
+                onChange={(e) => setSettleReason(e.target.value)}
+                placeholder="Reason for manual settlement..."
+                className="w-full bg-zinc-800 text-white px-3 py-2 rounded-lg border border-zinc-700 h-20 resize-none"
+              />
+            </div>
+
+            {/* Payout Preview */}
+            <div className="bg-zinc-800/50 rounded-lg p-3 mb-4">
+              <div className="flex justify-between text-sm">
+                <span className="text-zinc-400">Profit/Loss:</span>
+                <span className={
+                  settleResult === 'won' ? 'text-green-400 font-bold' :
+                  settleResult === 'lost' ? 'text-red-400 font-bold' :
+                  'text-zinc-400'
+                }>
+                  {settleResult === 'won' && `+${formatCurrency(selectedBet.stake * (selectedBet.oddsDecimal - 1))}`}
+                  {settleResult === 'lost' && `-${formatCurrency(selectedBet.stake)}`}
+                  {(settleResult === 'push' || settleResult === 'void') && '$0.00'}
+                </span>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowSettleModal(false);
+                  setSelectedBet(null);
+                }}
+                className="px-4 py-2 bg-zinc-800 text-zinc-300 rounded-lg hover:bg-zinc-700"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleManualSettle}
+                disabled={settlingBetId !== null}
+                className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50"
+              >
+                {settlingBetId ? 'Settling...' : 'Confirm Settlement'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

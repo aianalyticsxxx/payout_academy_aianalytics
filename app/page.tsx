@@ -5,9 +5,10 @@
 // Teal Theme with AI Swarm Intelligence
 // ==========================================
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { ProfileEditModal } from '@/components/ProfileEditModal';
 
 // ==========================================
@@ -150,27 +151,8 @@ interface SportCategory {
 
 const SPORTS_CATEGORIES: SportCategory[] = [
   {
-    id: 'basketball',
-    name: 'Basketball',
-    emoji: '🏀',
-    leagues: [
-      { key: 'basketball_nba', name: 'NBA' },
-      { key: 'basketball_ncaab', name: 'NCAA' },
-      { key: 'basketball_euroleague', name: 'EuroLeague' },
-    ],
-  },
-  {
     id: 'football',
     name: 'Football',
-    emoji: '🏈',
-    leagues: [
-      { key: 'americanfootball_nfl', name: 'NFL' },
-      { key: 'americanfootball_ncaaf', name: 'NCAA' },
-    ],
-  },
-  {
-    id: 'soccer',
-    name: 'Soccer',
     emoji: '⚽',
     leagues: [
       { key: 'soccer_epl', name: 'Premier League' },
@@ -182,19 +164,40 @@ const SPORTS_CATEGORIES: SportCategory[] = [
     ],
   },
   {
-    id: 'hockey',
-    name: 'Hockey',
-    emoji: '🏒',
+    id: 'basketball',
+    name: 'Basketball',
+    emoji: '🏀',
     leagues: [
-      { key: 'icehockey_nhl', name: 'NHL' },
+      { key: 'basketball_nba', name: 'NBA' },
+      { key: 'basketball_ncaab', name: 'NCAA' },
+      { key: 'basketball_euroleague', name: 'EuroLeague' },
     ],
   },
   {
-    id: 'baseball',
-    name: 'Baseball',
-    emoji: '⚾',
+    id: 'tennis',
+    name: 'Tennis',
+    emoji: '🎾',
     leagues: [
-      { key: 'baseball_mlb', name: 'MLB' },
+      { key: 'tennis_atp_aus_open', name: 'ATP' },
+      { key: 'tennis_wta_aus_open', name: 'WTA' },
+    ],
+  },
+  {
+    id: 'volleyball',
+    name: 'Volleyball',
+    emoji: '🏐',
+    leagues: [
+      { key: 'volleyball_world_championship', name: 'World Championship' },
+      { key: 'volleyball_nations_league', name: 'Nations League' },
+    ],
+  },
+  {
+    id: 'american_football',
+    name: 'American Football',
+    emoji: '🏈',
+    leagues: [
+      { key: 'americanfootball_nfl', name: 'NFL' },
+      { key: 'americanfootball_ncaaf', name: 'NCAA' },
     ],
   },
   {
@@ -206,12 +209,19 @@ const SPORTS_CATEGORIES: SportCategory[] = [
     ],
   },
   {
-    id: 'tennis',
-    name: 'Tennis',
-    emoji: '🎾',
+    id: 'baseball',
+    name: 'Baseball',
+    emoji: '⚾',
     leagues: [
-      { key: 'tennis_atp_aus_open', name: 'ATP' },
-      { key: 'tennis_wta_aus_open', name: 'WTA' },
+      { key: 'baseball_mlb', name: 'MLB' },
+    ],
+  },
+  {
+    id: 'hockey',
+    name: 'Hockey',
+    emoji: '🏒',
+    leagues: [
+      { key: 'icehockey_nhl', name: 'NHL' },
     ],
   },
 ];
@@ -230,7 +240,7 @@ const AI_AGENTS = [
 // MAIN COMPONENT
 // ==========================================
 
-export default function Dashboard() {
+function DashboardContent() {
   const { data: session, status, update } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -299,6 +309,11 @@ export default function Dashboard() {
   // Event AI analysis cache (for showing verdict on event cards)
   const [eventAnalysisCache, setEventAnalysisCache] = useState<Record<string, SwarmResult>>({});
   const [loadingEventAnalysis, setLoadingEventAnalysis] = useState<Record<string, boolean>>({});
+
+  // More Markets expansion state
+  const [expandedEventMarkets, setExpandedEventMarkets] = useState<Record<string, boolean>>({});
+  const [eventMarketsCache, setEventMarketsCache] = useState<Record<string, any>>({});
+  const [loadingEventMarkets, setLoadingEventMarkets] = useState<Record<string, boolean>>({});
 
   // Challenge state (supports up to 5 active challenges)
   const [activeChallenges, setActiveChallenges] = useState<any[]>([]);
@@ -787,6 +802,29 @@ export default function Dashboard() {
     }
   };
 
+  // Toggle and fetch more markets for an event
+  const toggleEventMarkets = async (event: SportEvent) => {
+    const eventId = event.id;
+    const isCurrentlyExpanded = expandedEventMarkets[eventId];
+
+    // Toggle expansion state
+    setExpandedEventMarkets(prev => ({ ...prev, [eventId]: !isCurrentlyExpanded }));
+
+    // If expanding and not cached, fetch the markets
+    if (!isCurrentlyExpanded && !eventMarketsCache[eventId] && !loadingEventMarkets[eventId]) {
+      setLoadingEventMarkets(prev => ({ ...prev, [eventId]: true }));
+      try {
+        const res = await fetch(`/api/sports/events/${eventId}?sport=${event.sportKey}&props=true`);
+        const data = await res.json();
+        setEventMarketsCache(prev => ({ ...prev, [eventId]: data }));
+      } catch (error) {
+        console.error('Failed to fetch event markets:', error);
+      } finally {
+        setLoadingEventMarkets(prev => ({ ...prev, [eventId]: false }));
+      }
+    }
+  };
+
   // Handle profile update
   const handleProfileSave = async (username: string, avatar: string) => {
     const res = await fetch('/api/user/profile', {
@@ -1086,6 +1124,14 @@ export default function Dashboard() {
           </div>
           <div className="flex items-center gap-3">
             <a
+              href="/referral"
+              className="flex items-center gap-1.5 bg-gradient-to-r from-teal-900/50 to-teal-800/30 hover:from-teal-800/50 hover:to-teal-700/30 px-3 py-1.5 rounded-xl border border-teal-600/30 transition-all"
+              title="Referral Program"
+            >
+              <span className="text-sm">👥</span>
+              <span className="text-teal-400 text-sm font-medium hidden md:block">Referrals</span>
+            </a>
+            <a
               href="/profile"
               className="flex items-center gap-2 bg-surface-light hover:bg-zinc-800 px-3 py-1.5 rounded-xl border border-zinc-700 transition-all"
               title="View Profile"
@@ -1129,6 +1175,12 @@ export default function Dashboard() {
               {tab.label}
             </button>
           ))}
+          <Link
+            href="/how-it-works"
+            className="px-4 md:px-6 py-3 font-medium transition-all whitespace-nowrap text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-300"
+          >
+            How It Works
+          </Link>
         </div>
       </nav>
 
@@ -1214,11 +1266,25 @@ export default function Dashboard() {
                               {eventDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
                             </span>
                           </div>
-                          <div className="text-2xl">{selectedCategory.emoji}</div>
+                          <Link
+                            href={`/event/${event.id}?sport=${event.sportKey}`}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-500/20 border border-teal-500/30 rounded-lg text-xs font-medium text-teal-400 hover:bg-teal-500/30 hover:border-teal-500/50 transition-all"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                            </svg>
+                            <span>All Markets</span>
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                          </Link>
                         </div>
 
-                        {/* Teams */}
-                        <div className="space-y-3 mb-5">
+                        {/* Teams - Clickable to event detail */}
+                        <Link
+                          href={`/event/${event.id}?sport=${event.sportKey}`}
+                          className="block space-y-3 mb-5 -mx-2 px-2 py-2 rounded-xl hover:bg-zinc-800/30 transition-colors cursor-pointer"
+                        >
                           <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-xs font-bold text-zinc-400 border border-zinc-700">
                               A
@@ -1234,7 +1300,7 @@ export default function Dashboard() {
                             </div>
                             <span className="font-medium text-zinc-200 flex-1 truncate">{event.homeTeam}</span>
                           </div>
-                        </div>
+                        </Link>
 
                         {/* Best Odds - Premium Design */}
                         {event.bestOdds && (
@@ -1305,6 +1371,84 @@ export default function Dashboard() {
                             </div>
                           </div>
                         )}
+
+                        {/* More Markets Button & Expandable Panel */}
+                        <div className="mb-4">
+                          <button
+                            onClick={() => toggleEventMarkets(event)}
+                            className="w-full flex items-center justify-between px-3 py-2.5 bg-zinc-800/30 hover:bg-zinc-800/50 border border-zinc-700/40 hover:border-zinc-600/60 rounded-xl transition-all text-sm"
+                          >
+                            <span className="text-zinc-400 font-medium flex items-center gap-2">
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                              </svg>
+                              More Markets
+                            </span>
+                            <svg
+                              className={`w-4 h-4 text-zinc-500 transition-transform ${expandedEventMarkets[event.id] ? 'rotate-180' : ''}`}
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </button>
+
+                          {/* Expanded Markets Panel */}
+                          {expandedEventMarkets[event.id] && (
+                            <div className="mt-3 space-y-3 animate-in slide-in-from-top-2 duration-200">
+                              {loadingEventMarkets[event.id] ? (
+                                <div className="flex items-center justify-center py-6 text-zinc-500">
+                                  <svg className="animate-spin h-5 w-5 mr-2" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                  </svg>
+                                  Loading markets...
+                                </div>
+                              ) : eventMarketsCache[event.id]?.markets ? (
+                                <div className="space-y-3 max-h-80 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
+                                  {Object.entries(eventMarketsCache[event.id].markets).map(([marketKey, market]: [string, any]) => (
+                                    <div key={marketKey} className="bg-zinc-900/50 rounded-lg p-3 border border-zinc-800/50">
+                                      <div className="text-xs text-zinc-500 font-medium mb-2 uppercase tracking-wider">
+                                        {market.label || marketKey}
+                                      </div>
+                                      <div className="grid grid-cols-2 gap-2">
+                                        {market.outcomes?.slice(0, 6).map((outcome: any, idx: number) => (
+                                          <button
+                                            key={idx}
+                                            onClick={() => session && outcome.price && openQuickBet(event, marketKey, `${outcome.name}${outcome.point ? ` ${outcome.point > 0 ? '+' : ''}${outcome.point}` : ''}`, outcome.price)}
+                                            disabled={!session || !outcome.price}
+                                            className={`bg-zinc-800/50 rounded-lg p-2 text-left border border-zinc-700/30 transition-all ${
+                                              session && outcome.price
+                                                ? 'hover:border-teal-500/50 hover:bg-teal-900/20 cursor-pointer'
+                                                : 'cursor-default opacity-60'
+                                            }`}
+                                          >
+                                            <div className="text-[10px] text-zinc-500 truncate">
+                                              {outcome.name}{outcome.point !== undefined ? ` ${outcome.point > 0 ? '+' : ''}${outcome.point}` : ''}
+                                            </div>
+                                            <div className="text-sm font-bold text-teal-400">
+                                              {outcome.price?.toFixed(2)}
+                                            </div>
+                                          </button>
+                                        ))}
+                                      </div>
+                                      {market.outcomes?.length > 6 && (
+                                        <div className="text-[10px] text-zinc-600 text-center mt-2">
+                                          +{market.outcomes.length - 6} more options
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="text-center py-4 text-zinc-500 text-sm">
+                                  No additional markets available
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
 
                         {/* AI Verdict & Actions */}
                         {(() => {
@@ -2966,7 +3110,7 @@ export default function Dashboard() {
                         <div className="flex items-center gap-6">
                           {/* Circular Progress */}
                           <div className="relative w-24 h-24 flex-shrink-0">
-                            <svg className="w-24 h-24 transform -rotate-90" viewBox="0 0 100 100">
+                            <svg className="w-24 h-24" viewBox="0 0 100 100">
                               <circle
                                 cx="50"
                                 cy="50"
@@ -2980,18 +3124,17 @@ export default function Dashboard() {
                                 cx="50"
                                 cy="50"
                                 r="42"
-                                stroke="url(#progressGradient)"
+                                stroke={selectedChallenge?.difficulty === 'pro' ? '#f59e0b' : '#14b8a6'}
                                 strokeWidth="8"
                                 fill="none"
                                 strokeLinecap="round"
-                                strokeDasharray={`${Math.min(264, ((selectedChallenge?.currentStreak || 0) / (selectedChallenge?.difficulty === 'pro' ? 9 : 15)) * 264)} 264`}
+                                style={{
+                                  strokeDasharray: 264,
+                                  strokeDashoffset: 264 - ((selectedChallenge?.currentStreak || 0) / (selectedChallenge?.difficulty === 'pro' ? 9 : 15)) * 264,
+                                  transform: 'rotate(-90deg)',
+                                  transformOrigin: '50% 50%'
+                                }}
                               />
-                              <defs>
-                                <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                                  <stop offset="0%" stopColor={selectedChallenge?.difficulty === 'pro' ? '#f59e0b' : '#14b8a6'} />
-                                  <stop offset="100%" stopColor={selectedChallenge?.difficulty === 'pro' ? '#fbbf24' : '#2dd4bf'} />
-                                </linearGradient>
-                              </defs>
                             </svg>
                             <div className="absolute inset-0 flex flex-col items-center justify-center">
                               <span className={`text-2xl font-bold ${selectedChallenge?.difficulty === 'pro' ? 'text-amber-400' : 'text-teal-400'}`}>
@@ -5115,5 +5258,18 @@ export default function Dashboard() {
         onSave={handleProfileSave}
       />
     </div>
+  );
+}
+
+// Wrap in Suspense for useSearchParams
+export default function Dashboard() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-dark flex items-center justify-center">
+        <div className="text-teal-400 text-xl">Loading...</div>
+      </div>
+    }>
+      <DashboardContent />
+    </Suspense>
   );
 }
