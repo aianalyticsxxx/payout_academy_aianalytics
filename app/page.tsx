@@ -132,6 +132,30 @@ interface PredictionStats {
   currentStreak: number;
 }
 
+interface ReferralData {
+  referralCode: string;
+  referralLink: string;
+  stats: {
+    totalReferrals: number;
+    pendingReferrals: number;
+    qualifiedReferrals: number;
+    totalEarned: number;
+    pendingRewards: number;
+  };
+  referrals: Array<{
+    id: string;
+    status: string;
+    rewardAmount: number;
+    createdAt: string;
+    qualifiedAt: string | null;
+    referred: {
+      username: string;
+      avatar: string;
+      joinedAt: string;
+    };
+  }>;
+}
+
 // ==========================================
 // CONSTANTS
 // ==========================================
@@ -246,7 +270,7 @@ function DashboardContent() {
   const searchParams = useSearchParams();
 
   // State
-  const [activeTab, setActiveTab] = useState<'events' | 'challenges' | 'ai' | 'bets' | 'rewards' | 'competition' | 'achievements'>('bets');
+  const [activeTab, setActiveTab] = useState<'events' | 'challenges' | 'ai' | 'bets' | 'rewards' | 'competition' | 'achievements' | 'referral'>('bets');
   const [challengeSuccessMessage, setChallengeSuccessMessage] = useState<string | null>(null);
   const [purchaseModalOpen, setPurchaseModalOpen] = useState(false);
   const [selectedChallenge, setSelectedChallenge] = useState<{ size: number; cost: number; label: string; profit: number; target: number; resetFee: number } | null>(null);
@@ -296,6 +320,11 @@ function DashboardContent() {
   const [predictionFilter, setPredictionFilter] = useState<'all' | 'pending' | 'won' | 'lost'>('all');
   const [loadingPredictions, setLoadingPredictions] = useState(false);
   const [selectedPrediction, setSelectedPrediction] = useState<AIPrediction | null>(null);
+
+  // Referral state
+  const [referralData, setReferralData] = useState<ReferralData | null>(null);
+  const [loadingReferral, setLoadingReferral] = useState(false);
+  const [referralCopied, setReferralCopied] = useState(false);
 
   // Bet placement modal state
   const [betModalOpen, setBetModalOpen] = useState(false);
@@ -424,6 +453,13 @@ function DashboardContent() {
     }
   }, [activeTab, session]);
 
+  // Fetch referral data when referral tab is selected
+  useEffect(() => {
+    if (activeTab === 'referral' && session) {
+      fetchReferralData();
+    }
+  }, [activeTab, session]);
+
   // ==========================================
   // API CALLS
   // ==========================================
@@ -470,6 +506,31 @@ function DashboardContent() {
       console.error('Failed to fetch achievements:', error);
     } finally {
       setLoadingAchievements(false);
+    }
+  };
+
+  const fetchReferralData = async () => {
+    setLoadingReferral(true);
+    try {
+      const res = await fetch('/api/referral');
+      if (res.ok) {
+        const data = await res.json();
+        setReferralData(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch referral data:', error);
+    } finally {
+      setLoadingReferral(false);
+    }
+  };
+
+  const copyReferralToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setReferralCopied(true);
+      setTimeout(() => setReferralCopied(false), 2000);
+    } catch (error) {
+      console.error('Failed to copy:', error);
     }
   };
 
@@ -1120,32 +1181,27 @@ function DashboardContent() {
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-teal-400 tracking-tight">ZALOGCHE</h1>
-            <p className="text-zinc-500 text-sm tracking-widest">Analytics</p>
           </div>
           <div className="flex items-center gap-3">
             <a
-              href="/referral"
-              className="flex items-center gap-1.5 bg-gradient-to-r from-teal-900/50 to-teal-800/30 hover:from-teal-800/50 hover:to-teal-700/30 px-3 py-1.5 rounded-xl border border-teal-600/30 transition-all"
-              title="Referral Program"
-            >
-              <span className="text-sm">👥</span>
-              <span className="text-teal-400 text-sm font-medium hidden md:block">Referrals</span>
-            </a>
-            <a
               href="/profile"
-              className="flex items-center gap-2 bg-surface-light hover:bg-zinc-800 px-3 py-1.5 rounded-xl border border-zinc-700 transition-all"
+              className="group flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-teal-900/40 to-teal-800/20 hover:from-teal-800/50 hover:to-teal-700/30 rounded-xl border border-teal-600/30 hover:border-teal-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-teal-500/10"
               title="View Profile"
             >
-              <span className="text-xl">{(session.user as any)?.avatar || '🎲'}</span>
-              <span className="text-zinc-300 text-sm hidden md:block">
-                {(session.user as any)?.username || 'Set Username'}
-              </span>
+              <svg className="w-5 h-5 text-teal-400 group-hover:text-teal-300 transition-colors" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 12c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm0 2c-3.33 0-10 1.67-10 5v2c0 .55.45 1 1 1h18c.55 0 1-.45 1-1v-2c0-3.33-6.67-5-10-5z"/>
+              </svg>
+              <span className="text-sm font-medium text-teal-400 group-hover:text-teal-300 hidden sm:inline">Profile</span>
             </a>
             <button
               onClick={() => signOut()}
-              className="bg-surface-light hover:bg-zinc-800 text-teal-400 px-3 py-1.5 rounded-xl text-sm font-medium border border-zinc-700 transition-all"
+              className="group flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-rose-900/30 to-rose-800/10 hover:from-rose-800/40 hover:to-rose-700/20 rounded-xl border border-rose-600/20 hover:border-rose-500/40 transition-all duration-300 hover:shadow-lg hover:shadow-rose-500/10"
+              title="Sign Out"
             >
-              Sign Out
+              <svg className="w-5 h-5 text-rose-400 group-hover:text-rose-300 transition-colors" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9"/>
+              </svg>
+              <span className="text-sm font-medium text-rose-400 group-hover:text-rose-300 hidden sm:inline">Sign Out</span>
             </button>
           </div>
         </div>
@@ -1162,6 +1218,7 @@ function DashboardContent() {
             { id: 'rewards', label: 'Rewards', icon: '🎁' },
             { id: 'competition', label: 'Competition', icon: '🏆' },
             { id: 'achievements', label: 'Achievements', icon: '⭐' },
+            { id: 'referral', label: 'Referral', icon: '👥' },
           ].map(tab => (
             <button
               key={tab.id}
@@ -4224,12 +4281,223 @@ function DashboardContent() {
           );
         })()}
 
+        {/* REFERRAL TAB */}
+        {activeTab === 'referral' && (
+          <div className="space-y-6">
+            {loadingReferral ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="animate-pulse text-zinc-500">Loading referral data...</div>
+              </div>
+            ) : referralData ? (
+              <>
+                {/* Referral Link Card */}
+                <div className="bg-gradient-to-br from-teal-900/30 to-teal-800/10 border border-teal-500/30 rounded-2xl p-6">
+                  <h2 className="text-xl font-bold text-white mb-4">Your Referral Link</h2>
+                  <div className="flex gap-3 mb-4">
+                    <input
+                      type="text"
+                      value={referralData.referralLink}
+                      readOnly
+                      className="flex-1 bg-zinc-900/50 border border-zinc-700 rounded-xl px-4 py-3 text-white font-mono text-sm"
+                    />
+                    <button
+                      onClick={() => copyReferralToClipboard(referralData.referralLink)}
+                      className={`px-6 py-3 rounded-xl font-medium transition-all ${
+                        referralCopied
+                          ? 'bg-green-600 text-white'
+                          : 'bg-teal-600 hover:bg-teal-700 text-white'
+                      }`}
+                    >
+                      {referralCopied ? 'Copied!' : 'Copy'}
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-4 text-sm">
+                    <span className="text-zinc-400">Your code:</span>
+                    <span className="bg-zinc-800 px-3 py-1 rounded-lg font-mono text-teal-400 font-bold">
+                      {referralData.referralCode}
+                    </span>
+                    <button
+                      onClick={() => copyReferralToClipboard(referralData.referralCode)}
+                      className="text-zinc-400 hover:text-white"
+                    >
+                      Copy code
+                    </button>
+                  </div>
+                </div>
+
+                {/* Two-Sided Benefits */}
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div className="bg-gradient-to-br from-green-900/20 to-green-800/10 border border-green-500/30 rounded-xl p-5">
+                    <div className="flex items-center gap-3 mb-2">
+                      <span className="text-2xl">💰</span>
+                      <h3 className="font-bold text-white">You Get 15% Cashback</h3>
+                    </div>
+                    <p className="text-sm text-zinc-400">
+                      Earn 15% of every friend&apos;s first challenge purchase added to your rewards balance
+                    </p>
+                  </div>
+                  <div className="bg-gradient-to-br from-purple-900/20 to-purple-800/10 border border-purple-500/30 rounded-xl p-5">
+                    <div className="flex items-center gap-3 mb-2">
+                      <span className="text-2xl">🎁</span>
+                      <h3 className="font-bold text-white">They Get 15% Off</h3>
+                    </div>
+                    <p className="text-sm text-zinc-400">
+                      Your friends get 15% discount on their first challenge purchase when they sign up with your link
+                    </p>
+                  </div>
+                </div>
+
+                {/* Stats Grid */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="bg-surface border border-zinc-800 rounded-xl p-4">
+                    <div className="text-3xl font-bold text-white">{referralData.stats.totalReferrals}</div>
+                    <div className="text-sm text-zinc-400">Total Referrals</div>
+                  </div>
+                  <div className="bg-surface border border-zinc-800 rounded-xl p-4">
+                    <div className="text-3xl font-bold text-teal-400">{referralData.stats.qualifiedReferrals}</div>
+                    <div className="text-sm text-zinc-400">Qualified</div>
+                  </div>
+                  <div className="bg-surface border border-zinc-800 rounded-xl p-4">
+                    <div className="text-3xl font-bold text-green-400">€{referralData.stats.totalEarned.toFixed(2)}</div>
+                    <div className="text-sm text-zinc-400">Total Earned</div>
+                  </div>
+                  <div className="bg-surface border border-zinc-800 rounded-xl p-4">
+                    <div className="text-3xl font-bold text-yellow-400">€{referralData.stats.pendingRewards.toFixed(2)}</div>
+                    <div className="text-sm text-zinc-400">Pending Rewards</div>
+                  </div>
+                </div>
+
+                {/* How It Works */}
+                <div className="bg-surface border border-zinc-800 rounded-2xl p-6">
+                  <h2 className="text-xl font-bold text-white mb-4">How It Works</h2>
+                  <div className="grid md:grid-cols-4 gap-6">
+                    <div className="text-center">
+                      <div className="w-12 h-12 bg-teal-900/30 rounded-full flex items-center justify-center mx-auto mb-3">
+                        <span className="text-xl font-bold text-teal-400">1</span>
+                      </div>
+                      <h3 className="font-semibold text-white mb-1">Share Your Link</h3>
+                      <p className="text-sm text-zinc-400">Send your unique referral link to friends</p>
+                    </div>
+                    <div className="text-center">
+                      <div className="w-12 h-12 bg-teal-900/30 rounded-full flex items-center justify-center mx-auto mb-3">
+                        <span className="text-xl font-bold text-teal-400">2</span>
+                      </div>
+                      <h3 className="font-semibold text-white mb-1">They Sign Up</h3>
+                      <p className="text-sm text-zinc-400">Friends create account with your link</p>
+                    </div>
+                    <div className="text-center">
+                      <div className="w-12 h-12 bg-purple-900/30 rounded-full flex items-center justify-center mx-auto mb-3">
+                        <span className="text-xl font-bold text-purple-400">3</span>
+                      </div>
+                      <h3 className="font-semibold text-white mb-1">They Save 15%</h3>
+                      <p className="text-sm text-zinc-400">They get 15% off their first challenge</p>
+                    </div>
+                    <div className="text-center">
+                      <div className="w-12 h-12 bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-3">
+                        <span className="text-xl font-bold text-green-400">4</span>
+                      </div>
+                      <h3 className="font-semibold text-white mb-1">You Earn 15%</h3>
+                      <p className="text-sm text-zinc-400">You get 15% of their purchase as reward</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Referrals List */}
+                <div className="bg-surface border border-zinc-800 rounded-2xl p-6">
+                  <h2 className="text-xl font-bold text-white mb-4">Your Referrals</h2>
+                  {referralData.referrals.length === 0 ? (
+                    <div className="text-center py-12">
+                      <div className="text-4xl mb-4">👥</div>
+                      <p className="text-zinc-400">No referrals yet</p>
+                      <p className="text-sm text-zinc-500 mt-1">Share your link to start earning rewards</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {referralData.referrals.map((referral) => (
+                        <div
+                          key={referral.id}
+                          className="flex items-center justify-between p-4 bg-zinc-800/30 rounded-xl"
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className="text-2xl">{referral.referred.avatar}</span>
+                            <div>
+                              <div className="font-medium text-white">{referral.referred.username}</div>
+                              <div className="text-xs text-zinc-500">
+                                Joined {new Date(referral.referred.joinedAt).toLocaleDateString()}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className={`text-sm font-medium ${
+                              referral.status === 'qualified' || referral.status === 'paid'
+                                ? 'text-green-400'
+                                : 'text-yellow-400'
+                            }`}>
+                              {referral.status === 'pending' && 'Pending'}
+                              {referral.status === 'qualified' && `+€${referral.rewardAmount.toFixed(2)}`}
+                              {referral.status === 'paid' && `+€${referral.rewardAmount.toFixed(2)} (Paid)`}
+                            </div>
+                            <div className="text-xs text-zinc-500">
+                              {referral.status === 'pending'
+                                ? 'Waiting for first purchase'
+                                : referral.qualifiedAt && `Qualified ${new Date(referral.qualifiedAt).toLocaleDateString()}`
+                              }
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Share Buttons */}
+                <div className="flex flex-wrap gap-3 justify-center">
+                  <a
+                    href={`https://twitter.com/intent/tweet?text=Join%20me%20on%20Zalogche%20and%20take%20on%20sports%20betting%20challenges!%20${encodeURIComponent(referralData.referralLink)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-4 py-2 bg-[#1DA1F2] hover:bg-[#1a8cd8] text-white rounded-lg font-medium transition-colors"
+                  >
+                    Share on Twitter
+                  </a>
+                  <a
+                    href={`https://wa.me/?text=Join%20me%20on%20Zalogche%20and%20take%20on%20sports%20betting%20challenges!%20${encodeURIComponent(referralData.referralLink)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-4 py-2 bg-[#25D366] hover:bg-[#20bd5a] text-white rounded-lg font-medium transition-colors"
+                  >
+                    Share on WhatsApp
+                  </a>
+                  <a
+                    href={`https://t.me/share/url?url=${encodeURIComponent(referralData.referralLink)}&text=Join%20me%20on%20Zalogche!`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-4 py-2 bg-[#0088cc] hover:bg-[#0077b5] text-white rounded-lg font-medium transition-colors"
+                  >
+                    Share on Telegram
+                  </a>
+                </div>
+              </>
+            ) : (
+              <div className="text-center py-12">
+                <div className="text-zinc-400">Failed to load referral data</div>
+                <button
+                  onClick={fetchReferralData}
+                  className="mt-4 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg"
+                >
+                  Try Again
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
       </main>
 
       {/* Footer */}
       <footer className="mt-12 py-8 border-t border-zinc-800/50 text-center">
         <p className="text-teal-400 font-semibold tracking-tight">ZALOGCHE</p>
-        <p className="text-zinc-500 text-xs mt-1">Analytics • For Entertainment Only • Gamble Responsibly</p>
+        <p className="text-zinc-500 text-xs mt-1">For Entertainment Only • Gamble Responsibly</p>
       </footer>
 
       {/* Bet Placement Modal */}
