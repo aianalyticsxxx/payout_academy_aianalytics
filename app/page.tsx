@@ -2705,194 +2705,10 @@ export default function Dashboard() {
         {/* BETS TAB - Main Dashboard */}
         {activeTab === 'bets' && (
           <div className="space-y-6">
-            {/* Top Row: Win Streak Challenge */}
-            <div className="grid gap-6 lg:grid-cols-2">
-              {/* Win Streak Challenge Card */}
-              <div className={`${activeChallenges.length === 0 ? 'opacity-40 blur-[2px] pointer-events-none select-none' : ''}`}>
-              {(() => {
-                // Calculate current win streak from settled bets
-                const settledBets = bets.filter(b => b.result !== 'pending').sort((a, b) =>
-                  new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-                );
-                let currentStreak = 0;
-                for (const bet of settledBets) {
-                  if (bet.result === 'won') {
-                    currentStreak++;
-                  } else {
-                    break;
-                  }
-                }
-                // Check if challenge failed (most recent bet is a loss and we had progress)
-                const mostRecentBet = settledBets[0];
-                const challengeFailed = mostRecentBet?.result === 'lost';
-
-                // Find best streak ever
-                let bestStreak = 0;
-                let tempStreak = 0;
-                for (const bet of [...settledBets].reverse()) {
-                  if (bet.result === 'won') {
-                    tempStreak++;
-                    bestStreak = Math.max(bestStreak, tempStreak);
-                  } else {
-                    tempStreak = 0;
-                  }
-                }
-                const targetStreak = 20;
-                const levels = [5, 10, 15, 20];
-                const currentLevel = levels.filter(l => currentStreak >= l).length;
-                const nextLevel = levels.find(l => currentStreak < l) || 20;
-                const challengeCompleted = currentStreak >= 20;
-
-                return (
-                  <div className={`bg-gradient-to-br ${
-                    challengeFailed
-                      ? 'from-red-950/80 via-red-900/60 to-red-950/80 border-red-800/50'
-                      : challengeCompleted
-                        ? 'from-amber-950/60 via-amber-900/40 to-amber-950/60 border-amber-700/50'
-                        : 'from-[#1a3a3a] via-[#153030] to-[#102828] border-[#2a5555]/50'
-                  } border rounded-2xl p-6 relative overflow-hidden`}>
-                    <div className={`absolute inset-0 ${
-                      challengeFailed
-                        ? 'bg-[radial-gradient(circle_at_30%_20%,rgba(220,38,38,0.15),transparent_50%)]'
-                        : challengeCompleted
-                          ? 'bg-[radial-gradient(circle_at_30%_20%,rgba(251,191,36,0.15),transparent_50%)]'
-                          : 'bg-[radial-gradient(circle_at_30%_20%,rgba(45,180,180,0.12),transparent_50%)]'
-                    }`}></div>
-                    <div className="relative">
-                      <div className="flex items-center justify-between mb-4">
-                        <span className={`text-sm font-medium ${
-                          challengeFailed ? 'text-red-400' : challengeCompleted ? 'text-amber-400' : 'text-[#7cc4c4]'
-                        }`}>Win Streak Challenge</span>
-                        {challengeFailed ? (
-                          <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-red-500/20 text-red-400 animate-pulse">
-                            FAILED
-                          </span>
-                        ) : challengeCompleted ? (
-                          <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-500/20 text-amber-400">
-                            COMPLETED!
-                          </span>
-                        ) : (
-                          <span className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
-                            currentStreak >= 15 ? 'bg-purple-500/20 text-purple-400' :
-                            currentStreak >= 10 ? 'bg-blue-500/20 text-blue-400' :
-                            currentStreak >= 5 ? 'bg-emerald-500/20 text-emerald-400' :
-                            'bg-zinc-500/20 text-zinc-400'
-                          }`}>
-                            Level {currentLevel}/4
-                          </span>
-                        )}
-                      </div>
-
-                      {challengeFailed ? (
-                        <>
-                          <div className="text-5xl font-bold text-red-400 mb-1 flex items-center gap-3">
-                            <span className="text-4xl">✕</span>
-                            <span>0</span>
-                            <span className="text-lg text-red-500/60 font-normal">/ {targetStreak}</span>
-                          </div>
-                          <div className="text-red-400/70 text-sm mb-4">Challenge Failed - Start Over</div>
-
-                          {/* Failed progress bar */}
-                          <div className="h-3 bg-red-950/50 rounded-full overflow-hidden mb-4">
-                            <div className="h-full w-0 rounded-full bg-red-500/50"></div>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <div className="text-5xl font-bold text-white mb-1 flex items-baseline gap-2">
-                            {currentStreak}
-                            <span className="text-lg text-[#5a9090] font-normal">/ {targetStreak}</span>
-                            {challengeCompleted && <span className="text-3xl ml-2">🏆</span>}
-                          </div>
-                          <div className="text-[#5a9090] text-sm mb-4">Consecutive Wins</div>
-
-                          {/* Progress bar to target */}
-                          <div className="h-3 bg-[#0d1f1f] rounded-full overflow-hidden mb-4">
-                            <div
-                              className={`h-full rounded-full transition-all duration-500 ${
-                                currentStreak >= 20 ? 'bg-gradient-to-r from-amber-500 to-yellow-400' :
-                                currentStreak >= 15 ? 'bg-gradient-to-r from-purple-500 to-purple-400' :
-                                currentStreak >= 10 ? 'bg-gradient-to-r from-blue-500 to-blue-400' :
-                                currentStreak >= 5 ? 'bg-gradient-to-r from-emerald-500 to-emerald-400' :
-                                'bg-gradient-to-r from-[#2d9090] to-[#3db5b5]'
-                              }`}
-                              style={{ width: `${(currentStreak / targetStreak) * 100}%` }}
-                            ></div>
-                          </div>
-                        </>
-                      )}
-
-                      {/* Level markers - Clickable when reward available */}
-                      <div className="flex justify-between mb-4">
-                        {levels.map((level, idx) => {
-                          const levelNum = idx + 1;
-                          const isComplete = bestStreak >= level;
-                          const canClaimReward = isComplete && !claimedRewards.includes(levelNum);
-
-                          return (
-                            <button
-                              key={level}
-                              onClick={() => {
-                                if (canClaimReward) {
-                                  setRewardToClaim(levelNum);
-                                  setRewardModalOpen(true);
-                                }
-                              }}
-                              disabled={!canClaimReward}
-                              className={`flex flex-col items-center ${canClaimReward ? 'cursor-pointer' : 'cursor-default'}`}
-                            >
-                              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all ${
-                                challengeFailed
-                                  ? 'bg-red-950/50 border-red-800/50 text-red-500/50'
-                                  : currentStreak >= level
-                                    ? level === 20 ? 'bg-amber-500 border-amber-400 text-black' :
-                                      level === 15 ? 'bg-purple-500 border-purple-400 text-white' :
-                                      level === 10 ? 'bg-blue-500 border-blue-400 text-white' :
-                                      'bg-emerald-500 border-emerald-400 text-white'
-                                    : 'bg-[#0d1f1f] border-[#2a5555] text-[#5a9090]'
-                              } ${canClaimReward ? 'ring-2 ring-teal-400/50 animate-pulse' : ''}`}>
-                                {challengeFailed ? '✕' : currentStreak >= level ? '✓' : level}
-                              </div>
-                              <span className={`text-[10px] mt-1 ${
-                                challengeFailed ? 'text-red-500/50' : currentStreak >= level ? 'text-[#7cc4c4]' : 'text-[#5a9090]'
-                              }`}>
-                                {level === 5 ? 'Lvl 1' : level === 10 ? 'Lvl 2' : level === 15 ? 'Lvl 3' : 'Lvl 4'}
-                              </span>
-                              {canClaimReward && (
-                                <span className="text-[8px] text-teal-400 font-medium mt-0.5">CLAIM</span>
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
-
-                      <div className={`pt-4 border-t ${challengeFailed ? 'border-red-800/40' : 'border-[#2a5555]/40'} grid grid-cols-3 gap-4`}>
-                        <div>
-                          <div className={`text-xs mb-1 ${challengeFailed ? 'text-red-500/60' : 'text-[#5a9090]'}`}>Best Streak</div>
-                          <div className={`font-semibold ${challengeFailed ? 'text-red-300' : 'text-white'}`}>{bestStreak}</div>
-                        </div>
-                        <div>
-                          <div className={`text-xs mb-1 ${challengeFailed ? 'text-red-500/60' : 'text-[#5a9090]'}`}>
-                            {challengeFailed ? 'Status' : 'Next Level'}
-                          </div>
-                          <div className={`font-semibold ${
-                            challengeFailed ? 'text-red-400' : 'text-[#7cc4c4]'
-                          }`}>
-                            {challengeFailed ? 'Restart' : currentStreak >= 20 ? 'Completed!' : `${nextLevel - currentStreak} more`}
-                          </div>
-                        </div>
-                        <div>
-                          <div className={`text-xs mb-1 ${challengeFailed ? 'text-red-500/60' : 'text-[#5a9090]'}`}>Record</div>
-                          <div className={`font-semibold ${challengeFailed ? 'text-red-300' : 'text-white'}`}>{userStats?.wins || 0}-{userStats?.losses || 0}</div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()}
-              </div>
-
-              {/* Account Selection - Dashboard Tab (Only Purchased Challenges) */}
+            {/* Top Row: Challenge Accounts */}
+            <div className="grid gap-6 lg:grid-cols-3">
+              {/* Account Selection - Dashboard Tab (Only Purchased Challenges) - Takes 2 columns */}
+              <div className="lg:col-span-2">
               {(() => {
                 // Get reward data for a tier
                 const getTierRewards = (tier: number): number[] => {
@@ -2991,71 +2807,157 @@ export default function Dashboard() {
                         </div>
                       )}
 
-                      {/* Selected Challenge Details */}
-                      <div className="bg-zinc-900/40 rounded-xl p-4 mb-4">
+                      {/* Selected Challenge Details - Enhanced */}
+                      <div className={`rounded-xl p-4 mb-4 ${
+                        selectedChallenge?.difficulty === 'pro'
+                          ? 'bg-gradient-to-br from-amber-900/20 to-amber-950/30 border border-amber-700/30'
+                          : 'bg-gradient-to-br from-teal-900/20 to-teal-950/30 border border-teal-700/30'
+                      }`}>
                         {/* Difficulty Badge */}
-                        <div className="flex justify-center mb-3">
-                          <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                        <div className="flex justify-center mb-4">
+                          <span className={`px-4 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 ${
                             selectedChallenge?.difficulty === 'pro'
-                              ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                              : 'bg-teal-500/20 text-teal-400 border border-teal-500/30'
+                              ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
+                              : 'bg-teal-500/20 text-teal-400 border border-teal-500/40'
                           }`}>
                             {selectedChallenge?.difficulty === 'pro' ? '⚡ Pro Mode' : '🎯 Beginner Mode'} • Min {selectedChallenge?.minOdds || 1.5}x Odds
                           </span>
                         </div>
-                        <div className="grid grid-cols-4 gap-4 text-center">
-                          <div>
-                            <div className="text-xs text-zinc-500 mb-1">Streak</div>
-                            <div className={`text-lg font-bold ${selectedChallenge?.difficulty === 'pro' ? 'text-amber-400' : 'text-teal-400'}`}>{selectedChallenge?.currentStreak || 0}</div>
+
+                        {/* Circular Progress & Stats */}
+                        <div className="flex items-center gap-6">
+                          {/* Circular Progress */}
+                          <div className="relative w-24 h-24 flex-shrink-0">
+                            <svg className="w-24 h-24 transform -rotate-90" viewBox="0 0 100 100">
+                              <circle
+                                cx="50"
+                                cy="50"
+                                r="42"
+                                stroke="currentColor"
+                                strokeWidth="8"
+                                fill="none"
+                                className="text-zinc-800"
+                              />
+                              <circle
+                                cx="50"
+                                cy="50"
+                                r="42"
+                                stroke="url(#progressGradient)"
+                                strokeWidth="8"
+                                fill="none"
+                                strokeLinecap="round"
+                                strokeDasharray={`${((selectedChallenge?.currentStreak || 0) / 20) * 264} 264`}
+                              />
+                              <defs>
+                                <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                  <stop offset="0%" stopColor={selectedChallenge?.difficulty === 'pro' ? '#f59e0b' : '#14b8a6'} />
+                                  <stop offset="100%" stopColor={selectedChallenge?.difficulty === 'pro' ? '#fbbf24' : '#2dd4bf'} />
+                                </linearGradient>
+                              </defs>
+                            </svg>
+                            <div className="absolute inset-0 flex flex-col items-center justify-center">
+                              <span className={`text-2xl font-bold ${selectedChallenge?.difficulty === 'pro' ? 'text-amber-400' : 'text-teal-400'}`}>
+                                {selectedChallenge?.currentStreak || 0}
+                              </span>
+                              <span className="text-[10px] text-zinc-500">/ 20 wins</span>
+                            </div>
                           </div>
-                          <div>
-                            <div className="text-xs text-zinc-500 mb-1">Level</div>
-                            <div className="text-lg font-bold text-white">{selectedChallenge?.currentLevel || 1}/4</div>
-                          </div>
-                          <div>
-                            <div className="text-xs text-zinc-500 mb-1">Days Left</div>
-                            <div className="text-lg font-bold text-amber-400">{selectedChallenge?.daysRemaining ?? 30}</div>
-                          </div>
-                          <div>
-                            <div className="text-xs text-zinc-500 mb-1">Earned</div>
-                            <div className="text-lg font-bold text-emerald-400">€{(selectedChallenge?.totalRewardsEarned || 0).toLocaleString()}</div>
+
+                          {/* Stats Grid */}
+                          <div className="flex-1 grid grid-cols-3 gap-3">
+                            <div className="bg-zinc-900/50 rounded-lg p-2.5 text-center">
+                              <div className="text-[10px] text-zinc-500 uppercase tracking-wide mb-0.5">Level</div>
+                              <div className="text-lg font-bold text-white">{selectedChallenge?.currentLevel || 1}<span className="text-zinc-500 text-sm">/4</span></div>
+                            </div>
+                            <div className="bg-zinc-900/50 rounded-lg p-2.5 text-center">
+                              <div className="text-[10px] text-zinc-500 uppercase tracking-wide mb-0.5">Days Left</div>
+                              <div className={`text-lg font-bold ${(selectedChallenge?.daysRemaining ?? 30) <= 7 ? 'text-red-400' : (selectedChallenge?.daysRemaining ?? 30) <= 14 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                                {selectedChallenge?.daysRemaining ?? 30}
+                              </div>
+                            </div>
+                            <div className="bg-zinc-900/50 rounded-lg p-2.5 text-center">
+                              <div className="text-[10px] text-zinc-500 uppercase tracking-wide mb-0.5">Earned</div>
+                              <div className="text-lg font-bold text-emerald-400">€{(selectedChallenge?.totalRewardsEarned || 0).toLocaleString()}</div>
+                            </div>
                           </div>
                         </div>
                       </div>
 
-                      {/* Level Rewards Preview */}
-                      <div className="pt-4 border-t border-[#2a5555]/40">
-                        <div className="flex justify-between text-xs">
-                          <div className="text-center">
-                            <div className={`font-semibold ${selectedChallenge?.level1Completed ? 'text-emerald-400' : 'text-zinc-400'}`}>
-                              ${rewards[0]} {selectedChallenge?.level1Completed && '✓'}
+                      {/* Level Progression - Enhanced */}
+                      {(() => {
+                        // Get level requirements from the challenge (comes from API based on difficulty)
+                        const levelReqs = selectedChallenge?.levelRequirements || [
+                          { level: 1, streakRequired: 3 },
+                          { level: 2, streakRequired: 6 },
+                          { level: 3, streakRequired: 10 },
+                          { level: 4, streakRequired: 15 },
+                        ];
+                        const maxStreak = levelReqs[levelReqs.length - 1]?.streakRequired || 15;
+
+                        return (
+                          <div className="pt-4 border-t border-[#2a5555]/40">
+                            <div className="flex items-center justify-between mb-3">
+                              <span className="text-xs text-zinc-500 uppercase tracking-wide">Level Progression</span>
+                              <span className="text-xs text-zinc-400">
+                                {[selectedChallenge?.level1Completed, selectedChallenge?.level2Completed, selectedChallenge?.level3Completed, selectedChallenge?.level4Completed].filter(Boolean).length}/4 completed
+                              </span>
                             </div>
-                            <div className="text-zinc-500">Lvl 1 (5W)</div>
-                          </div>
-                          <div className="text-center">
-                            <div className={`font-semibold ${selectedChallenge?.level2Completed ? 'text-blue-400' : 'text-zinc-400'}`}>
-                              ${rewards[1]?.toLocaleString()} {selectedChallenge?.level2Completed && '✓'}
+
+                            {/* Progress Track */}
+                            <div className="relative mb-4">
+                              <div className="absolute top-4 left-0 right-0 h-1 bg-zinc-800 rounded-full"></div>
+                              <div
+                                className={`absolute top-4 left-0 h-1 rounded-full transition-all duration-500 ${
+                                  selectedChallenge?.difficulty === 'pro'
+                                    ? 'bg-gradient-to-r from-amber-500 to-amber-400'
+                                    : 'bg-gradient-to-r from-teal-500 to-teal-400'
+                                }`}
+                                style={{ width: `${Math.min(100, ((selectedChallenge?.currentStreak || 0) / maxStreak) * 100)}%` }}
+                              ></div>
+                              <div className="flex justify-between relative">
+                                {[
+                                  { level: 1, wins: levelReqs[0]?.streakRequired || 3, reward: rewards[0], completed: selectedChallenge?.level1Completed, color: 'emerald' },
+                                  { level: 2, wins: levelReqs[1]?.streakRequired || 6, reward: rewards[1], completed: selectedChallenge?.level2Completed, color: 'blue' },
+                                  { level: 3, wins: levelReqs[2]?.streakRequired || 10, reward: rewards[2], completed: selectedChallenge?.level3Completed, color: 'purple' },
+                                  { level: 4, wins: levelReqs[3]?.streakRequired || 15, reward: rewards[3], completed: selectedChallenge?.level4Completed, color: 'amber' },
+                                ].map((lvl) => {
+                                  const isActive = (selectedChallenge?.currentStreak || 0) >= lvl.wins;
+                                  const colorClasses: Record<string, { bg: string; text: string; border: string }> = {
+                                    emerald: { bg: 'bg-emerald-500', text: 'text-emerald-400', border: 'border-emerald-500' },
+                                    blue: { bg: 'bg-blue-500', text: 'text-blue-400', border: 'border-blue-500' },
+                                    purple: { bg: 'bg-purple-500', text: 'text-purple-400', border: 'border-purple-500' },
+                                    amber: { bg: 'bg-amber-500', text: 'text-amber-400', border: 'border-amber-500' },
+                                  };
+                                  const colors = colorClasses[lvl.color];
+
+                                  return (
+                                    <div key={lvl.level} className="flex flex-col items-center">
+                                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all ${
+                                        lvl.completed
+                                          ? `${colors.bg} border-white/30 text-white shadow-lg`
+                                          : isActive
+                                            ? `bg-zinc-900 ${colors.border} ${colors.text}`
+                                            : 'bg-zinc-900 border-zinc-700 text-zinc-500'
+                                      }`}>
+                                        {lvl.completed ? '✓' : lvl.wins}
+                                      </div>
+                                      <div className={`mt-2 text-center ${lvl.completed ? colors.text : 'text-zinc-400'}`}>
+                                        <div className="text-sm font-bold">${lvl.reward?.toLocaleString()}</div>
+                                        <div className="text-[10px] text-zinc-500">{lvl.wins}W</div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
                             </div>
-                            <div className="text-zinc-500">Lvl 2 (10W)</div>
                           </div>
-                          <div className="text-center">
-                            <div className={`font-semibold ${selectedChallenge?.level3Completed ? 'text-purple-400' : 'text-zinc-400'}`}>
-                              ${rewards[2]?.toLocaleString()} {selectedChallenge?.level3Completed && '✓'}
-                            </div>
-                            <div className="text-zinc-500">Lvl 3 (15W)</div>
-                          </div>
-                          <div className="text-center">
-                            <div className={`font-semibold ${selectedChallenge?.level4Completed ? 'text-amber-400' : 'text-zinc-400'}`}>
-                              ${rewards[3]?.toLocaleString()} {selectedChallenge?.level4Completed && '✓'}
-                            </div>
-                            <div className="text-zinc-500">Lvl 4 (20W)</div>
-                          </div>
-                        </div>
-                      </div>
+                        );
+                      })()}
                     </div>
                   </div>
                 );
               })()}
+              </div>
 
               {/* Streak History / Recent Results */}
               <div className={`bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-6 ${activeChallenges.length === 0 ? 'opacity-40 blur-[2px] pointer-events-none select-none' : ''}`}>
