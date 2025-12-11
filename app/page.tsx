@@ -7,7 +7,8 @@
 
 import { useState, useEffect } from 'react';
 import { useSession, signOut } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { ProfileEditModal } from '@/components/ProfileEditModal';
 
 // ==========================================
 // TYPES
@@ -230,14 +231,17 @@ const AI_AGENTS = [
 // ==========================================
 
 export default function Dashboard() {
-  const { data: session, status } = useSession();
+  const { data: session, status, update } = useSession();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   // State
-  const [activeTab, setActiveTab] = useState<'events' | 'challenges' | 'ai' | 'bets' | 'rewards' | 'competition'>('bets');
+  const [activeTab, setActiveTab] = useState<'events' | 'challenges' | 'ai' | 'bets' | 'rewards' | 'competition' | 'achievements'>('bets');
+  const [challengeSuccessMessage, setChallengeSuccessMessage] = useState<string | null>(null);
   const [purchaseModalOpen, setPurchaseModalOpen] = useState(false);
   const [selectedChallenge, setSelectedChallenge] = useState<{ size: number; cost: number; label: string; profit: number; target: number; resetFee: number } | null>(null);
   const [selectedDifficulty, setSelectedDifficulty] = useState<'beginner' | 'pro'>('beginner');
+  const [paymentMethod, setPaymentMethod] = useState<'card' | 'crypto'>('card');
   const [challengesViewDifficulty, setChallengesViewDifficulty] = useState<'beginner' | 'pro'>('beginner');
   const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
   const [claimedRewards, setClaimedRewards] = useState<number[]>([]);
@@ -294,6 +298,10 @@ export default function Dashboard() {
   const [quickBetEvent, setQuickBetEvent] = useState<SportEvent | null>(null);
   const [quickBetSelection, setQuickBetSelection] = useState<{ type: string; name: string; odds: number } | null>(null);
 
+  // Achievements state
+  const [achievements, setAchievements] = useState<Array<{ id: string; name: string; description: string; icon: string }>>([]);
+  const [loadingAchievements, setLoadingAchievements] = useState(false);
+
   // Parlay builder state
   const [parlayLegs, setParlayLegs] = useState<Array<{
     eventId: string;
@@ -311,12 +319,45 @@ export default function Dashboard() {
   const [parlaySuccess, setParlaySuccess] = useState(false);
   const [parlays, setParlays] = useState<Parlay[]>([]);
 
+  // Profile edit modal state
+  const [showProfileModal, setShowProfileModal] = useState(false);
+
   // Redirect if not authenticated
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/login');
     }
   }, [status, router]);
+
+  // Handle Stripe checkout success/cancel redirects
+  useEffect(() => {
+    const challengeSuccess = searchParams.get('challenge_success');
+    const challengeCancelled = searchParams.get('challenge_cancelled');
+    const tier = searchParams.get('tier');
+    const difficulty = searchParams.get('difficulty');
+
+    if (challengeSuccess === 'true') {
+      // Show success message and switch to challenges tab
+      const tierLabel = tier ? `$${(parseInt(tier) / 1000).toFixed(0)}K` : '';
+      setChallengeSuccessMessage(`${difficulty === 'pro' ? '⚡' : '🎯'} ${tierLabel} ${difficulty === 'pro' ? 'Pro' : 'Beginner'} Challenge purchased successfully!`);
+      setActiveTab('challenges');
+
+      // Refresh challenges data
+      fetchActiveChallenge();
+
+      // Clear URL parameters
+      router.replace('/', { scroll: false });
+
+      // Auto-hide message after 5 seconds
+      setTimeout(() => setChallengeSuccessMessage(null), 5000);
+    }
+
+    if (challengeCancelled === 'true') {
+      setChallengeSuccessMessage(null);
+      // Clear URL parameters
+      router.replace('/', { scroll: false });
+    }
+  }, [searchParams, router]);
 
   // Fetch events when league changes
   useEffect(() => {
@@ -343,6 +384,13 @@ export default function Dashboard() {
       fetchAiCompetition();
     }
   }, [aiSubTab, predictionFilter]);
+
+  // Fetch achievements when achievements tab is selected
+  useEffect(() => {
+    if (activeTab === 'achievements' && session) {
+      fetchAchievements();
+    }
+  }, [activeTab, session]);
 
   // ==========================================
   // API CALLS
@@ -377,6 +425,19 @@ export default function Dashboard() {
       console.error('Failed to fetch bets:', error);
     } finally {
       setLoadingBets(false);
+    }
+  };
+
+  const fetchAchievements = async () => {
+    setLoadingAchievements(true);
+    try {
+      const res = await fetch('/api/user/profile');
+      const data = await res.json();
+      setAchievements(data.achievements || []);
+    } catch (error) {
+      console.error('Failed to fetch achievements:', error);
+    } finally {
+      setLoadingAchievements(false);
     }
   };
 
@@ -428,7 +489,8 @@ export default function Dashboard() {
     setChallengeError(null);
 
     try {
-      const res = await fetch('/api/challenges', {
+      // Create Stripe Checkout session
+      const res = await fetch('/api/stripe/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tier: selectedChallenge.size, difficulty: selectedDifficulty }),
@@ -437,24 +499,63 @@ export default function Dashboard() {
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to purchase challenge');
+        throw new Error(data.error || 'Failed to create checkout session');
       }
 
-      // Success - add to challenges array and close modal
-      setActiveChallenges(prev => [data.challenge, ...prev]);
-      setChallengeCount(prev => prev + 1);
-      setCanCreateMoreChallenges(challengeCount + 1 < maxChallenges);
-      setPurchaseModalOpen(false);
-      setSelectedChallenge(null);
-
-      // Show success feedback
-      alert(`Successfully started ${selectedChallenge.label} Challenge! You now have ${challengeCount + 1}/${maxChallenges} active challenges.`);
+      // Redirect to Stripe Checkout
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error('No checkout URL returned');
+      }
 
     } catch (error: any) {
-      console.error('Failed to purchase challenge:', error);
-      setChallengeError(error.message || 'Failed to purchase challenge');
-    } finally {
+      console.error('Failed to start checkout:', error);
+      setChallengeError(error.message || 'Failed to start checkout');
       setPurchasingChallenge(false);
+    }
+    // Note: Don't set purchasingChallenge to false on success since we're redirecting
+  };
+
+  const purchaseWithCrypto = async () => {
+    if (!selectedChallenge) return;
+
+    setPurchasingChallenge(true);
+    setChallengeError(null);
+
+    try {
+      // Create Confirmo invoice
+      const res = await fetch('/api/confirmo/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tier: selectedChallenge.size, difficulty: selectedDifficulty }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to create crypto checkout');
+      }
+
+      // Redirect to Confirmo payment page
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error('No checkout URL returned');
+      }
+
+    } catch (error: any) {
+      console.error('Failed to start crypto checkout:', error);
+      setChallengeError(error.message || 'Failed to start crypto checkout');
+      setPurchasingChallenge(false);
+    }
+  };
+
+  const handlePurchase = () => {
+    if (paymentMethod === 'crypto') {
+      purchaseWithCrypto();
+    } else {
+      purchaseChallenge();
     }
   };
 
@@ -559,6 +660,23 @@ export default function Dashboard() {
       setActiveTab('ai');
       setAiSubTab('swarm');
     }
+  };
+
+  // Handle profile update
+  const handleProfileSave = async (username: string, avatar: string) => {
+    const res = await fetch('/api/user/profile', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, avatar }),
+    });
+
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.error || 'Failed to update profile');
+    }
+
+    // Update session with new values
+    await update({ username, avatar });
   };
 
   // Open quick bet modal from odds click
@@ -825,10 +943,17 @@ export default function Dashboard() {
             <h1 className="text-2xl md:text-3xl font-bold text-teal-400 tracking-tight">ZALOGCHE</h1>
             <p className="text-zinc-500 text-sm tracking-widest">Analytics</p>
           </div>
-          <div className="flex items-center gap-4">
-            <span className="text-zinc-400 text-sm hidden md:block">
-              {(session.user as any)?.username || session.user?.email}
-            </span>
+          <div className="flex items-center gap-3">
+            <a
+              href="/profile"
+              className="flex items-center gap-2 bg-surface-light hover:bg-zinc-800 px-3 py-1.5 rounded-xl border border-zinc-700 transition-all"
+              title="View Profile"
+            >
+              <span className="text-xl">{(session.user as any)?.avatar || '🎲'}</span>
+              <span className="text-zinc-300 text-sm hidden md:block">
+                {(session.user as any)?.username || 'Set Username'}
+              </span>
+            </a>
             <button
               onClick={() => signOut()}
               className="bg-surface-light hover:bg-zinc-800 text-teal-400 px-3 py-1.5 rounded-xl text-sm font-medium border border-zinc-700 transition-all"
@@ -849,6 +974,7 @@ export default function Dashboard() {
             { id: 'ai', label: 'AI Hub', icon: '🤖' },
             { id: 'rewards', label: 'Rewards', icon: '🎁' },
             { id: 'competition', label: 'Competition', icon: '🏆' },
+            { id: 'achievements', label: 'Achievements', icon: '⭐' },
           ].map(tab => (
             <button
               key={tab.id}
@@ -1160,6 +1286,31 @@ export default function Dashboard() {
         {/* CHALLENGES TAB */}
         {activeTab === 'challenges' && (
           <div className="space-y-6">
+            {/* Success Message Banner */}
+            {challengeSuccessMessage && (
+              <div className="bg-gradient-to-r from-emerald-900/60 to-teal-900/60 border border-emerald-500/40 rounded-2xl p-4 flex items-center justify-between animate-pulse">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-emerald-500/20 rounded-full flex items-center justify-center">
+                    <svg className="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-emerald-400">{challengeSuccessMessage}</p>
+                    <p className="text-sm text-zinc-400">Your challenge is now active. Good luck!</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setChallengeSuccessMessage(null)}
+                  className="text-zinc-400 hover:text-white transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            )}
+
             {/* Challenge Tiers Data */}
             {(() => {
               // 4-Level Progression System - Beginner difficulty (default)
@@ -1264,7 +1415,8 @@ export default function Dashboard() {
                           {activeChallenges.map((challenge) => {
                             const tier = challengeTiers.find(t => t.size === challenge.tier);
                             // Use the challenge's actual difficulty to get level requirements
-                            const challengeLevels = challenge.difficulty === 'pro' ? proLevels : beginnerLevels;
+                            const isPro = challenge.difficulty === 'pro';
+                            const challengeLevels = isPro ? proLevels : beginnerLevels;
                             const nextLevel = challengeLevels.find(l => challenge.currentStreak < l.streakRequired);
                             const currentLevelReq = challengeLevels.find(l => l.level === challenge.currentLevel);
                             const streakProgress = nextLevel
@@ -1274,29 +1426,46 @@ export default function Dashboard() {
                             return (
                               <div
                                 key={challenge.id}
-                                className="bg-zinc-900/80 border border-zinc-700/50 rounded-xl p-4 hover:border-teal-500/50 transition-all"
+                                className={`bg-zinc-900/80 border rounded-xl p-4 transition-all ${
+                                  isPro
+                                    ? 'border-amber-500/30 hover:border-amber-500/60'
+                                    : 'border-zinc-700/50 hover:border-teal-500/50'
+                                }`}
                               >
-                                <div className="flex items-center justify-between mb-3">
-                                  <div className="flex items-center gap-2">
-                                    <span className={`px-2 py-1 rounded text-xs font-bold bg-gradient-to-r ${currentLevelReq?.color || 'from-zinc-500 to-zinc-400'} text-white`}>
-                                      {challenge.difficulty === 'pro' ? '⚡' : '🎯'} Level {challenge.currentLevel}
-                                    </span>
-                                    <span className="text-white font-bold">{tier?.label || `€${challenge.tier/1000}K`}</span>
-                                  </div>
+                                {/* Difficulty Badge */}
+                                <div className="flex items-center justify-between mb-2">
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                    isPro
+                                      ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                                      : 'bg-teal-500/20 text-teal-400 border border-teal-500/30'
+                                  }`}>
+                                    {isPro ? '⚡ PRO' : '🎯 BEGINNER'} • {challenge.minOdds || (isPro ? 2.0 : 1.5)}x
+                                  </span>
                                   <span className="text-zinc-400 text-xs">{challenge.daysRemaining}d left</span>
+                                </div>
+
+                                <div className="flex items-center gap-2 mb-3">
+                                  <span className={`px-2 py-1 rounded text-xs font-bold bg-gradient-to-r ${currentLevelReq?.color || 'from-zinc-500 to-zinc-400'} text-white`}>
+                                    Level {challenge.currentLevel}
+                                  </span>
+                                  <span className="text-white font-bold">{tier?.label || `€${challenge.tier/1000}K`}</span>
                                 </div>
 
                                 {/* Streak Progress */}
                                 <div className="mb-3">
                                   <div className="flex items-center justify-between text-xs mb-1">
                                     <span className="text-zinc-400">Current Streak</span>
-                                    <span className="text-teal-400 font-bold">
+                                    <span className={`font-bold ${isPro ? 'text-amber-400' : 'text-teal-400'}`}>
                                       {challenge.currentStreak}/{nextLevel?.streakRequired || challengeLevels[challengeLevels.length - 1].streakRequired} wins
                                     </span>
                                   </div>
                                   <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
                                     <div
-                                      className="h-full bg-gradient-to-r from-teal-500 to-emerald-400 transition-all"
+                                      className={`h-full transition-all ${
+                                        isPro
+                                          ? 'bg-gradient-to-r from-amber-500 to-orange-400'
+                                          : 'bg-gradient-to-r from-teal-500 to-emerald-400'
+                                      }`}
                                       style={{ width: `${streakProgress}%` }}
                                     ></div>
                                   </div>
@@ -1311,7 +1480,9 @@ export default function Dashboard() {
                                         challenge[`level${lvl}Completed`]
                                           ? 'bg-gradient-to-r from-emerald-500 to-green-400 text-white'
                                           : lvl === challenge.currentLevel
-                                          ? 'bg-teal-500/30 border-2 border-teal-500 text-teal-400'
+                                          ? isPro
+                                            ? 'bg-amber-500/30 border-2 border-amber-500 text-amber-400'
+                                            : 'bg-teal-500/30 border-2 border-teal-500 text-teal-400'
                                           : 'bg-zinc-800 text-zinc-500'
                                       }`}
                                     >
@@ -2792,21 +2963,27 @@ export default function Dashboard() {
                           {activeChallenges.map((challenge) => {
                             const isSelected = challenge.id === (selectedChallengeId || activeChallenges[0]?.id);
                             const label = challenge.tierLabel || getTierLabel(challenge.tier);
+                            const isPro = challenge.difficulty === 'pro';
                             return (
                               <button
                                 key={challenge.id}
                                 onClick={() => setSelectedChallengeId(challenge.id)}
                                 className={`p-3 rounded-xl border transition-all ${
                                   isSelected
-                                    ? 'bg-teal-500/20 border-teal-500 shadow-lg shadow-teal-500/20'
+                                    ? isPro
+                                      ? 'bg-amber-500/20 border-amber-500 shadow-lg shadow-amber-500/20'
+                                      : 'bg-teal-500/20 border-teal-500 shadow-lg shadow-teal-500/20'
                                     : 'bg-zinc-900/50 border-zinc-700/50 hover:border-teal-600/50'
                                 }`}
                               >
-                                <div className={`text-base font-bold ${isSelected ? 'text-teal-400' : 'text-white'}`}>
-                                  {label}
+                                <div className="flex items-center justify-center gap-1">
+                                  <span className="text-sm">{isPro ? '⚡' : '🎯'}</span>
+                                  <span className={`text-base font-bold ${isSelected ? (isPro ? 'text-amber-400' : 'text-teal-400') : 'text-white'}`}>
+                                    {label}
+                                  </span>
                                 </div>
-                                <div className="text-xs text-zinc-500">
-                                  Streak: {challenge.currentStreak || 0}
+                                <div className="text-[10px] text-zinc-500 mt-0.5">
+                                  {isPro ? 'Pro' : 'Beginner'} • {challenge.currentStreak || 0}W
                                 </div>
                               </button>
                             );
@@ -2816,10 +2993,20 @@ export default function Dashboard() {
 
                       {/* Selected Challenge Details */}
                       <div className="bg-zinc-900/40 rounded-xl p-4 mb-4">
+                        {/* Difficulty Badge */}
+                        <div className="flex justify-center mb-3">
+                          <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                            selectedChallenge?.difficulty === 'pro'
+                              ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                              : 'bg-teal-500/20 text-teal-400 border border-teal-500/30'
+                          }`}>
+                            {selectedChallenge?.difficulty === 'pro' ? '⚡ Pro Mode' : '🎯 Beginner Mode'} • Min {selectedChallenge?.minOdds || 1.5}x Odds
+                          </span>
+                        </div>
                         <div className="grid grid-cols-4 gap-4 text-center">
                           <div>
-                            <div className="text-xs text-zinc-500 mb-1">Current Streak</div>
-                            <div className="text-lg font-bold text-teal-400">{selectedChallenge?.currentStreak || 0}</div>
+                            <div className="text-xs text-zinc-500 mb-1">Streak</div>
+                            <div className={`text-lg font-bold ${selectedChallenge?.difficulty === 'pro' ? 'text-amber-400' : 'text-teal-400'}`}>{selectedChallenge?.currentStreak || 0}</div>
                           </div>
                           <div>
                             <div className="text-xs text-zinc-500 mb-1">Level</div>
@@ -3577,18 +3764,29 @@ export default function Dashboard() {
           <div className="space-y-6">
             {/* User Profile Card */}
             <div className="bg-gradient-to-r from-teal-900/30 to-teal-800/20 border border-teal-700/30 rounded-2xl p-6">
-              <div className="flex items-center gap-4">
-                <div className="text-5xl">{(session.user as any)?.avatar || '🎲'}</div>
-                <div>
-                  <div className="text-xl font-bold">
-                    {(session.user as any)?.username || 'Set Username'}
-                  </div>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className={`${getTierInfo((session.user as any)?.tier || 'Bronze').color}`}>
-                      {getTierInfo((session.user as any)?.tier || 'Bronze').icon} {(session.user as any)?.tier || 'Bronze'}
-                    </span>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="text-5xl">{(session.user as any)?.avatar || '🎲'}</div>
+                  <div>
+                    <div className="text-xl font-bold">
+                      {(session.user as any)?.username || 'Set Username'}
+                    </div>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className={`${getTierInfo((session.user as any)?.tier || 'Bronze').color}`}>
+                        {getTierInfo((session.user as any)?.tier || 'Bronze').icon} {(session.user as any)?.tier || 'Bronze'}
+                      </span>
+                    </div>
                   </div>
                 </div>
+                <button
+                  onClick={() => setShowProfileModal(true)}
+                  className="p-2 rounded-lg bg-teal-600/20 hover:bg-teal-600/40 text-teal-400 transition-colors"
+                  title="Edit Profile"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                  </svg>
+                </button>
               </div>
             </div>
 
@@ -3691,8 +3889,292 @@ export default function Dashboard() {
                 />
               </div>
             </div>
+
           </div>
         )}
+
+        {/* ACHIEVEMENTS TAB */}
+        {activeTab === 'achievements' && (() => {
+          // Calculate XP and level based on achievements
+          const xpPerAchievement = 100;
+          const totalXP = achievements.length * xpPerAchievement;
+          const levelThresholds = [0, 200, 500, 900, 1400, 2000]; // XP needed for each level
+          const currentLevel = levelThresholds.filter(t => totalXP >= t).length;
+          const nextLevelXP = levelThresholds[currentLevel] || levelThresholds[levelThresholds.length - 1];
+          const prevLevelXP = levelThresholds[currentLevel - 1] || 0;
+          const xpProgress = nextLevelXP > prevLevelXP ? ((totalXP - prevLevelXP) / (nextLevelXP - prevLevelXP)) * 100 : 100;
+
+          // Level rewards
+          const levelRewards = [
+            { level: 1, reward: '$5 Bonus', icon: '🎁', unlocked: currentLevel >= 1 },
+            { level: 2, reward: '$10 Bonus', icon: '💵', unlocked: currentLevel >= 2 },
+            { level: 3, reward: 'Free Challenge Reset', icon: '🔄', unlocked: currentLevel >= 3 },
+            { level: 4, reward: '$25 Bonus', icon: '💰', unlocked: currentLevel >= 4 },
+            { level: 5, reward: 'VIP Status', icon: '👑', unlocked: currentLevel >= 5 },
+            { level: 6, reward: '$50 Bonus + Badge', icon: '🏆', unlocked: currentLevel >= 6 },
+          ];
+
+          // All achievements with XP values
+          const allAchievements = [
+            { icon: '🎯', name: 'First Blood', desc: 'Place your first bet', xp: 50 },
+            { icon: '🔟', name: 'Getting Started', desc: 'Place 10 bets', xp: 75 },
+            { icon: '💯', name: 'Century Club', desc: 'Place 100 bets', xp: 150 },
+            { icon: '🔥', name: 'Hot Streak', desc: 'Win 5 bets in a row', xp: 100 },
+            { icon: '💥', name: 'On Fire', desc: 'Win 10 bets in a row', xp: 200 },
+            { icon: '🎰', name: 'High Roller', desc: 'Win a $100+ bet', xp: 125 },
+            { icon: '💰', name: 'Money Maker', desc: 'Earn $500 profit', xp: 150 },
+            { icon: '🤑', name: 'Big Winner', desc: 'Earn $1,000 profit', xp: 250 },
+            { icon: '🃏', name: 'Parlay Starter', desc: 'Win a 2-leg parlay', xp: 75 },
+            { icon: '🎲', name: 'Parlay Pro', desc: 'Win a 3-leg parlay', xp: 125 },
+            { icon: '🏆', name: 'Parlay Master', desc: 'Win a 4-leg parlay', xp: 200 },
+            { icon: '🥉', name: 'Bronze Badge', desc: 'Reach Bronze tier', xp: 50 },
+            { icon: '🥈', name: 'Silver Star', desc: 'Reach Silver tier', xp: 100 },
+            { icon: '🥇', name: 'Gold Glory', desc: 'Reach Gold tier', xp: 150 },
+            { icon: '👑', name: 'Platinum Crown', desc: 'Reach Platinum tier', xp: 200 },
+            { icon: '💎', name: 'Diamond Elite', desc: 'Reach Diamond tier', xp: 300 },
+            { icon: '⭐', name: 'Sharp Bettor', desc: '55%+ win rate (50+ bets)', xp: 125 },
+            { icon: '🌟', name: 'Elite Bettor', desc: '60%+ win rate (100+ bets)', xp: 200 },
+            { icon: '📈', name: 'Profit King', desc: '20%+ ROI', xp: 175 },
+            { icon: '🎮', name: 'Challenge Starter', desc: 'Complete first challenge level', xp: 100 },
+            { icon: '🏅', name: 'Challenge Champion', desc: 'Complete a full challenge', xp: 250 },
+          ];
+
+          return (
+          <div className="space-y-6">
+            {/* Level & XP Header */}
+            <div className="bg-gradient-to-r from-amber-900/30 to-yellow-800/20 border border-amber-700/30 rounded-2xl p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 bg-gradient-to-br from-amber-500 to-yellow-600 rounded-xl flex items-center justify-center shadow-lg shadow-amber-500/30">
+                    <span className="text-3xl font-bold text-black">{currentLevel}</span>
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold text-white">Level {currentLevel}</h2>
+                    <p className="text-amber-300/70">Achievement Hunter</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-2xl font-bold text-amber-400">{totalXP} XP</div>
+                  <div className="text-sm text-zinc-400">{achievements.length} Achievements</div>
+                </div>
+              </div>
+
+              {/* XP Progress Bar */}
+              <div className="mt-4">
+                <div className="flex justify-between text-sm mb-2">
+                  <span className="text-zinc-400">Level {currentLevel}</span>
+                  <span className="text-amber-400">{totalXP} / {nextLevelXP} XP</span>
+                  <span className="text-zinc-400">Level {currentLevel + 1}</span>
+                </div>
+                <div className="h-4 bg-zinc-800 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 transition-all duration-500 relative"
+                    style={{ width: `${Math.min(xpProgress, 100)}%` }}
+                  >
+                    <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
+                  </div>
+                </div>
+                <p className="text-xs text-zinc-500 mt-2 text-center">
+                  {nextLevelXP - totalXP > 0 ? `${nextLevelXP - totalXP} XP to next level` : 'Max level reached!'}
+                </p>
+              </div>
+            </div>
+
+            {/* Level Rewards with Progress Bar */}
+            <div className="bg-surface border border-zinc-800/50 rounded-2xl p-6">
+              <h3 className="font-semibold mb-6 flex items-center gap-2">
+                <span className="text-xl">🎁</span> Level Rewards
+              </h3>
+
+              {/* Level Progress Track */}
+              <div className="relative">
+                {/* Progress bar background */}
+                <div className="absolute top-8 left-0 right-0 h-2 bg-zinc-800 rounded-full mx-8 hidden md:block"></div>
+
+                {/* Progress bar fill */}
+                <div
+                  className="absolute top-8 left-0 h-2 bg-gradient-to-r from-amber-500 to-teal-400 rounded-full mx-8 hidden md:block transition-all duration-500"
+                  style={{ width: `calc(${Math.min((currentLevel / 6) * 100, 100)}% - 4rem)` }}
+                ></div>
+
+                {/* Level nodes */}
+                <div className="flex justify-between items-start relative z-10">
+                  {levelRewards.map((reward, index) => {
+                    const isCurrentLevel = currentLevel === reward.level;
+                    const isPastLevel = currentLevel > reward.level;
+                    const isFutureLevel = currentLevel < reward.level;
+
+                    // Calculate progress to this level
+                    const levelXP = levelThresholds[reward.level] || 2000;
+                    const prevLevelXP = levelThresholds[reward.level - 1] || 0;
+                    const progressToLevel = isFutureLevel && currentLevel === reward.level - 1
+                      ? Math.min(((totalXP - prevLevelXP) / (levelXP - prevLevelXP)) * 100, 100)
+                      : 0;
+
+                    return (
+                      <div key={reward.level} className="flex flex-col items-center" style={{ width: '16.666%' }}>
+                        {/* Level circle */}
+                        <div
+                          className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl transition-all ${
+                            isPastLevel
+                              ? 'bg-gradient-to-br from-teal-500 to-emerald-500 shadow-lg shadow-teal-500/30'
+                              : isCurrentLevel
+                              ? 'bg-gradient-to-br from-amber-500 to-yellow-500 shadow-lg shadow-amber-500/30 ring-4 ring-amber-400/30'
+                              : 'bg-zinc-800 border-2 border-zinc-700'
+                          }`}
+                        >
+                          {isPastLevel ? (
+                            <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                            </svg>
+                          ) : (
+                            <span className={isCurrentLevel ? '' : 'grayscale opacity-50'}>{reward.icon}</span>
+                          )}
+                        </div>
+
+                        {/* Level number */}
+                        <div className={`mt-2 text-sm font-bold ${
+                          isPastLevel ? 'text-teal-400' : isCurrentLevel ? 'text-amber-400' : 'text-zinc-500'
+                        }`}>
+                          Lvl {reward.level}
+                        </div>
+
+                        {/* XP required */}
+                        <div className="text-xs text-zinc-500 mt-0.5">
+                          {levelThresholds[reward.level] || 2000} XP
+                        </div>
+
+                        {/* Reward */}
+                        <div className={`mt-2 text-xs font-medium text-center px-2 py-1 rounded-lg ${
+                          isPastLevel
+                            ? 'bg-teal-500/20 text-teal-400'
+                            : isCurrentLevel
+                            ? 'bg-amber-500/20 text-amber-400'
+                            : 'bg-zinc-800 text-zinc-500'
+                        }`}>
+                          {reward.reward}
+                        </div>
+
+                        {/* Status badge */}
+                        {isPastLevel && (
+                          <div className="mt-2 px-2 py-0.5 bg-teal-500/20 text-teal-400 text-xs rounded-full">
+                            Claimed
+                          </div>
+                        )}
+                        {isCurrentLevel && (
+                          <div className="mt-2 px-2 py-0.5 bg-amber-500/20 text-amber-400 text-xs rounded-full animate-pulse">
+                            Current
+                          </div>
+                        )}
+                        {isFutureLevel && (
+                          <div className="mt-2 px-2 py-0.5 bg-zinc-700/50 text-zinc-500 text-xs rounded-full">
+                            Locked
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Mobile-friendly progress */}
+              <div className="mt-6 md:hidden">
+                <div className="flex justify-between text-xs text-zinc-500 mb-1">
+                  <span>Level {currentLevel}</span>
+                  <span>Level {Math.min(currentLevel + 1, 6)}</span>
+                </div>
+                <div className="h-3 bg-zinc-800 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-amber-500 to-teal-400 transition-all duration-500"
+                    style={{ width: `${xpProgress}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Achievements Grid */}
+            <div className="bg-surface border border-zinc-800/50 rounded-2xl p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="font-semibold text-lg">All Achievements</h3>
+                <span className="text-sm text-zinc-400">{achievements.length} / {allAchievements.length} unlocked</span>
+              </div>
+
+              {loadingAchievements ? (
+                <div className="flex justify-center py-12">
+                  <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-teal-400"></div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                  {/* Show unlocked achievements first */}
+                  {achievements.map((achievement) => {
+                    const achData = allAchievements.find(a => a.name === achievement.name);
+                    return (
+                    <div
+                      key={achievement.id}
+                      className="bg-gradient-to-br from-amber-900/30 to-yellow-800/20 border border-amber-600/40 rounded-xl p-4 text-center hover:scale-105 transition-transform cursor-default shadow-lg shadow-amber-900/10"
+                    >
+                      <div className="text-4xl mb-2">{achievement.icon}</div>
+                      <div className="text-sm font-semibold text-white mb-1">{achievement.name}</div>
+                      <div className="text-xs text-zinc-400 mb-2">{achievement.description}</div>
+                      <div className="flex items-center justify-center gap-2">
+                        <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-xs rounded-full">
+                          +{achData?.xp || 100} XP
+                        </span>
+                      </div>
+                    </div>
+                  )})}
+
+                  {/* Locked achievements */}
+                  {allAchievements.filter(locked => !achievements.some(a => a.name === locked.name)).map((achievement, i) => (
+                    <div
+                      key={`locked-${i}`}
+                      className="bg-zinc-800/30 border border-zinc-700/30 rounded-xl p-4 text-center opacity-50 hover:opacity-70 transition-opacity"
+                      title={achievement.desc}
+                    >
+                      <div className="text-4xl mb-2 grayscale">{achievement.icon}</div>
+                      <div className="text-sm font-medium text-zinc-400 mb-1">{achievement.name}</div>
+                      <div className="text-xs text-zinc-500 mb-2">{achievement.desc}</div>
+                      <div className="flex items-center justify-center gap-2">
+                        <span className="px-2 py-0.5 bg-zinc-700/50 text-zinc-500 text-xs rounded-full">
+                          +{achievement.xp} XP
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Stats Summary */}
+            <div className="bg-surface border border-zinc-800/50 rounded-2xl p-6">
+              <h3 className="font-semibold mb-4">Progress Summary</h3>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <div className="bg-zinc-800/50 rounded-xl p-4 text-center">
+                  <div className="text-2xl font-bold text-amber-400">{currentLevel}</div>
+                  <div className="text-xs text-zinc-500 mt-1">Current Level</div>
+                </div>
+                <div className="bg-zinc-800/50 rounded-xl p-4 text-center">
+                  <div className="text-2xl font-bold text-teal-400">{totalXP}</div>
+                  <div className="text-xs text-zinc-500 mt-1">Total XP</div>
+                </div>
+                <div className="bg-zinc-800/50 rounded-xl p-4 text-center">
+                  <div className="text-2xl font-bold text-purple-400">{achievements.length}</div>
+                  <div className="text-xs text-zinc-500 mt-1">Achievements</div>
+                </div>
+                <div className="bg-zinc-800/50 rounded-xl p-4 text-center">
+                  <div className="text-2xl font-bold text-emerald-400">{levelRewards.filter(r => r.unlocked).length}</div>
+                  <div className="text-xs text-zinc-500 mt-1">Rewards Claimed</div>
+                </div>
+                <div className="bg-zinc-800/50 rounded-xl p-4 text-center">
+                  <div className="text-2xl font-bold text-zinc-400">{Math.round((achievements.length / allAchievements.length) * 100)}%</div>
+                  <div className="text-xs text-zinc-500 mt-1">Completion</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          );
+        })()}
+
       </main>
 
       {/* Footer */}
@@ -4366,73 +4848,59 @@ export default function Dashboard() {
 
       {/* CHALLENGE PURCHASE MODAL */}
       {purchaseModalOpen && selectedChallenge && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setPurchaseModalOpen(false)}>
-          <div className="bg-gradient-to-b from-[#1a1a1a] to-[#111111] border border-zinc-800 rounded-2xl p-6 w-full max-w-md relative overflow-hidden" onClick={e => e.stopPropagation()}>
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(45,180,180,0.12),transparent_60%)]"></div>
-            <button onClick={() => setPurchaseModalOpen(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white transition-colors z-10">
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-3" onClick={() => setPurchaseModalOpen(false)}>
+          <div className="bg-gradient-to-b from-[#1a1a1a] to-[#111111] border border-zinc-800 rounded-xl p-4 w-full max-w-[360px] max-h-[85vh] overflow-y-auto relative" onClick={e => e.stopPropagation()}>
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(45,180,180,0.12),transparent_60%)] pointer-events-none rounded-xl"></div>
+            <button onClick={() => setPurchaseModalOpen(false)} className="absolute top-3 right-3 text-zinc-500 hover:text-white transition-colors z-10">
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
             <div className="relative">
-              <div className="text-center mb-4">
-                <span className="text-4xl mb-2 block">🎮</span>
-                <h2 className="text-2xl font-bold text-white">Start Your Challenge</h2>
-                <p className="text-zinc-400 text-sm mt-1">Complete 4 levels of winning streaks!</p>
+              {/* Header */}
+              <div className="text-center mb-3">
+                <span className="text-2xl block">🎮</span>
+                <h2 className="text-lg font-bold text-white">Start Challenge</h2>
+                <p className="text-zinc-400 text-xs">Build your winning streak</p>
               </div>
 
               {/* Difficulty Selector */}
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-zinc-300 mb-2 text-center">Choose Difficulty</label>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    onClick={() => setSelectedDifficulty('beginner')}
-                    className={`p-4 rounded-xl border transition-all ${
-                      selectedDifficulty === 'beginner'
-                        ? 'bg-teal-500/20 border-teal-500 shadow-lg shadow-teal-500/20'
-                        : 'bg-zinc-900/50 border-zinc-700/50 hover:border-teal-600/50'
-                    }`}
-                  >
-                    <div className="text-2xl mb-1">🎯</div>
-                    <div className={`font-bold mb-1 ${selectedDifficulty === 'beginner' ? 'text-teal-400' : 'text-white'}`}>Beginner</div>
-                    <div className="text-xs text-zinc-400 mb-2">Min odds 1.5x</div>
-                    <div className="text-xs text-zinc-500">3, 6, 10, 15 wins</div>
-                  </button>
-                  <button
-                    onClick={() => setSelectedDifficulty('pro')}
-                    className={`p-4 rounded-xl border transition-all ${
-                      selectedDifficulty === 'pro'
-                        ? 'bg-amber-500/20 border-amber-500 shadow-lg shadow-amber-500/20'
-                        : 'bg-zinc-900/50 border-zinc-700/50 hover:border-amber-600/50'
-                    }`}
-                  >
-                    <div className="text-2xl mb-1">⚡</div>
-                    <div className={`font-bold mb-1 ${selectedDifficulty === 'pro' ? 'text-amber-400' : 'text-white'}`}>Pro</div>
-                    <div className="text-xs text-zinc-400 mb-2">Min odds 2.0x</div>
-                    <div className="text-xs text-zinc-500">2, 4, 6, 9 wins</div>
-                  </button>
-                </div>
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                <button
+                  onClick={() => setSelectedDifficulty('beginner')}
+                  className={`p-2.5 rounded-lg border transition-all text-center ${
+                    selectedDifficulty === 'beginner'
+                      ? 'bg-teal-500/20 border-teal-500'
+                      : 'bg-zinc-900/50 border-zinc-700/50 hover:border-teal-600/50'
+                  }`}
+                >
+                  <div className="text-xl">🎯</div>
+                  <div className={`font-bold text-sm ${selectedDifficulty === 'beginner' ? 'text-teal-400' : 'text-white'}`}>Beginner</div>
+                  <div className="text-[10px] text-zinc-400">1.5x odds • 3-15 wins</div>
+                </button>
+                <button
+                  onClick={() => setSelectedDifficulty('pro')}
+                  className={`p-2.5 rounded-lg border transition-all text-center ${
+                    selectedDifficulty === 'pro'
+                      ? 'bg-amber-500/20 border-amber-500'
+                      : 'bg-zinc-900/50 border-zinc-700/50 hover:border-amber-600/50'
+                  }`}
+                >
+                  <div className="text-xl">⚡</div>
+                  <div className={`font-bold text-sm ${selectedDifficulty === 'pro' ? 'text-amber-400' : 'text-white'}`}>Pro</div>
+                  <div className="text-[10px] text-zinc-400">2.0x odds • 2-9 wins</div>
+                </button>
               </div>
 
-              <div className="bg-zinc-900/70 border border-zinc-700/50 rounded-xl p-4 mb-4">
-                <div className="text-center mb-3">
-                  <div className="text-3xl font-black text-white">€{selectedChallenge.size.toLocaleString()}</div>
-                  <div className="text-sm font-bold text-teal-400 tracking-widest uppercase">Streak Challenge</div>
+              {/* Challenge Info */}
+              <div className="bg-zinc-900/70 border border-zinc-700/50 rounded-lg p-3 mb-3">
+                <div className="text-center mb-2">
+                  <div className="text-2xl font-black text-white">€{selectedChallenge.size.toLocaleString()}</div>
+                  <div className="text-[10px] font-bold text-teal-400 tracking-widest uppercase">Streak Challenge</div>
                 </div>
-                {/* Level Breakdown */}
-                <div className="text-xs text-zinc-400 text-center mb-2 uppercase">Level Rewards</div>
-                <div className="grid grid-cols-4 gap-1 mb-3">
+                {/* Level Rewards */}
+                <div className="grid grid-cols-4 gap-1.5 mb-2">
                   {(selectedDifficulty === 'beginner'
-                    ? [
-                        { lvl: 1, wins: 3, color: 'from-amber-700 to-amber-600' },
-                        { lvl: 2, wins: 6, color: 'from-zinc-400 to-zinc-300' },
-                        { lvl: 3, wins: 10, color: 'from-yellow-500 to-yellow-400' },
-                        { lvl: 4, wins: 15, color: 'from-cyan-400 to-blue-400' },
-                      ]
-                    : [
-                        { lvl: 1, wins: 2, color: 'from-amber-700 to-amber-600' },
-                        { lvl: 2, wins: 4, color: 'from-zinc-400 to-zinc-300' },
-                        { lvl: 3, wins: 6, color: 'from-yellow-500 to-yellow-400' },
-                        { lvl: 4, wins: 9, color: 'from-cyan-400 to-blue-400' },
-                      ]
+                    ? [{ lvl: 1, wins: 3 }, { lvl: 2, wins: 6 }, { lvl: 3, wins: 10 }, { lvl: 4, wins: 15 }]
+                    : [{ lvl: 1, wins: 2 }, { lvl: 2, wins: 4 }, { lvl: 3, wins: 6 }, { lvl: 4, wins: 9 }]
                   ).map((l, i) => {
                     const rewards = selectedChallenge.size === 1000 ? [3, 100, 500, 1000] :
                                    selectedChallenge.size === 5000 ? [20, 350, 2000, 5000] :
@@ -4441,67 +4909,114 @@ export default function Dashboard() {
                                    selectedChallenge.size === 50000 ? [150, 2800, 20000, 50000] :
                                    [250, 5000, 50000, 100000];
                     return (
-                      <div key={l.lvl} className="bg-zinc-800/50 rounded-lg p-2 text-center">
-                        <div className={`text-[9px] font-bold bg-gradient-to-r ${l.color} bg-clip-text text-transparent`}>L{l.lvl}•{l.wins}W</div>
-                        <div className="text-white font-bold text-xs">€{rewards[i]}</div>
+                      <div key={l.lvl} className="bg-zinc-800/50 rounded p-1.5 text-center">
+                        <div className="text-[9px] text-zinc-500">Lvl {l.lvl}</div>
+                        <div className="text-white font-bold text-xs">€{rewards[i].toLocaleString()}</div>
+                        <div className="text-[9px] text-zinc-400">{l.wins} wins</div>
                       </div>
                     );
                   })}
                 </div>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between items-center py-1.5 border-b border-zinc-800"><span className="text-zinc-400">💰 Max Payout</span><span className="text-teal-400 font-semibold">€{selectedChallenge.profit.toLocaleString()}</span></div>
-                  <div className="flex justify-between items-center py-1.5 border-b border-zinc-800"><span className="text-zinc-400">⏱️ Time Limit</span><span className="text-white font-semibold">30 days</span></div>
-                  <div className="flex justify-between items-center py-1.5"><span className="text-zinc-400">🔄 Reset Fee</span><span className="text-zinc-300">€{selectedChallenge.resetFee}</span></div>
+                {/* Stats */}
+                <div className="grid grid-cols-3 gap-1 pt-2 border-t border-zinc-800 text-center">
+                  <div>
+                    <div className="text-[10px] text-zinc-500">Max Payout</div>
+                    <div className="text-teal-400 font-semibold text-sm">€{selectedChallenge.profit.toLocaleString()}</div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-zinc-500">Duration</div>
+                    <div className="text-white font-semibold text-sm">30 days</div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-zinc-500">Reset Fee</div>
+                    <div className="text-white font-semibold text-sm">${selectedChallenge.resetFee}</div>
+                  </div>
                 </div>
               </div>
-              <div className="bg-teal-500/10 border border-teal-500/30 rounded-xl p-3 mb-4">
-                <div className="flex justify-between items-center"><span className="text-zinc-300 font-medium">Total</span><span className="text-2xl font-black text-teal-400">€{selectedChallenge.cost.toFixed(2)}</span></div>
+
+              {/* Payment Section */}
+              <div className="bg-zinc-900/50 border border-zinc-700/50 rounded-lg p-3 mb-3">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-zinc-400 text-sm">Total</span>
+                  <span className="text-xl font-black text-teal-400">${selectedChallenge.cost}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => setPaymentMethod('card')}
+                    className={`p-2.5 rounded-lg border transition-all flex items-center justify-center gap-2 ${
+                      paymentMethod === 'card'
+                        ? 'bg-blue-500/20 border-blue-500 text-blue-400'
+                        : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-400 hover:border-blue-600/50'
+                    }`}
+                  >
+                    <span>💳</span>
+                    <span className="font-medium text-sm">Card</span>
+                  </button>
+                  <button
+                    onClick={() => setPaymentMethod('crypto')}
+                    className={`p-2.5 rounded-lg border transition-all flex items-center justify-center gap-2 ${
+                      paymentMethod === 'crypto'
+                        ? 'bg-orange-500/20 border-orange-500 text-orange-400'
+                        : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-400 hover:border-orange-600/50'
+                    }`}
+                  >
+                    <span>₿</span>
+                    <span className="font-medium text-sm">Crypto</span>
+                  </button>
+                </div>
               </div>
-              <label className="flex items-start gap-3 mb-4 cursor-pointer group">
-                <input type="checkbox" className="mt-1 w-4 h-4 rounded border-zinc-600 bg-zinc-800 text-teal-500 focus:ring-teal-500 focus:ring-offset-0" />
-                <span className="text-xs text-zinc-400 group-hover:text-zinc-300 transition-colors">I understand I must complete consecutive win streaks to earn rewards. Losses reset my current streak but not my earned rewards.</span>
+
+              {/* Terms checkbox */}
+              <label className="flex items-start gap-2 mb-3 cursor-pointer">
+                <input type="checkbox" className="mt-0.5 w-3.5 h-3.5 rounded border-zinc-600 bg-zinc-800 text-teal-500 focus:ring-teal-500 focus:ring-offset-0" />
+                <span className="text-[11px] text-zinc-500 leading-snug">I understand that losing a bet resets my streak, but earned rewards are kept.</span>
               </label>
+
+              {/* Error/Status Messages */}
               {challengeError && (
-                <div className="mb-4 p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400 text-sm">
+                <div className="mb-2 p-2 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400 text-xs">
                   {challengeError}
                 </div>
               )}
               {!canCreateMoreChallenges && (
-                <div className="mb-4 p-3 bg-yellow-500/20 border border-yellow-500/50 rounded-lg text-yellow-400 text-sm">
-                  You have reached the maximum of {maxChallenges} active challenges. Complete or let one expire to start a new one.
+                <div className="mb-2 p-2 bg-yellow-500/20 border border-yellow-500/50 rounded-lg text-yellow-400 text-xs">
+                  Max {maxChallenges} active challenges reached.
                 </div>
               )}
               {activeChallenges.length > 0 && canCreateMoreChallenges && (
-                <div className="mb-4 p-3 bg-teal-500/20 border border-teal-500/50 rounded-lg text-teal-400 text-sm">
-                  You have {challengeCount}/{maxChallenges} active challenges. You can add {maxChallenges - challengeCount} more.
+                <div className="mb-2 p-2 bg-teal-500/20 border border-teal-500/50 rounded-lg text-teal-400 text-xs">
+                  {challengeCount}/{maxChallenges} active • {maxChallenges - challengeCount} slots left
                 </div>
               )}
+
+              {/* Purchase Button */}
               <button
-                className={`w-full py-4 rounded-xl font-bold text-lg transition-all ${
+                className={`w-full py-3 rounded-lg font-bold transition-all ${
                   purchasingChallenge || !canCreateMoreChallenges
                     ? 'bg-zinc-700 text-zinc-400 cursor-not-allowed'
-                    : 'bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-teal-400 text-white shadow-lg shadow-teal-500/25 hover:shadow-teal-500/40 hover:scale-[1.02] active:scale-[0.98]'
+                    : 'bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-teal-400 text-white shadow-lg shadow-teal-500/25'
                 }`}
-                onClick={purchaseChallenge}
+                onClick={handlePurchase}
                 disabled={purchasingChallenge || !canCreateMoreChallenges}
               >
                 {purchasingChallenge ? (
                   <span className="flex items-center justify-center gap-2">
-                    <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                     </svg>
-                    Starting Challenge...
+                    Processing...
                   </span>
                 ) : !canCreateMoreChallenges ? (
                   'Max Challenges Reached'
+                ) : paymentMethod === 'crypto' ? (
+                  `₿ Pay with Crypto - $${selectedChallenge.cost}`
                 ) : (
-                  `💳 Start Challenge - $${selectedChallenge.cost}`
+                  `💳 Pay with Card - $${selectedChallenge.cost}`
                 )}
               </button>
-              <p className="text-center text-xs text-zinc-500 mt-3 flex items-center justify-center gap-2">
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
-                Secure checkout powered by Stripe
+              <p className="text-center text-[10px] text-zinc-500 mt-2">
+                Secure checkout via {paymentMethod === 'crypto' ? 'Confirmo' : 'Stripe'}
               </p>
             </div>
           </div>
@@ -4605,6 +5120,15 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      {/* Profile Edit Modal */}
+      <ProfileEditModal
+        isOpen={showProfileModal}
+        onClose={() => setShowProfileModal(false)}
+        currentUsername={(session?.user as any)?.username || null}
+        currentAvatar={(session?.user as any)?.avatar || '🎲'}
+        onSave={handleProfileSave}
+      />
     </div>
   );
 }

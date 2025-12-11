@@ -57,6 +57,42 @@ model VerificationToken {
 }
 
 // ==========================================
+// USER SESSIONS (Active Sessions Tracking)
+// ==========================================
+
+model UserSession {
+  id           String   @id @default(cuid())
+  userId       String
+
+  // Session info
+  sessionToken String   @unique
+
+  // Device/Browser info
+  userAgent    String?
+  browser      String?
+  os           String?
+  device       String?  // desktop, mobile, tablet
+
+  // Location
+  ipAddress    String?
+  city         String?
+  country      String?
+
+  // Activity
+  lastActivity DateTime @default(now())
+  createdAt    DateTime @default(now())
+
+  // Current session flag (set via JWT or cookie check)
+  isCurrent    Boolean  @default(false)
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([sessionToken])
+  @@index([lastActivity])
+}
+
+// ==========================================
 // USER PROFILE
 // ==========================================
 
@@ -78,6 +114,11 @@ model User {
   roleUpdatedAt DateTime?
   roleUpdatedBy String?
 
+  // Two-Factor Authentication
+  twoFactorEnabled  Boolean   @default(false)
+  twoFactorSecret   String?   // Encrypted TOTP secret
+  twoFactorBackupCodes String? // Encrypted backup codes JSON
+
   // Subscription
   stripeCustomerId       String?   @unique
   stripeSubscriptionId   String?
@@ -89,6 +130,7 @@ model User {
 
   accounts      Account[]
   sessions      Session[]
+  userSessions  UserSession[]
   bets          Bet[]
   parlays       Parlay[]
   bankrollHistory BankrollHistory[]
@@ -96,6 +138,7 @@ model User {
   pushSubscription PushSubscription?
   challenges    Challenge[]
   adminLogs     AdminLog[]  @relation("AdminActions")
+  pendingPayments PendingPayment[]
 }
 
 // ==========================================
@@ -350,6 +393,8 @@ model Challenge {
 
   // Challenge tier info
   tier          Int      // 1000, 5000, 10000, 25000, 50000, 100000
+  difficulty    String   @default("beginner") // beginner, pro
+  minOdds       Float    @default(1.5) // 1.5 for beginner, 2.0 for pro
   cost          Float    // Purchase price paid
   resetFee      Float    // 50% reset fee
 
@@ -476,4 +521,36 @@ model AdminLog {
   @@index([adminId, createdAt])
   @@index([action, createdAt])
   @@index([targetType, targetId])
+}
+
+// ==========================================
+// PENDING PAYMENTS (Crypto/Stripe tracking)
+// ==========================================
+
+model PendingPayment {
+  id          String   @id @default(cuid())
+  userId      String
+
+  // Payment details
+  tier        Int
+  difficulty  String   @default("beginner")
+  amount      Float
+  currency    String   @default("USD")
+
+  // Provider info
+  provider    String   // 'stripe' or 'confirmo'
+  externalId  String?  // Stripe session ID or Confirmo invoice ID
+
+  // Status
+  status      String   @default("pending") // pending, paid, expired, failed
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  paidAt      DateTime?
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([externalId])
+  @@index([status])
 }
