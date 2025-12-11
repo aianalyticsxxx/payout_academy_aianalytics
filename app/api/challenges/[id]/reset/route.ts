@@ -32,7 +32,7 @@ export async function POST(
 
     return NextResponse.json({
       challenge,
-      message: `${tier?.label || '$' + challenge.tier / 1000 + 'K'} Challenge reset successfully! You have 30 more days.`,
+      message: `${tier?.label || '$' + challenge.tier / 1000 + 'K'} Challenge reset successfully! You have 45 more days.`,
     });
   } catch (error) {
     console.error('Reset challenge error:', error);

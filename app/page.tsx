@@ -1390,8 +1390,8 @@ export default function Dashboard() {
                 { q: "How do the 4 levels work?", a: "Requirements depend on difficulty: Beginner (3, 6, 10, 15 wins with min odds 1.5) or Pro (2, 4, 6, 9 wins with min odds 2.0). You earn rewards at each level!" },
                 { q: "What happens if I lose during a level?", a: "If you lose while attempting a level, your streak resets to zero but you keep any rewards already earned from completed levels. You can continue attempting the current level." },
                 { q: "Do I need to complete all 4 levels?", a: "No! You can cash out your earned rewards at any time. However, completing all 4 levels unlocks the maximum payout for your account size." },
-                { q: "How long do I have to complete all levels?", a: "You have 30 days from your purchase date to complete as many levels as you can. Any rewards earned during this time are yours to keep." },
-                { q: "Can I reset my challenge?", a: "Yes! If your 30 days expire, you can reset at 50% of the original cost. This gives you a fresh 30 days to continue earning rewards." },
+                { q: "How long do I have to complete all levels?", a: "You have 45 days from your purchase date to complete as many levels as you can. Any rewards earned during this time are yours to keep." },
+                { q: "Can I reset my challenge?", a: "Yes! If your 45 days expire, you can reset at 50% of the original cost. This gives you a fresh 45 days to continue earning rewards." },
               ];
 
               return (
@@ -1588,7 +1588,7 @@ export default function Dashboard() {
                         </div>
                         <div className="flex items-center gap-2 bg-teal-500/10 px-4 py-2 rounded-lg border border-teal-500/30">
                           <span className="text-teal-400">✓</span>
-                          <span className="text-zinc-300 text-sm">30 Day Access</span>
+                          <span className="text-zinc-300 text-sm">45 Day Access</span>
                         </div>
                       </div>
                     </div>
@@ -1641,7 +1641,7 @@ export default function Dashboard() {
 
                         {/* Meta Info */}
                         <div className="flex items-center justify-between text-xs text-zinc-500 mb-4">
-                          <span>⏱️ 30 days</span>
+                          <span>⏱️ 45 days</span>
                           <span>🔄 Reset: €{tier.resetFee}</span>
                         </div>
 
@@ -1742,7 +1742,7 @@ export default function Dashboard() {
                       </li>
                       <li className="flex items-start gap-2">
                         <span className="text-teal-400 mt-0.5">•</span>
-                        <span>You have 30 days to complete as many levels as possible</span>
+                        <span>You have 45 days to complete as many levels as possible</span>
                       </li>
                       <li className="flex items-start gap-2">
                         <span className="text-teal-400 mt-0.5">•</span>
@@ -1750,7 +1750,7 @@ export default function Dashboard() {
                       </li>
                       <li className="flex items-start gap-2">
                         <span className="text-teal-400 mt-0.5">•</span>
-                        <span>Reset option available at 50% of original cost when your 30 days expire</span>
+                        <span>Reset option available at 50% of original cost when your 45 days expire</span>
                       </li>
                     </ul>
                   </div>
@@ -2565,8 +2565,7 @@ export default function Dashboard() {
                               <th className="px-5 py-3 text-center text-xs text-zinc-500 uppercase tracking-wider">Record</th>
                               <th className="px-5 py-3 text-center text-xs text-zinc-500 uppercase tracking-wider">Win %</th>
                               <th className="px-5 py-3 text-center text-xs text-zinc-500 uppercase tracking-wider">Streak</th>
-                              <th className="px-5 py-3 text-center text-xs text-zinc-500 uppercase tracking-wider">Units</th>
-                              <th className="px-5 py-3 text-right text-xs text-zinc-500 uppercase tracking-wider">ROI</th>
+                              <th className="px-5 py-3 text-right text-xs text-zinc-500 uppercase tracking-wider">Best</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-zinc-800/30">
@@ -2603,18 +2602,9 @@ export default function Dashboard() {
                                       {agent.currentStreak > 0 ? `🔥${agent.currentStreak}` : agent.currentStreak < 0 ? `❄️${Math.abs(agent.currentStreak)}` : '—'}
                                     </span>
                                   </td>
-                                  <td className="px-5 py-4 text-center">
-                                    <span className={`font-medium ${agent.units >= 0 ? 'text-teal-400' : 'text-red-400'}`}>
-                                      {agent.units >= 0 ? '+' : ''}{agent.units?.toFixed(1) || '0.0'}u
-                                    </span>
-                                  </td>
                                   <td className="px-5 py-4 text-right">
-                                    <span className={`px-2 py-1 rounded text-sm font-medium ${
-                                      agent.roi >= 10 ? 'bg-teal-900/40 text-teal-400' :
-                                      agent.roi >= 0 ? 'bg-zinc-800 text-zinc-300' :
-                                      'bg-red-900/30 text-red-400'
-                                    }`}>
-                                      {agent.roi >= 0 ? '+' : ''}{agent.roi?.toFixed(1) || '0.0'}%
+                                    <span className="text-amber-400 font-medium">
+                                      🔥 {agent.bestStreak || 0}
                                     </span>
                                   </td>
                                 </tr>
@@ -2681,7 +2671,7 @@ export default function Dashboard() {
                       </h4>
                       <ul className="text-sm text-zinc-500 leading-relaxed space-y-2">
                         <li>• Each AI model votes on every analyzed match with BET or PASS recommendation</li>
-                        <li>• A &quot;win&quot; is counted when the AI&apos;s recommendation would have been profitable</li>
+                        <li>• A &quot;win&quot; is counted when the AI&apos;s recommendation correctly predicts the outcome</li>
                         <li>• BET recommendations that hit = Win | BET recommendations that miss = Loss</li>
                         <li>• PASS on losing bets = Win (saved money) | PASS on winning bets = Loss (missed opportunity)</li>
                         <li>• Rankings are based on win rate with settled predictions only</li>
@@ -2705,10 +2695,8 @@ export default function Dashboard() {
         {/* BETS TAB - Main Dashboard */}
         {activeTab === 'bets' && (
           <div className="space-y-6">
-            {/* Top Row: Challenge Accounts */}
-            <div className="grid gap-6 lg:grid-cols-3">
-              {/* Account Selection - Dashboard Tab (Only Purchased Challenges) - Takes 2 columns */}
-              <div className="lg:col-span-2">
+            {/* Challenge Accounts - Full Width */}
+            <div>
               {(() => {
                 // Get reward data for a tier
                 const getTierRewards = (tier: number): number[] => {
@@ -2768,8 +2756,17 @@ export default function Dashboard() {
                           </p>
                         </div>
                         <div className="text-right">
-                          <div className="text-xs text-zinc-400">Max Reward</div>
-                          <div className="text-xl font-bold text-teal-400">€{rewards[3]?.toLocaleString()}</div>
+                          <div className="flex items-center gap-4">
+                            <div>
+                              <div className="text-[10px] text-zinc-500 uppercase">Total Potential</div>
+                              <div className="text-lg font-bold text-teal-400">€{rewards.reduce((a: number, b: number) => a + b, 0)?.toLocaleString()}</div>
+                            </div>
+                            <div className="w-px h-8 bg-zinc-700"></div>
+                            <div>
+                              <div className="text-[10px] text-zinc-500 uppercase">Reset Fee</div>
+                              <div className="text-lg font-bold text-zinc-400">€{selectedChallenge?.resetFee || 0}</div>
+                            </div>
+                          </div>
                         </div>
                       </div>
 
@@ -2846,7 +2843,7 @@ export default function Dashboard() {
                                 strokeWidth="8"
                                 fill="none"
                                 strokeLinecap="round"
-                                strokeDasharray={`${((selectedChallenge?.currentStreak || 0) / 20) * 264} 264`}
+                                strokeDasharray={`${Math.min(264, ((selectedChallenge?.currentStreak || 0) / (selectedChallenge?.difficulty === 'pro' ? 9 : 15)) * 264)} 264`}
                               />
                               <defs>
                                 <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="0%">
@@ -2859,26 +2856,58 @@ export default function Dashboard() {
                               <span className={`text-2xl font-bold ${selectedChallenge?.difficulty === 'pro' ? 'text-amber-400' : 'text-teal-400'}`}>
                                 {selectedChallenge?.currentStreak || 0}
                               </span>
-                              <span className="text-[10px] text-zinc-500">/ 20 wins</span>
+                              <span className="text-[10px] text-zinc-500">/ {selectedChallenge?.difficulty === 'pro' ? 9 : 15} wins</span>
                             </div>
                           </div>
 
                           {/* Stats Grid */}
-                          <div className="flex-1 grid grid-cols-3 gap-3">
+                          <div className="flex-1 grid grid-cols-2 gap-2">
                             <div className="bg-zinc-900/50 rounded-lg p-2.5 text-center">
                               <div className="text-[10px] text-zinc-500 uppercase tracking-wide mb-0.5">Level</div>
                               <div className="text-lg font-bold text-white">{selectedChallenge?.currentLevel || 1}<span className="text-zinc-500 text-sm">/4</span></div>
                             </div>
                             <div className="bg-zinc-900/50 rounded-lg p-2.5 text-center">
                               <div className="text-[10px] text-zinc-500 uppercase tracking-wide mb-0.5">Days Left</div>
-                              <div className={`text-lg font-bold ${(selectedChallenge?.daysRemaining ?? 30) <= 7 ? 'text-red-400' : (selectedChallenge?.daysRemaining ?? 30) <= 14 ? 'text-amber-400' : 'text-emerald-400'}`}>
-                                {selectedChallenge?.daysRemaining ?? 30}
+                              <div className={`text-lg font-bold ${(selectedChallenge?.daysRemaining ?? 45) <= 7 ? 'text-red-400' : (selectedChallenge?.daysRemaining ?? 45) <= 14 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                                {selectedChallenge?.daysRemaining ?? 45}
                               </div>
                             </div>
                             <div className="bg-zinc-900/50 rounded-lg p-2.5 text-center">
                               <div className="text-[10px] text-zinc-500 uppercase tracking-wide mb-0.5">Earned</div>
                               <div className="text-lg font-bold text-emerald-400">€{(selectedChallenge?.totalRewardsEarned || 0).toLocaleString()}</div>
                             </div>
+                            <div className="bg-zinc-900/50 rounded-lg p-2.5 text-center">
+                              <div className="text-[10px] text-zinc-500 uppercase tracking-wide mb-0.5">Next Target</div>
+                              <div className="text-lg font-bold text-white">
+                                {(() => {
+                                  const streak = selectedChallenge?.currentStreak || 0;
+                                  const levelReqs = selectedChallenge?.difficulty === 'pro'
+                                    ? [2, 4, 6, 9]
+                                    : [3, 6, 10, 15];
+                                  const nextTarget = levelReqs.find(r => r > streak);
+                                  return nextTarget ? `${nextTarget}W` : '✓';
+                                })()}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Challenge Info Row */}
+                        <div className="flex items-center justify-between mt-3 pt-3 border-t border-zinc-800/50">
+                          <div className="flex items-center gap-4 text-xs text-zinc-500">
+                            <span>
+                              📅 Started: {selectedChallenge?.purchasedAt
+                                ? new Date(selectedChallenge.purchasedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                                : 'N/A'}
+                            </span>
+                            <span>
+                              ⏰ Expires: {selectedChallenge?.expiresAt
+                                ? new Date(selectedChallenge.expiresAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                                : 'N/A'}
+                            </span>
+                          </div>
+                          <div className="text-xs text-zinc-600 font-mono">
+                            #{selectedChallenge?.id?.slice(-6).toUpperCase() || '------'}
                           </div>
                         </div>
                       </div>
@@ -2957,55 +2986,111 @@ export default function Dashboard() {
                   </div>
                 );
               })()}
-              </div>
+            </div>
 
-              {/* Streak History / Recent Results */}
-              <div className={`bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-6 ${activeChallenges.length === 0 ? 'opacity-40 blur-[2px] pointer-events-none select-none' : ''}`}>
-                <div className="flex items-center justify-between mb-4">
-                  <span className="text-zinc-300 font-medium">Recent Results</span>
-                  <span className="text-xs text-zinc-500">Last 20 bets</span>
-                </div>
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {(() => {
-                    const recentBets = bets
-                      .filter(b => b.result !== 'pending')
-                      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-                      .slice(0, 20);
-                    if (recentBets.length === 0) {
-                      return <div className="text-zinc-500 text-sm">No settled bets yet</div>;
+            {/* Recent Results - Full Width Below */}
+            <div className={`bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-5 ${activeChallenges.length === 0 ? 'opacity-40 blur-[2px] pointer-events-none select-none' : ''}`}>
+                {(() => {
+                  const recentBets = bets
+                    .filter(b => b.result !== 'pending')
+                    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                    .slice(0, 10);
+
+                  // Calculate current streak
+                  let currentStreak = 0;
+                  let streakType: 'win' | 'loss' | null = null;
+                  for (const bet of recentBets) {
+                    if (bet.result === 'won') {
+                      if (streakType === 'loss') break;
+                      streakType = 'win';
+                      currentStreak++;
+                    } else if (bet.result === 'lost') {
+                      if (streakType === 'win') break;
+                      streakType = 'loss';
+                      currentStreak++;
                     }
-                    return recentBets.map((bet, i) => (
-                      <div
-                        key={i}
-                        className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold ${
-                          bet.result === 'won'
-                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                            : bet.result === 'lost'
-                            ? 'bg-red-500/20 text-red-400 border border-red-500/30'
-                            : 'bg-zinc-500/20 text-zinc-400 border border-zinc-500/30'
-                        }`}
-                        title={`${bet.matchup} - ${bet.result}`}
-                      >
-                        {bet.result === 'won' ? 'W' : bet.result === 'lost' ? 'L' : 'P'}
+                  }
+
+                  const wins = recentBets.filter(b => b.result === 'won').length;
+                  const losses = recentBets.filter(b => b.result === 'lost').length;
+
+                  if (recentBets.length === 0) {
+                    return (
+                      <div className="text-center py-6">
+                        <div className="text-3xl mb-3">🎯</div>
+                        <h3 className="text-white font-medium mb-1">No Bets Yet</h3>
+                        <p className="text-zinc-500 text-sm mb-4">Place your first bet to start tracking results</p>
+                        <button
+                          onClick={() => setActiveTab('ai')}
+                          className="px-4 py-2 bg-teal-500/20 text-teal-400 text-sm font-medium rounded-lg border border-teal-500/30 hover:bg-teal-500/30 transition-all"
+                        >
+                          View AI Picks
+                        </button>
                       </div>
-                    ));
-                  })()}
-                </div>
-                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-zinc-800">
-                  <div>
-                    <div className="text-xs text-zinc-500 mb-1">Win Rate</div>
-                    <div className={`font-semibold ${(userStats?.winRate || 0) >= 55 ? 'text-emerald-400' : (userStats?.winRate || 0) >= 50 ? 'text-amber-400' : 'text-red-400'}`}>
-                      {(userStats?.winRate || 0).toFixed(1)}%
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-zinc-500 mb-1">Profit/Loss</div>
-                    <div className={`font-semibold ${(userStats?.totalProfit || 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                      {(userStats?.totalProfit || 0) >= 0 ? '+' : ''}${(userStats?.totalProfit || 0).toFixed(2)}
-                    </div>
-                  </div>
-                </div>
-              </div>
+                    );
+                  }
+
+                  return (
+                    <>
+                      {/* Header with Streak */}
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <span className="text-zinc-300 font-medium">Recent Results</span>
+                          <div className="text-xs text-zinc-500 mt-0.5">{wins}W - {losses}L last 10</div>
+                        </div>
+                        {currentStreak > 0 && (
+                          <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg ${
+                            streakType === 'win'
+                              ? 'bg-emerald-500/20 border border-emerald-500/30'
+                              : 'bg-red-500/20 border border-red-500/30'
+                          }`}>
+                            <span className={`text-lg ${streakType === 'win' ? 'text-emerald-400' : 'text-red-400'}`}>
+                              {streakType === 'win' ? '🔥' : '❄️'}
+                            </span>
+                            <span className={`text-sm font-bold ${streakType === 'win' ? 'text-emerald-400' : 'text-red-400'}`}>
+                              {currentStreak} {streakType === 'win' ? 'Win' : 'Loss'} Streak
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Results Grid */}
+                      <div className="flex flex-wrap gap-1.5 mb-4">
+                        {recentBets.map((bet, i) => (
+                          <div
+                            key={i}
+                            className={`w-7 h-7 rounded-md flex items-center justify-center text-xs font-bold transition-all hover:scale-110 cursor-default ${
+                              bet.result === 'won'
+                                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                                : bet.result === 'lost'
+                                ? 'bg-red-500/20 text-red-400 border border-red-500/40'
+                                : 'bg-zinc-500/20 text-zinc-400 border border-zinc-500/40'
+                            }`}
+                            title={`${bet.matchup} - ${bet.result}`}
+                          >
+                            {bet.result === 'won' ? 'W' : bet.result === 'lost' ? 'L' : 'P'}
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Stats Row */}
+                      <div className="grid grid-cols-2 gap-3 pt-3 border-t border-zinc-800/50">
+                        <div className="bg-zinc-900/50 rounded-lg p-2.5 text-center">
+                          <div className="text-[10px] text-zinc-500 uppercase tracking-wide mb-0.5">Win Rate</div>
+                          <div className={`text-lg font-bold ${(userStats?.winRate || 0) >= 55 ? 'text-emerald-400' : (userStats?.winRate || 0) >= 50 ? 'text-amber-400' : 'text-red-400'}`}>
+                            {(userStats?.winRate || 0).toFixed(1)}%
+                          </div>
+                        </div>
+                        <div className="bg-zinc-900/50 rounded-lg p-2.5 text-center">
+                          <div className="text-[10px] text-zinc-500 uppercase tracking-wide mb-0.5">Record</div>
+                          <div className="text-lg font-bold text-white">
+                            {userStats?.wins || 0}W - {userStats?.losses || 0}L
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
             </div>
 
             {/* Middle Row: Challenge Info + Trading Objectives + Calendar */}
@@ -3266,17 +3351,17 @@ export default function Dashboard() {
                           <div className="flex gap-2">
                             <button
                               onClick={() => settleBet(bet.id, 'won')}
-                              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-1"
+                              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
                             >
+                              <span>✓</span>
                               <span>Won</span>
-                              <span className="text-emerald-200">+${((bet.stake * parseFloat(bet.odds)) - bet.stake).toFixed(2)}</span>
                             </button>
                             <button
                               onClick={() => settleBet(bet.id, 'lost')}
-                              className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-1"
+                              className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
                             >
+                              <span>✗</span>
                               <span>Lost</span>
-                              <span className="text-red-200">-${bet.stake.toFixed(2)}</span>
                             </button>
                           </div>
                         </div>
@@ -3308,9 +3393,6 @@ export default function Dashboard() {
                   <div className="space-y-3">
                     {bets.filter(b => b.result !== 'pending').map(bet => {
                       const isWon = bet.result === 'won';
-                      const profit = isWon
-                        ? (bet.stake * parseFloat(bet.odds)) - bet.stake
-                        : -bet.stake;
 
                       return (
                         <div
@@ -3336,17 +3418,14 @@ export default function Dashboard() {
                             <div>
                               <div className="font-medium text-white">{bet.matchup}</div>
                               <div className="text-sm text-zinc-400">
-                                {bet.selection} @ {bet.odds} &middot; ${bet.stake} stake
+                                {bet.selection} @ {bet.odds}
                               </div>
                             </div>
                           </div>
-                          <div className="text-right">
-                            <div className={`text-lg font-bold font-mono ${isWon ? 'text-emerald-400' : 'text-red-400'}`}>
-                              {profit >= 0 ? '+' : ''}{profit.toFixed(2)}
-                            </div>
-                            <div className={`text-xs font-semibold uppercase ${isWon ? 'text-emerald-500' : 'text-red-500'}`}>
-                              {bet.result}
-                            </div>
+                          <div className={`px-4 py-2 rounded-lg font-bold uppercase text-sm ${
+                            isWon ? 'bg-emerald-900/30 text-emerald-400' : 'bg-red-900/30 text-red-400'
+                          }`}>
+                            {isWon ? 'Won' : 'Lost'}
                           </div>
                         </div>
                       );
@@ -3710,8 +3789,7 @@ export default function Dashboard() {
                       <th className="px-4 py-3 text-left text-zinc-300">Player</th>
                       <th className="px-4 py-3 text-right text-zinc-300">Record</th>
                       <th className="px-4 py-3 text-right text-zinc-300">Win %</th>
-                      <th className="px-4 py-3 text-right text-zinc-300">ROI</th>
-                      <th className="px-4 py-3 text-right text-zinc-300">Profit</th>
+                      <th className="px-4 py-3 text-right text-zinc-300">Best Streak</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -3741,15 +3819,8 @@ export default function Dashboard() {
                         }`}>
                           {player.winRate?.toFixed(1)}%
                         </td>
-                        <td className={`px-4 py-3 text-right ${
-                          player.roi >= 0 ? 'text-teal-400' : 'text-red-400'
-                        }`}>
-                          {player.roi >= 0 ? '+' : ''}{player.roi?.toFixed(1)}%
-                        </td>
-                        <td className={`px-4 py-3 text-right ${
-                          player.totalProfit >= 0 ? 'text-teal-400' : 'text-red-400'
-                        }`}>
-                          ${Math.abs(player.totalProfit)?.toFixed(0)}
+                        <td className="px-4 py-3 text-right text-amber-400 font-medium">
+                          🔥 {player.bestStreak || 0}
                         </td>
                       </tr>
                     ))}
@@ -3824,8 +3895,8 @@ export default function Dashboard() {
             { icon: '🔥', name: 'Hot Streak', desc: 'Win 5 bets in a row', xp: 100 },
             { icon: '💥', name: 'On Fire', desc: 'Win 10 bets in a row', xp: 200 },
             { icon: '🎰', name: 'High Roller', desc: 'Win a $100+ bet', xp: 125 },
-            { icon: '💰', name: 'Money Maker', desc: 'Earn $500 profit', xp: 150 },
-            { icon: '🤑', name: 'Big Winner', desc: 'Earn $1,000 profit', xp: 250 },
+            { icon: '💰', name: 'Money Maker', desc: '15 win streak', xp: 150 },
+            { icon: '🤑', name: 'Big Winner', desc: '20 win streak', xp: 250 },
             { icon: '🃏', name: 'Parlay Starter', desc: 'Win a 2-leg parlay', xp: 75 },
             { icon: '🎲', name: 'Parlay Pro', desc: 'Win a 3-leg parlay', xp: 125 },
             { icon: '🏆', name: 'Parlay Master', desc: 'Win a 4-leg parlay', xp: 200 },
@@ -3836,7 +3907,7 @@ export default function Dashboard() {
             { icon: '💎', name: 'Diamond Elite', desc: 'Reach Diamond tier', xp: 300 },
             { icon: '⭐', name: 'Sharp Bettor', desc: '55%+ win rate (50+ bets)', xp: 125 },
             { icon: '🌟', name: 'Elite Bettor', desc: '60%+ win rate (100+ bets)', xp: 200 },
-            { icon: '📈', name: 'Profit King', desc: '20%+ ROI', xp: 175 },
+            { icon: '📈', name: 'Streak King', desc: '25 win streak', xp: 175 },
             { icon: '🎮', name: 'Challenge Starter', desc: 'Complete first challenge level', xp: 100 },
             { icon: '🏅', name: 'Challenge Champion', desc: 'Complete a full challenge', xp: 250 },
           ];
@@ -4236,7 +4307,6 @@ export default function Dashboard() {
                     ? topSelection[1].odds.reduce((a, b) => a + b, 0) / topSelection[1].odds.length
                     : 1.91;
                   const potentialReturn = betStake * avgOdds;
-                  const profit = potentialReturn - betStake;
 
                   return (
                     <div className="bg-teal-900/30 border border-teal-800/30 rounded-xl p-4 mb-6">
@@ -4244,7 +4314,7 @@ export default function Dashboard() {
                         <span className="text-zinc-300">Potential Return</span>
                         <div className="text-right">
                           <div className="text-2xl font-bold text-teal-400 font-mono">€{potentialReturn.toFixed(2)}</div>
-                          <div className="text-xs text-teal-500">+€{profit.toFixed(2)} profit</div>
+                          <div className="text-xs text-teal-500">@ {avgOdds.toFixed(2)} odds</div>
                         </div>
                       </div>
                     </div>
@@ -4397,7 +4467,6 @@ export default function Dashboard() {
                 {/* Potential Return */}
                 {(() => {
                   const potentialReturn = betStake * quickBetSelection.odds;
-                  const profit = potentialReturn - betStake;
 
                   return (
                     <div className="bg-teal-900/30 border border-teal-800/30 rounded-xl p-4 mb-6">
@@ -4405,7 +4474,7 @@ export default function Dashboard() {
                         <span className="text-zinc-300">Potential Return</span>
                         <div className="text-right">
                           <div className="text-2xl font-bold text-teal-400 font-mono">€{potentialReturn.toFixed(2)}</div>
-                          <div className="text-xs text-teal-500">+€{profit.toFixed(2)} profit</div>
+                          <div className="text-xs text-teal-500">@ {quickBetSelection.odds.toFixed(2)} odds</div>
                         </div>
                       </div>
                     </div>
@@ -4615,8 +4684,8 @@ export default function Dashboard() {
 
                 {/* Potential Return */}
                 {(() => {
-                  const potentialReturn = parlayStake * calculateParlayOdds();
-                  const profit = potentialReturn - parlayStake;
+                  const parlayOdds = calculateParlayOdds();
+                  const potentialReturn = parlayStake * parlayOdds;
 
                   return (
                     <div className="bg-teal-900/30 border border-teal-800/30 rounded-xl p-4 mb-6">
@@ -4624,7 +4693,7 @@ export default function Dashboard() {
                         <span className="text-zinc-300">Potential Return</span>
                         <div className="text-right">
                           <div className="text-2xl font-bold text-teal-400 font-mono">€{potentialReturn.toFixed(2)}</div>
-                          <div className="text-xs text-teal-500">+€{profit.toFixed(2)} profit</div>
+                          <div className="text-xs text-teal-500">@ {parlayOdds.toFixed(2)} combined odds</div>
                         </div>
                       </div>
                     </div>
@@ -4827,7 +4896,7 @@ export default function Dashboard() {
                   </div>
                   <div>
                     <div className="text-[10px] text-zinc-500">Duration</div>
-                    <div className="text-white font-semibold text-sm">30 days</div>
+                    <div className="text-white font-semibold text-sm">45 days</div>
                   </div>
                   <div>
                     <div className="text-[10px] text-zinc-500">Reset Fee</div>

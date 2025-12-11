@@ -416,7 +416,7 @@ model Challenge {
 
   // Timing
   purchasedAt   DateTime @default(now())
-  expiresAt     DateTime // purchasedAt + 30 days
+  expiresAt     DateTime // purchasedAt + 45 days
   completedAt   DateTime?
 
   // Relations

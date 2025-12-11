@@ -65,7 +65,7 @@ export const DIFFICULTY_CONFIG = {
 
 export type DifficultyType = keyof typeof DIFFICULTY_CONFIG;
 
-export const CHALLENGE_DURATION_DAYS = 30;
+export const CHALLENGE_DURATION_DAYS = 45;
 export const MAX_ACTIVE_CHALLENGES = 5;
 
 // ==========================================

@@ -280,10 +280,10 @@ export default function ProfilePage() {
                 <div className="text-xs text-zinc-500">Win Rate</div>
               </div>
               <div className="text-center">
-                <div className={`text-2xl font-bold ${(stats?.totalProfit || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                  {(stats?.totalProfit || 0) >= 0 ? '+' : ''}${Math.abs(stats?.totalProfit || 0).toFixed(0)}
+                <div className="text-2xl font-bold text-amber-400">
+                  🔥 {stats?.bestStreak || 0}
                 </div>
-                <div className="text-xs text-zinc-500">Profit</div>
+                <div className="text-xs text-zinc-500">Best Streak</div>
               </div>
             </div>
           </div>
@@ -386,9 +386,9 @@ export default function ProfilePage() {
 
                 <div className="bg-zinc-800/50 rounded-xl p-4">
                   <div className="flex justify-between items-center">
-                    <span className="text-zinc-400">ROI</span>
-                    <span className={`font-bold ${(stats?.roi || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                      {(stats?.roi || 0) >= 0 ? '+' : ''}{stats?.roi?.toFixed(1) || 0}%
+                    <span className="text-zinc-400">Current Streak</span>
+                    <span className={`font-bold ${(stats?.currentStreak || 0) > 0 ? 'text-green-400' : (stats?.currentStreak || 0) < 0 ? 'text-red-400' : 'text-zinc-400'}`}>
+                      {(stats?.currentStreak || 0) > 0 ? '🔥' : (stats?.currentStreak || 0) < 0 ? '❄️' : ''} {stats?.currentStreak || 0}
                     </span>
                   </div>
                 </div>
@@ -584,17 +584,16 @@ export default function ProfilePage() {
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className={`font-bold ${
-                          bet.result === 'won' ? 'text-green-400' :
-                          bet.result === 'lost' ? 'text-red-400' :
-                          bet.result === 'push' ? 'text-yellow-400' :
-                          'text-zinc-400'
+                        <div className={`px-3 py-1 rounded-lg font-bold uppercase text-sm inline-block ${
+                          bet.result === 'won' ? 'bg-green-900/30 text-green-400' :
+                          bet.result === 'lost' ? 'bg-red-900/30 text-red-400' :
+                          bet.result === 'push' ? 'bg-yellow-900/30 text-yellow-400' :
+                          'bg-zinc-800 text-zinc-400'
                         }`}>
-                          {bet.result === 'won' ? `+$${bet.profitLoss?.toFixed(2)}` :
-                           bet.result === 'lost' ? `-$${bet.stake?.toFixed(2)}` :
+                          {bet.result === 'won' ? 'Won' :
+                           bet.result === 'lost' ? 'Lost' :
                            bet.result === 'push' ? 'Push' : 'Pending'}
                         </div>
-                        <div className="text-xs text-zinc-500">${bet.stake} stake</div>
                         <div className="text-xs text-zinc-500 mt-1">
                           {new Date(bet.createdAt).toLocaleDateString()}
                         </div>
@@ -728,7 +727,7 @@ export default function ProfilePage() {
                   { icon: '💯', name: 'Century Club', description: '100 bets placed' },
                   { icon: '🎰', name: 'High Roller', description: '500 bets placed' },
                   { icon: '💥', name: 'On Fire', description: '10 win streak' },
-                  { icon: '💰', name: 'Money Maker', description: '25%+ ROI' },
+                  { icon: '💰', name: 'Money Maker', description: '15 win streak' },
                   { icon: '👑', name: 'Champion', description: 'Complete 5 challenges' },
                   { icon: '🃏', name: 'Parlay Master', description: 'Win 5 parlays' },
                   { icon: '💎', name: 'Diamond Tier', description: 'Reach Diamond tier' },
