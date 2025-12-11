@@ -139,6 +139,7 @@ model User {
   challenges    Challenge[]
   adminLogs     AdminLog[]  @relation("AdminActions")
   pendingPayments PendingPayment[]
+  payoutRequests PayoutRequest[]
 }
 
 // ==========================================
@@ -553,4 +554,39 @@ model PendingPayment {
   @@index([userId])
   @@index([externalId])
   @@index([status])
+}
+
+// ==========================================
+// PAYOUT REQUESTS (Withdrawals)
+// ==========================================
+
+model PayoutRequest {
+  id              String   @id @default(cuid())
+  userId          String
+
+  // Amount
+  amount          Float    // Amount requested
+  currency        String   @default("EUR")
+
+  // Payment method
+  paymentMethod   String   // 'bank', 'paypal', 'crypto'
+  paymentDetails  Json     // { iban, accountName } or { paypalEmail } or { walletAddress, network }
+
+  // Status
+  status          String   @default("pending") // pending, processing, completed, rejected
+  rejectionReason String?
+
+  // Processing
+  processedBy     String?  // Admin who processed
+  processedAt     DateTime?
+  transactionId   String?  // External transaction reference
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
 }

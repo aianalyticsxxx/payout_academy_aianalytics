@@ -7,7 +7,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/config';
 import { prisma } from '@/lib/db/prisma';
 import { z } from 'zod';
-import { linkBetToChallenge, processChallengeSettlement } from '@/lib/challenges/challenge-service';
+import { linkBetToChallenge, processChallengeSettlement, getActiveChallenges } from '@/lib/challenges/challenge-service';
 
 // ==========================================
 // VALIDATION SCHEMAS
@@ -23,6 +23,7 @@ const CreateBetSchema = z.object({
   stake: z.number().positive(),
   eventId: z.string().optional(),
   notes: z.string().optional(),
+  challengeIds: z.array(z.string()).optional(), // Selected challenge IDs to link to
 });
 
 const UpdateBetSchema = z.object({
@@ -35,15 +36,10 @@ const UpdateBetSchema = z.object({
 // HELPERS
 // ==========================================
 
-function convertOddsToDecimal(odds: string): number {
-  const numOdds = parseFloat(odds.replace('+', ''));
-  if (isNaN(numOdds)) return 2.0;
-  
-  if (numOdds > 0) {
-    return (numOdds / 100) + 1;
-  } else {
-    return (100 / Math.abs(numOdds)) + 1;
-  }
+function parseDecimalOdds(odds: string): number {
+  const numOdds = parseFloat(odds);
+  if (isNaN(numOdds) || numOdds < 1) return 2.0;
+  return numOdds;
 }
 
 function calculateProfitLoss(
@@ -204,7 +200,33 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const data = CreateBetSchema.parse(body);
 
-    const oddsDecimal = convertOddsToDecimal(data.odds);
+    const oddsDecimal = parseDecimalOdds(data.odds);
+
+    // Get active challenges
+    const activeChallenges = await getActiveChallenges(userId);
+
+    // Determine which challenges to link to
+    let selectedChallenges = activeChallenges;
+    if (data.challengeIds && data.challengeIds.length > 0) {
+      // User specified which challenges to link to
+      selectedChallenges = activeChallenges.filter(c => data.challengeIds!.includes(c.id));
+    }
+
+    // Validate minimum odds for selected challenges
+    if (selectedChallenges.length > 0) {
+      for (const challenge of selectedChallenges) {
+        if (oddsDecimal < challenge.minOdds) {
+          const difficultyName = challenge.difficulty === 'pro' ? 'Pro' : 'Beginner';
+          return NextResponse.json(
+            {
+              error: `Odds too low for challenge`,
+              message: `Your €${challenge.tier.toLocaleString()} ${difficultyName} challenge requires minimum odds of ${challenge.minOdds.toFixed(2)}. Current odds: ${oddsDecimal.toFixed(2)}`
+            },
+            { status: 400 }
+          );
+        }
+      }
+    }
 
     const bet = await prisma.bet.create({
       data: {
@@ -223,8 +245,22 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Link to active challenge if exists
-    await linkBetToChallenge(bet.id, userId);
+    // Link to selected challenges only
+    if (selectedChallenges.length > 0) {
+      for (const challenge of selectedChallenges) {
+        // Check if bet meets minimum odds for this challenge
+        if (oddsDecimal >= challenge.minOdds) {
+          await prisma.challengeBet.create({
+            data: {
+              challengeId: challenge.id,
+              betId: bet.id,
+              streakBefore: challenge.currentStreak,
+              levelBefore: challenge.currentLevel,
+            },
+          });
+        }
+      }
+    }
 
     return NextResponse.json(bet, { status: 201 });
     

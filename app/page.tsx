@@ -248,8 +248,22 @@ export default function Dashboard() {
   const [rewardModalOpen, setRewardModalOpen] = useState(false);
   const [rewardToClaim, setRewardToClaim] = useState<number | null>(null);
   const [payoutModalOpen, setPayoutModalOpen] = useState(false);
-  const [payoutAmount, setPayoutAmount] = useState<number>(50);
-  const [totalEarnings, setTotalEarnings] = useState<number>(0); // Track total earned from rewards
+  const [payoutAmount, setPayoutAmount] = useState<number>(10);
+  const [availableBalance, setAvailableBalance] = useState<number>(0);
+  const [payoutMethod, setPayoutMethod] = useState<'bank' | 'paypal' | 'crypto'>('bank');
+  const [payoutDetails, setPayoutDetails] = useState<{
+    iban?: string;
+    accountName?: string;
+    bankName?: string;
+    paypalEmail?: string;
+    walletAddress?: string;
+    network?: string;
+  }>({});
+  const [payoutHistory, setPayoutHistory] = useState<any[]>([]);
+  const [loadingPayouts, setLoadingPayouts] = useState(false);
+  const [submittingPayout, setSubmittingPayout] = useState(false);
+  const [payoutError, setPayoutError] = useState<string | null>(null);
+  const [payoutSuccess, setPayoutSuccess] = useState<string | null>(null);
   const [selectedAccountSize, setSelectedAccountSize] = useState<number>(1000); // Account size selection
   const [selectedCategory, setSelectedCategory] = useState<SportCategory>(SPORTS_CATEGORIES[0]);
   const [selectedLeague, setSelectedLeague] = useState<League>(SPORTS_CATEGORIES[0].leagues[0]);
@@ -278,7 +292,9 @@ export default function Dashboard() {
   const [betStake, setBetStake] = useState<number>(10);
   const [placingBet, setPlacingBet] = useState(false);
   const [betSuccess, setBetSuccess] = useState(false);
+  const [betError, setBetError] = useState<string | null>(null);
   const [betsSubTab, setBetsSubTab] = useState<'active' | 'history'>('active');
+  const [selectedBetChallengeIds, setSelectedBetChallengeIds] = useState<string[]>([]);
 
   // Event AI analysis cache (for showing verdict on event cards)
   const [eventAnalysisCache, setEventAnalysisCache] = useState<Record<string, SwarmResult>>({});
@@ -372,6 +388,7 @@ export default function Dashboard() {
       fetchUserStats();
       fetchLeaderboard();
       fetchActiveChallenge();
+      fetchPayouts();
     }
   }, [session]);
 
@@ -479,6 +496,114 @@ export default function Dashboard() {
       console.error('Failed to fetch active challenges:', error);
     } finally {
       setLoadingChallenge(false);
+    }
+  };
+
+  const fetchPayouts = async () => {
+    setLoadingPayouts(true);
+    try {
+      const res = await fetch('/api/payouts');
+      const data = await res.json();
+      setPayoutHistory(data.payouts || []);
+      setAvailableBalance(data.availableBalance || 0);
+    } catch (error) {
+      console.error('Failed to fetch payouts:', error);
+    } finally {
+      setLoadingPayouts(false);
+    }
+  };
+
+  const [claimingRewards, setClaimingRewards] = useState(false);
+
+  const claimRewards = async (challengeId?: string) => {
+    setClaimingRewards(true);
+    try {
+      const res = await fetch('/api/rewards/claim', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ challengeId }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        // Refresh challenges and payouts to update balances
+        fetchActiveChallenge();
+        fetchPayouts();
+        setActiveTab('rewards');
+      } else {
+        console.error('Claim failed:', data.error);
+      }
+    } catch (error) {
+      console.error('Failed to claim rewards:', error);
+    } finally {
+      setClaimingRewards(false);
+    }
+  };
+
+  const submitPayoutRequest = async () => {
+    if (payoutAmount < 10 || payoutAmount > availableBalance) return;
+
+    setSubmittingPayout(true);
+    setPayoutError(null);
+    setPayoutSuccess(null);
+
+    // Build payment details based on method
+    let details: any = {};
+    if (payoutMethod === 'bank') {
+      if (!payoutDetails.iban || !payoutDetails.accountName) {
+        setPayoutError('Please fill in IBAN and Account Name');
+        setSubmittingPayout(false);
+        return;
+      }
+      details = {
+        iban: payoutDetails.iban,
+        accountName: payoutDetails.accountName,
+        bankName: payoutDetails.bankName || undefined,
+      };
+    } else if (payoutMethod === 'paypal') {
+      if (!payoutDetails.paypalEmail) {
+        setPayoutError('Please enter your PayPal email');
+        setSubmittingPayout(false);
+        return;
+      }
+      details = { paypalEmail: payoutDetails.paypalEmail };
+    } else if (payoutMethod === 'crypto') {
+      if (!payoutDetails.walletAddress || !payoutDetails.network) {
+        setPayoutError('Please enter wallet address and select network');
+        setSubmittingPayout(false);
+        return;
+      }
+      details = {
+        walletAddress: payoutDetails.walletAddress,
+        network: payoutDetails.network,
+      };
+    }
+
+    try {
+      const res = await fetch('/api/payouts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: payoutAmount,
+          paymentMethod: payoutMethod,
+          paymentDetails: details,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || data.error || 'Failed to submit payout request');
+      }
+
+      setPayoutSuccess(data.message || 'Payout request submitted successfully!');
+      setPayoutModalOpen(false);
+      setPayoutDetails({});
+      setPayoutAmount(10);
+      fetchPayouts(); // Refresh the list
+    } catch (error: any) {
+      setPayoutError(error.message || 'Failed to submit payout request');
+    } finally {
+      setSubmittingPayout(false);
     }
   };
 
@@ -685,6 +810,8 @@ export default function Dashboard() {
     setQuickBetEvent(event);
     setQuickBetSelection({ type: selectionType, name: selectionName, odds });
     setBetStake(10);
+    setBetError(null);
+    setSelectedBetChallengeIds([]);
     setBetModalOpen(true);
   };
 
@@ -693,6 +820,7 @@ export default function Dashboard() {
     if (!quickBetEvent || !quickBetSelection) return;
 
     setPlacingBet(true);
+    setBetError(null);
     try {
       const res = await fetch('/api/bets', {
         method: 'POST',
@@ -705,26 +833,33 @@ export default function Dashboard() {
           betType: '1X2',
           selection: quickBetSelection.name,
           odds: quickBetSelection.odds.toFixed(2),
-          stake: betStake,
-          aiConsensus: 'MANUAL',
-          aiScore: '0',
+          stake: 10, // Fixed stake since we removed stake input
+          challengeIds: selectedBetChallengeIds.length > 0 ? selectedBetChallengeIds : undefined,
         }),
       });
+
+      const data = await res.json();
 
       if (res.ok) {
         setBetSuccess(true);
         fetchBets();
         fetchUserStats();
+        fetchActiveChallenge();
+        fetchPayouts();
         setTimeout(() => {
           setBetModalOpen(false);
           setBetSuccess(false);
           setQuickBetEvent(null);
           setQuickBetSelection(null);
           setBetStake(10);
-        }, 2000);
+          setSelectedBetChallengeIds([]);
+        }, 1500);
+      } else {
+        setBetError(data.message || data.error || 'Failed to place bet');
       }
     } catch (error) {
       console.error('Failed to place bet:', error);
+      setBetError('Failed to place bet. Please try again.');
     } finally {
       setPlacingBet(false);
     }
@@ -872,6 +1007,7 @@ export default function Dashboard() {
           stake: betStake,
           aiConsensus: swarmResult.consensus.verdict,
           aiScore: swarmResult.consensus.score,
+          challengeIds: selectedBetChallengeIds.length > 0 ? selectedBetChallengeIds : undefined,
         }),
       });
 
@@ -879,12 +1015,17 @@ export default function Dashboard() {
         setBetSuccess(true);
         fetchBets();
         fetchUserStats();
+        fetchActiveChallenge();
         // Auto close modal after 2 seconds
         setTimeout(() => {
           setBetModalOpen(false);
           setBetSuccess(false);
           setBetStake(10);
+          setSelectedBetChallengeIds([]);
         }, 2000);
+      } else {
+        const errorData = await res.json();
+        alert(errorData.message || errorData.error || 'Failed to place bet');
       }
     } catch (error) {
       console.error('Failed to place bet:', error);
@@ -1611,7 +1752,7 @@ export default function Dashboard() {
                         )}
 
                         {/* Card Header */}
-                        <div className={`text-center mb-4 ${idx === 2 || idx === 3 ? 'mt-4' : ''}`}>
+                        <div className="text-center mb-4 mt-4">
                           <div className="text-4xl font-black text-white mb-1">€{tier.size.toLocaleString()}</div>
                           <div className="text-sm font-bold text-teal-400 tracking-widest uppercase">CHALLENGE</div>
                         </div>
@@ -2907,7 +3048,7 @@ export default function Dashboard() {
                             </span>
                           </div>
                           <div className="text-xs text-zinc-600 font-mono">
-                            #{selectedChallenge?.id?.slice(-6).toUpperCase() || '------'}
+                            Account {selectedChallenge?.id?.slice(-6).toLowerCase() || '------'}
                           </div>
                         </div>
                       </div>
@@ -2982,279 +3123,57 @@ export default function Dashboard() {
                           </div>
                         );
                       })()}
+
+                      {/* Claim Reward Button */}
+                      {selectedChallenge && (selectedChallenge.totalPendingAmount || 0) > 0 && (
+                        <div className="mt-4">
+                          <button
+                            onClick={() => claimRewards(selectedChallenge.id)}
+                            disabled={claimingRewards}
+                            className="w-full py-3 px-4 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white font-semibold rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-amber-900/30 disabled:opacity-50"
+                          >
+                            <span>{claimingRewards ? '⏳' : '💰'}</span>
+                            <span>{claimingRewards ? 'Claiming...' : `Claim €${(selectedChallenge.totalPendingAmount || 0).toLocaleString()} Reward`}</span>
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Recent Results - Simple W/L */}
+                      <div className="pt-4 border-t border-zinc-800/50 mt-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs text-zinc-500">Recent Results</span>
+                          <span className="text-xs text-zinc-500">
+                            {bets.filter(b => b.result === 'won').length}W - {bets.filter(b => b.result === 'lost').length}L
+                          </span>
+                        </div>
+                        <div className="flex gap-1">
+                          {bets
+                            .filter(b => b.result !== 'pending')
+                            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                            .slice(0, 10)
+                            .map((bet, i) => (
+                              <div
+                                key={i}
+                                className={`w-6 h-6 rounded flex items-center justify-center text-xs font-bold ${
+                                  bet.result === 'won'
+                                    ? 'bg-emerald-500/20 text-emerald-400'
+                                    : bet.result === 'lost'
+                                    ? 'bg-red-500/20 text-red-400'
+                                    : 'bg-zinc-500/20 text-zinc-400'
+                                }`}
+                              >
+                                {bet.result === 'won' ? 'W' : bet.result === 'lost' ? 'L' : 'P'}
+                              </div>
+                            ))}
+                          {bets.filter(b => b.result !== 'pending').length === 0 && (
+                            <span className="text-xs text-zinc-600">No results yet</span>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 );
               })()}
-            </div>
-
-            {/* Recent Results - Full Width Below */}
-            <div className={`bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-5 ${activeChallenges.length === 0 ? 'opacity-40 blur-[2px] pointer-events-none select-none' : ''}`}>
-                {(() => {
-                  const recentBets = bets
-                    .filter(b => b.result !== 'pending')
-                    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-                    .slice(0, 10);
-
-                  // Calculate current streak
-                  let currentStreak = 0;
-                  let streakType: 'win' | 'loss' | null = null;
-                  for (const bet of recentBets) {
-                    if (bet.result === 'won') {
-                      if (streakType === 'loss') break;
-                      streakType = 'win';
-                      currentStreak++;
-                    } else if (bet.result === 'lost') {
-                      if (streakType === 'win') break;
-                      streakType = 'loss';
-                      currentStreak++;
-                    }
-                  }
-
-                  const wins = recentBets.filter(b => b.result === 'won').length;
-                  const losses = recentBets.filter(b => b.result === 'lost').length;
-
-                  if (recentBets.length === 0) {
-                    return (
-                      <div className="text-center py-6">
-                        <div className="text-3xl mb-3">🎯</div>
-                        <h3 className="text-white font-medium mb-1">No Bets Yet</h3>
-                        <p className="text-zinc-500 text-sm mb-4">Place your first bet to start tracking results</p>
-                        <button
-                          onClick={() => setActiveTab('ai')}
-                          className="px-4 py-2 bg-teal-500/20 text-teal-400 text-sm font-medium rounded-lg border border-teal-500/30 hover:bg-teal-500/30 transition-all"
-                        >
-                          View AI Picks
-                        </button>
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <>
-                      {/* Header with Streak */}
-                      <div className="flex items-center justify-between mb-4">
-                        <div>
-                          <span className="text-zinc-300 font-medium">Recent Results</span>
-                          <div className="text-xs text-zinc-500 mt-0.5">{wins}W - {losses}L last 10</div>
-                        </div>
-                        {currentStreak > 0 && (
-                          <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg ${
-                            streakType === 'win'
-                              ? 'bg-emerald-500/20 border border-emerald-500/30'
-                              : 'bg-red-500/20 border border-red-500/30'
-                          }`}>
-                            <span className={`text-lg ${streakType === 'win' ? 'text-emerald-400' : 'text-red-400'}`}>
-                              {streakType === 'win' ? '🔥' : '❄️'}
-                            </span>
-                            <span className={`text-sm font-bold ${streakType === 'win' ? 'text-emerald-400' : 'text-red-400'}`}>
-                              {currentStreak} {streakType === 'win' ? 'Win' : 'Loss'} Streak
-                            </span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Results Grid */}
-                      <div className="flex flex-wrap gap-1.5 mb-4">
-                        {recentBets.map((bet, i) => (
-                          <div
-                            key={i}
-                            className={`w-7 h-7 rounded-md flex items-center justify-center text-xs font-bold transition-all hover:scale-110 cursor-default ${
-                              bet.result === 'won'
-                                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
-                                : bet.result === 'lost'
-                                ? 'bg-red-500/20 text-red-400 border border-red-500/40'
-                                : 'bg-zinc-500/20 text-zinc-400 border border-zinc-500/40'
-                            }`}
-                            title={`${bet.matchup} - ${bet.result}`}
-                          >
-                            {bet.result === 'won' ? 'W' : bet.result === 'lost' ? 'L' : 'P'}
-                          </div>
-                        ))}
-                      </div>
-
-                      {/* Stats Row */}
-                      <div className="grid grid-cols-2 gap-3 pt-3 border-t border-zinc-800/50">
-                        <div className="bg-zinc-900/50 rounded-lg p-2.5 text-center">
-                          <div className="text-[10px] text-zinc-500 uppercase tracking-wide mb-0.5">Win Rate</div>
-                          <div className={`text-lg font-bold ${(userStats?.winRate || 0) >= 55 ? 'text-emerald-400' : (userStats?.winRate || 0) >= 50 ? 'text-amber-400' : 'text-red-400'}`}>
-                            {(userStats?.winRate || 0).toFixed(1)}%
-                          </div>
-                        </div>
-                        <div className="bg-zinc-900/50 rounded-lg p-2.5 text-center">
-                          <div className="text-[10px] text-zinc-500 uppercase tracking-wide mb-0.5">Record</div>
-                          <div className="text-lg font-bold text-white">
-                            {userStats?.wins || 0}W - {userStats?.losses || 0}L
-                          </div>
-                        </div>
-                      </div>
-                    </>
-                  );
-                })()}
-            </div>
-
-            {/* Middle Row: Challenge Info + Trading Objectives + Calendar */}
-            <div className={`grid gap-6 lg:grid-cols-3 ${activeChallenges.length === 0 ? 'opacity-40 blur-[2px] pointer-events-none select-none' : ''}`}>
-              {/* Challenge Info */}
-              <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-5">
-                <h3 className="text-zinc-300 font-medium mb-4">Challenge Info</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <div className="text-xs text-zinc-500 mb-1">Start Date</div>
-                    <div className="text-white font-medium text-sm">
-                      {bets.length > 0
-                        ? new Date(bets[bets.length - 1]?.createdAt).toLocaleDateString('en', { month: 'short', day: 'numeric', year: 'numeric' })
-                        : 'No bets yet'}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-zinc-500 mb-1">Challenge</div>
-                    <div className="text-white font-medium text-sm">AI Betting</div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-zinc-500 mb-1">Account Size</div>
-                    <div className="text-white font-medium text-sm">€1,000</div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-zinc-500 mb-1">Inactivity</div>
-                    <div className="text-white font-medium text-sm">
-                      {bets.length > 0
-                        ? `${Math.floor((Date.now() - new Date(bets[0]?.createdAt).getTime()) / 86400000)} days`
-                        : '0 days'}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Streak Objectives */}
-              <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-5">
-                <h3 className="text-zinc-300 font-medium mb-4">Streak Objectives</h3>
-                {(() => {
-                  const settledBets = bets.filter(b => b.result !== 'pending').sort((a, b) =>
-                    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-                  );
-                  let currentStreak = 0;
-                  for (const bet of settledBets) {
-                    if (bet.result === 'won') currentStreak++;
-                    else break;
-                  }
-                  return (
-                    <div className="space-y-3">
-                      {/* Level 1: Bronze (5 wins) */}
-                      <div>
-                        <div className="flex justify-between text-xs mb-1">
-                          <span className="text-zinc-500">Level 1: Bronze (5)</span>
-                          <span className={currentStreak >= 5 ? 'text-emerald-400' : 'text-zinc-400'}>
-                            {Math.min(currentStreak, 5)}/5
-                          </span>
-                        </div>
-                        <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
-                          <div
-                            className={`h-full rounded-full transition-all ${currentStreak >= 5 ? 'bg-emerald-500' : 'bg-[#2d9090]'}`}
-                            style={{ width: `${Math.min((currentStreak / 5) * 100, 100)}%` }}
-                          ></div>
-                        </div>
-                      </div>
-                      {/* Level 2: Silver (10 wins) */}
-                      <div>
-                        <div className="flex justify-between text-xs mb-1">
-                          <span className="text-zinc-500">Level 2: Silver (10)</span>
-                          <span className={currentStreak >= 10 ? 'text-blue-400' : 'text-zinc-400'}>
-                            {Math.min(currentStreak, 10)}/10
-                          </span>
-                        </div>
-                        <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
-                          <div
-                            className={`h-full rounded-full transition-all ${currentStreak >= 10 ? 'bg-blue-500' : 'bg-[#2d9090]'}`}
-                            style={{ width: `${Math.min((currentStreak / 10) * 100, 100)}%` }}
-                          ></div>
-                        </div>
-                      </div>
-                      {/* Level 3: Gold (15 wins) */}
-                      <div>
-                        <div className="flex justify-between text-xs mb-1">
-                          <span className="text-zinc-500">Level 3: Gold (15)</span>
-                          <span className={currentStreak >= 15 ? 'text-purple-400' : 'text-zinc-400'}>
-                            {Math.min(currentStreak, 15)}/15
-                          </span>
-                        </div>
-                        <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
-                          <div
-                            className={`h-full rounded-full transition-all ${currentStreak >= 15 ? 'bg-purple-500' : 'bg-[#2d9090]'}`}
-                            style={{ width: `${Math.min((currentStreak / 15) * 100, 100)}%` }}
-                          ></div>
-                        </div>
-                      </div>
-                      {/* Level 4: Elite (20 wins) */}
-                      <div>
-                        <div className="flex justify-between text-xs mb-1">
-                          <span className="text-zinc-500">Level 4: Elite (20)</span>
-                          <span className={currentStreak >= 20 ? 'text-amber-400' : 'text-zinc-400'}>
-                            {Math.min(currentStreak, 20)}/20
-                          </span>
-                        </div>
-                        <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
-                          <div
-                            className={`h-full rounded-full transition-all ${currentStreak >= 20 ? 'bg-gradient-to-r from-amber-500 to-yellow-400' : 'bg-[#2d9090]'}`}
-                            style={{ width: `${Math.min((currentStreak / 20) * 100, 100)}%` }}
-                          ></div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })()}
-              </div>
-
-              {/* Calendar */}
-              <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-5">
-                <h3 className="text-zinc-300 font-medium mb-3">
-                  {new Date().toLocaleDateString('en', { month: 'long', year: 'numeric' })}
-                </h3>
-                <div className="grid grid-cols-7 gap-1 text-center">
-                  {['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'].map(d => (
-                    <div key={d} className="text-[10px] text-zinc-600 py-1">{d}</div>
-                  ))}
-                  {(() => {
-                    const now = new Date();
-                    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-                    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-                    const startOffset = (firstDay.getDay() + 6) % 7;
-                    const days = [];
-                    for (let i = 0; i < startOffset; i++) {
-                      days.push(<div key={`empty-${i}`} className="h-7"></div>);
-                    }
-                    for (let d = 1; d <= lastDay.getDate(); d++) {
-                      const dayDate = new Date(now.getFullYear(), now.getMonth(), d);
-                      const dayBets = bets.filter(b =>
-                        b.result !== 'pending' &&
-                        new Date(b.createdAt).toDateString() === dayDate.toDateString()
-                      );
-                      const dayPL = dayBets.reduce((sum, b) => {
-                        return sum + (b.result === 'won'
-                          ? (b.stake * parseFloat(b.odds)) - b.stake
-                          : -b.stake);
-                      }, 0);
-                      const isToday = d === now.getDate();
-                      days.push(
-                        <div
-                          key={d}
-                          className={`h-7 flex items-center justify-center text-[10px] rounded ${
-                            isToday ? 'ring-1 ring-[#2d9090]' : ''
-                          } ${
-                            dayPL > 0 ? 'bg-emerald-900/40 text-emerald-400' :
-                            dayPL < 0 ? 'bg-red-900/40 text-red-400' :
-                            'text-zinc-600'
-                          }`}
-                          title={dayPL !== 0 ? `${dayPL >= 0 ? '+' : ''}$${dayPL.toFixed(2)}` : ''}
-                        >
-                          {d}
-                        </div>
-                      );
-                    }
-                    return days;
-                  })()}
-                </div>
-              </div>
             </div>
 
             {/* Sub-tab Switcher */}
@@ -3335,19 +3254,9 @@ export default function Dashboard() {
                             <div className="text-xs text-zinc-500 mb-1">Odds</div>
                             <div className="font-mono font-bold text-amber-400">@{bet.odds}</div>
                           </div>
-                          <div>
-                            <div className="text-xs text-zinc-500 mb-1">Stake</div>
-                            <div className="font-medium text-white">€{bet.stake}</div>
-                          </div>
                         </div>
 
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="text-xs text-zinc-500 mb-1">Potential Return</div>
-                            <div className="text-xl font-bold text-emerald-400 font-mono">
-                              €{(bet.stake * parseFloat(bet.odds)).toFixed(2)}
-                            </div>
-                          </div>
+                        <div className="flex items-center justify-end">
                           <div className="flex gap-2">
                             <button
                               onClick={() => settleBet(bet.id, 'won')}
@@ -3437,306 +3346,305 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* REWARDS TAB */}
+        {/* REWARDS TAB - Integrated with Challenge System */}
         {activeTab === 'rewards' && (
           <div className="space-y-6">
-            {/* Earnings Balance Card */}
+            {/* Available Balance & Payout Button */}
             <div className="bg-gradient-to-br from-emerald-950/60 via-emerald-900/40 to-emerald-950/60 border border-emerald-700/40 rounded-2xl p-6 relative overflow-hidden">
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(16,185,129,0.15),transparent_50%)]"></div>
               <div className="relative">
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <div className="text-sm text-emerald-400 font-medium mb-1">Available Balance</div>
-                    <div className="text-4xl font-bold text-white">€{totalEarnings.toLocaleString()}</div>
+                    <div className="text-sm text-emerald-400 font-medium mb-1">Available to Withdraw</div>
+                    <div className="text-4xl font-bold text-white">€{availableBalance.toLocaleString()}</div>
                   </div>
-                  <div className="w-16 h-16 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center">
-                    <span className="text-3xl">💰</span>
+                  <button
+                    onClick={() => setPayoutModalOpen(true)}
+                    disabled={availableBalance < 10}
+                    className="px-6 py-3 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-semibold rounded-xl transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    <span>💸</span>
+                    Request Payout
+                  </button>
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="bg-emerald-900/30 rounded-xl p-3 text-center">
+                    <div className="text-lg font-bold text-white">{activeChallenges.length}</div>
+                    <div className="text-xs text-emerald-400">Active Accounts</div>
+                  </div>
+                  <div className="bg-emerald-900/30 rounded-xl p-3 text-center">
+                    <div className="text-lg font-bold text-white">
+                      {activeChallenges.reduce((sum, c) => {
+                        return sum + [c.level1Completed, c.level2Completed, c.level3Completed, c.level4Completed].filter(Boolean).length;
+                      }, 0)}
+                    </div>
+                    <div className="text-xs text-emerald-400">Levels Completed</div>
+                  </div>
+                  <div className="bg-emerald-900/30 rounded-xl p-3 text-center">
+                    <div className="text-lg font-bold text-white">
+                      {activeChallenges.filter(c => c.level4Completed).length}
+                    </div>
+                    <div className="text-xs text-emerald-400">Max Payouts</div>
                   </div>
                 </div>
+              </div>
+            </div>
+
+            {/* Per-Account Rewards */}
+            {activeChallenges.length === 0 ? (
+              <div className="bg-[#111111] border border-zinc-800/50 rounded-2xl p-8 text-center">
+                <div className="text-4xl mb-4">🎯</div>
+                <h3 className="text-xl font-bold text-white mb-2">No Active Challenges</h3>
+                <p className="text-zinc-400 mb-4">Start a challenge to begin earning rewards!</p>
                 <button
-                  onClick={() => setPayoutModalOpen(true)}
-                  disabled={totalEarnings < 50}
-                  className={`w-full py-3 rounded-xl font-bold transition-all ${
-                    totalEarnings >= 50
-                      ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white shadow-lg shadow-emerald-500/20'
-                      : 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
-                  }`}
+                  onClick={() => setActiveTab('challenges')}
+                  className="px-6 py-3 bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-teal-400 text-white font-semibold rounded-xl transition-all"
                 >
-                  {totalEarnings >= 50 ? 'Request Payout' : `Minimum $50 to withdraw (need $${50 - totalEarnings} more)`}
+                  Browse Challenges
                 </button>
               </div>
-            </div>
+            ) : (
+              <div className="space-y-4">
+                {activeChallenges.map((challenge) => {
+                  const difficultyLabel = challenge.difficulty === 'pro' ? 'Pro' : 'Beginner';
+                  const tierLabel = `€${(challenge.tier / 1000)}K`;
+                  const rewards = challenge.tierRewards || [0, 0, 0, 0];
+                  const levelReqs = challenge.levelRequirements || [
+                    { streakRequired: 3 }, { streakRequired: 6 }, { streakRequired: 10 }, { streakRequired: 15 }
+                  ];
 
-            {/* Account Size Selection */}
-            {(() => {
-              const accountSizes = [
-                { size: 1000, cost: 19.99, label: '$1K', rewards: [3, 100, 500, 1000] },
-                { size: 5000, cost: 99, label: '$5K', rewards: [20, 350, 2000, 5000] },
-                { size: 10000, cost: 199, label: '$10K', rewards: [60, 700, 4500, 10000] },
-                { size: 25000, cost: 399, label: '$25K', rewards: [100, 1400, 10000, 25000] },
-                { size: 50000, cost: 699, label: '$50K', rewards: [150, 2800, 20000, 50000] },
-                { size: 100000, cost: 999, label: '$100K', rewards: [250, 5000, 50000, 100000] },
-              ];
-              const currentAccount = accountSizes.find(a => a.size === selectedAccountSize) || accountSizes[0];
+                  const levels = [
+                    { level: 1, completed: challenge.level1Completed, reward: rewards[0], streak: levelReqs[0]?.streakRequired || 3, icon: '🥉', color: 'amber' },
+                    { level: 2, completed: challenge.level2Completed, reward: rewards[1], streak: levelReqs[1]?.streakRequired || 6, icon: '🥈', color: 'zinc' },
+                    { level: 3, completed: challenge.level3Completed, reward: rewards[2], streak: levelReqs[2]?.streakRequired || 10, icon: '🥇', color: 'yellow' },
+                    { level: 4, completed: challenge.level4Completed, reward: rewards[3], streak: levelReqs[3]?.streakRequired || 15, icon: '💎', color: 'cyan' },
+                  ];
 
-              return (
-                <div className="bg-gradient-to-br from-[#1a3a3a] via-[#153030] to-[#102828] border border-[#2a5555]/50 rounded-2xl p-6 relative overflow-hidden">
-                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(45,180,180,0.12),transparent_50%)]"></div>
-                  <div className="relative">
-                    <div className="flex items-center justify-between mb-6">
-                      <div>
-                        <h2 className="text-2xl font-bold text-white mb-2">Choose Your Account Size</h2>
-                        <p className="text-[#7cc4c4]">Higher accounts unlock bigger rewards</p>
+                  const completedCount = levels.filter(l => l.completed).length;
+                  const totalPossible = rewards.reduce((a: number, b: number) => a + b, 0);
+                  const earned = challenge.totalRewardsEarned || 0;
+
+                  return (
+                    <div key={challenge.id} className="bg-gradient-to-br from-[#1a3a3a] via-[#153030] to-[#102828] border border-[#2a5555]/50 rounded-2xl overflow-hidden">
+                      {/* Account Header */}
+                      <div className="p-4 border-b border-[#2a5555]/30 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                            challenge.difficulty === 'pro' ? 'bg-amber-500/20' : 'bg-teal-500/20'
+                          }`}>
+                            <span className="text-xl">{challenge.difficulty === 'pro' ? '⚡' : '🎯'}</span>
+                          </div>
+                          <div>
+                            <div className="font-bold text-white">{tierLabel} {difficultyLabel}</div>
+                            <div className="text-xs text-zinc-400">Account {challenge.id.slice(-6).toLowerCase()}</div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm text-zinc-400">Earned</div>
+                          <div className="text-lg font-bold text-emerald-400">€{earned.toLocaleString()}</div>
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <div className="text-sm text-zinc-400">Current Account</div>
-                        <div className="text-2xl font-bold text-teal-400">€{selectedAccountSize.toLocaleString()}</div>
+
+                      {/* Current Progress */}
+                      <div className="p-4 border-b border-[#2a5555]/30 bg-black/20">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm text-zinc-400">Current Streak</span>
+                          <span className="text-lg font-bold text-teal-400">{challenge.currentStreak} wins</span>
+                        </div>
+                        <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-gradient-to-r from-teal-600 to-teal-400 rounded-full transition-all"
+                            style={{
+                              width: `${Math.min(100, (challenge.currentStreak / (levels.find(l => !l.completed)?.streak || 15)) * 100)}%`
+                            }}
+                          ></div>
+                        </div>
+                        {levels.find(l => !l.completed) && (
+                          <div className="text-xs text-zinc-500 mt-1">
+                            {levels.find(l => !l.completed)!.streak - challenge.currentStreak} more wins to Level {levels.find(l => !l.completed)!.level}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Level Rewards Grid */}
+                      <div className="p-4">
+                        <div className="grid grid-cols-4 gap-2">
+                          {levels.map((lvl) => {
+                            // Check if this level has a pending reward
+                            const pendingReward = (challenge.pendingRewards || []).find(
+                              (r: any) => r.level === lvl.level
+                            );
+                            const paidReward = (challenge.paidRewards || []).find(
+                              (r: any) => r.level === lvl.level
+                            );
+                            const isPending = lvl.completed && pendingReward;
+                            const isPaid = lvl.completed && paidReward;
+
+                            return (
+                              <div
+                                key={lvl.level}
+                                className={`p-3 rounded-xl text-center transition-all ${
+                                  isPending
+                                    ? 'bg-amber-900/30 border border-amber-500/50'
+                                    : lvl.completed
+                                      ? 'bg-emerald-900/30 border border-emerald-600/30'
+                                      : 'bg-zinc-900/50 border border-zinc-800/50'
+                                }`}
+                              >
+                                <div className="text-xl mb-1">{lvl.icon}</div>
+                                <div className={`text-xs font-medium mb-1 ${
+                                  isPending ? 'text-amber-400' : lvl.completed ? 'text-emerald-400' : 'text-zinc-500'
+                                }`}>
+                                  Level {lvl.level}
+                                </div>
+                                <div className={`text-sm font-bold ${lvl.completed ? 'text-white' : 'text-zinc-400'}`}>
+                                  €{lvl.reward.toLocaleString()}
+                                </div>
+                                <div className={`text-[10px] mt-1 ${
+                                  isPending ? 'text-amber-400' : lvl.completed ? 'text-emerald-400' : 'text-zinc-600'
+                                }`}>
+                                  {isPending ? '⏳ Pending' : isPaid ? '✓ Paid' : lvl.completed ? '✓ Complete' : `${lvl.streak} wins`}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Claim Reward Button */}
+                        {(challenge.totalPendingAmount || 0) > 0 && (
+                          <button
+                            onClick={() => claimRewards(challenge.id)}
+                            disabled={claimingRewards}
+                            className="w-full mt-4 py-3 px-4 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white font-semibold rounded-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                          >
+                            <span>{claimingRewards ? '⏳' : '💰'}</span>
+                            <span>{claimingRewards ? 'Claiming...' : `Claim €${(challenge.totalPendingAmount || 0).toLocaleString()} Reward`}</span>
+                          </button>
+                        )}
+
+                        {/* Progress Summary */}
+                        <div className="mt-4 flex items-center justify-between text-sm">
+                          <span className="text-zinc-400">{completedCount}/4 Levels Complete</span>
+                          <span className="text-zinc-400">
+                            €{earned.toLocaleString()} / €{totalPossible.toLocaleString()}
+                          </span>
+                        </div>
                       </div>
                     </div>
+                  );
+                })}
+              </div>
+            )}
 
-                    {/* Account Size Cards */}
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                      {accountSizes.map((account) => (
-                        <button
-                          key={account.size}
-                          onClick={() => setSelectedAccountSize(account.size)}
-                          className={`p-4 rounded-xl border transition-all ${
-                            selectedAccountSize === account.size
-                              ? 'bg-teal-500/20 border-teal-500 shadow-lg shadow-teal-500/20'
-                              : 'bg-zinc-900/50 border-zinc-700/50 hover:border-teal-600/50'
-                          }`}
-                        >
-                          <div className={`text-xl font-bold mb-1 ${selectedAccountSize === account.size ? 'text-teal-400' : 'text-white'}`}>
-                            {account.label}
-                          </div>
-                          <div className="text-sm text-zinc-400">€{account.cost}</div>
-                          <div className="text-xs text-zinc-500 mt-2">
-                            Max: €{account.rewards[3].toLocaleString()}
-                          </div>
-                        </button>
-                      ))}
-                    </div>
+            {/* How Rewards Work */}
+            <div className="bg-[#111111] border border-zinc-800/50 rounded-2xl p-6">
+              <h3 className="text-lg font-semibold text-white mb-4">How Rewards Work</h3>
+              <div className="space-y-3">
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-teal-500/20 flex items-center justify-center flex-shrink-0">
+                    <span className="text-sm">1</span>
+                  </div>
+                  <div>
+                    <div className="text-white font-medium">Win Consecutive Bets</div>
+                    <div className="text-sm text-zinc-400">Build your streak by winning bets with minimum odds (1.5x Beginner, 2.0x Pro)</div>
                   </div>
                 </div>
-              );
-            })()}
-
-            {/* Rewards Header - Teal Theme */}
-            <div className="bg-gradient-to-br from-[#1a3a3a] via-[#153030] to-[#102828] border border-[#2a5555]/50 rounded-2xl p-6 relative overflow-hidden">
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(45,180,180,0.12),transparent_50%)]"></div>
-              <div className="relative flex items-center justify-between">
-                <div>
-                  <h2 className="text-2xl font-bold text-white mb-2">Win Streak Rewards</h2>
-                  <p className="text-[#7cc4c4]">Claim exclusive rewards for reaching streak milestones</p>
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-teal-500/20 flex items-center justify-center flex-shrink-0">
+                    <span className="text-sm">2</span>
+                  </div>
+                  <div>
+                    <div className="text-white font-medium">Complete Levels</div>
+                    <div className="text-sm text-zinc-400">Reach streak milestones to complete levels and unlock rewards</div>
+                  </div>
                 </div>
-                <div className="w-16 h-16 rounded-2xl bg-teal-500/10 border border-teal-500/30 flex items-center justify-center">
-                  <svg className="w-8 h-8 text-teal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
-                  </svg>
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-teal-500/20 flex items-center justify-center flex-shrink-0">
+                    <span className="text-sm">3</span>
+                  </div>
+                  <div>
+                    <div className="text-white font-medium">Get Paid Instantly</div>
+                    <div className="text-sm text-zinc-400">Rewards are credited automatically when you complete each level</div>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+                    <span className="text-sm">!</span>
+                  </div>
+                  <div>
+                    <div className="text-white font-medium">Keep What You Earn</div>
+                    <div className="text-sm text-zinc-400">A loss resets your streak but you keep all previously earned rewards</div>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Rewards Grid */}
-            {(() => {
-              // Account sizes with their rewards
-              const accountSizes: Record<number, number[]> = {
-                1000: [3, 100, 500, 1000],
-                5000: [20, 350, 2000, 5000],
-                10000: [60, 700, 4500, 10000],
-                25000: [100, 1400, 10000, 25000],
-                50000: [150, 2800, 20000, 50000],
-                100000: [250, 5000, 50000, 100000],
-              };
-              const currentRewards = accountSizes[selectedAccountSize] || accountSizes[1000];
-
-              // Calculate current streak (same logic as Bet Analysis)
-              const settledBets = bets.filter(b => b.result !== 'pending').sort((a, b) =>
-                new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-              );
-              let currentStreak = 0;
-              for (const bet of settledBets) {
-                if (bet.result === 'won') {
-                  currentStreak++;
-                } else {
-                  break;
-                }
-              }
-              // Find best streak ever
-              let bestStreak = 0;
-              let tempStreak = 0;
-              for (const bet of [...settledBets].reverse()) {
-                if (bet.result === 'won') {
-                  tempStreak++;
-                  bestStreak = Math.max(bestStreak, tempStreak);
-                } else {
-                  tempStreak = 0;
-                }
-              }
-
-              const rewards = [
-                { level: 1, streak: 5, title: 'Lvl 1', description: '5 consecutive wins', reward: `$${currentRewards[0].toLocaleString()}`, value: currentRewards[0], icon: '💵', accent: 'emerald' },
-                { level: 2, streak: 10, title: 'Lvl 2', description: '10 consecutive wins', reward: `$${currentRewards[1].toLocaleString()}`, value: currentRewards[1], icon: '💰', accent: 'blue' },
-                { level: 3, streak: 15, title: 'Lvl 3', description: '15 consecutive wins', reward: `$${currentRewards[2].toLocaleString()}`, value: currentRewards[2], icon: '💎', accent: 'purple' },
-                { level: 4, streak: 20, title: 'Lvl 4', description: '20 consecutive wins', reward: `$${currentRewards[3].toLocaleString()}`, value: currentRewards[3], icon: '🏆', accent: 'amber' },
-              ];
-
-              // Accent colors for progress bar and badge only
-              const accentColors: Record<string, { bar: string; badge: string; glow: string }> = {
-                emerald: { bar: 'bg-emerald-500', badge: 'text-emerald-400 bg-emerald-500/20', glow: 'shadow-emerald-500/20' },
-                blue: { bar: 'bg-blue-500', badge: 'text-blue-400 bg-blue-500/20', glow: 'shadow-blue-500/20' },
-                purple: { bar: 'bg-purple-500', badge: 'text-purple-400 bg-purple-500/20', glow: 'shadow-purple-500/20' },
-                amber: { bar: 'bg-amber-500', badge: 'text-amber-400 bg-amber-500/20', glow: 'shadow-amber-500/20' },
-              };
-
-              return (
-                <div className="grid gap-4 md:grid-cols-2">
-                  {rewards.map((reward) => {
-                    const isUnlocked = bestStreak >= reward.streak;
-                    const isClaimed = claimedRewards.includes(reward.level);
-                    const canClaim = isUnlocked && !isClaimed;
-                    const progress = Math.min(100, (bestStreak / reward.streak) * 100);
-                    const accent = accentColors[reward.accent];
-
-                    return (
-                      <div
-                        key={reward.level}
-                        className={`bg-[#111111] border rounded-2xl p-6 relative overflow-hidden transition-all duration-300 ${
-                          isUnlocked
-                            ? 'border-[#2a5555]/50 hover:border-teal-600/60'
-                            : 'border-zinc-800/50 opacity-50'
-                        }`}
-                      >
-                        {/* Subtle glow for unlocked */}
-                        {isUnlocked && (
-                          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(45,180,180,0.08),transparent_60%)]"></div>
-                        )}
-
-                        <div className="relative">
-                          {/* Header Row */}
-                          <div className="flex items-center justify-between mb-4">
-                            <div className="flex items-center gap-3">
-                              <span className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
-                                isUnlocked ? accent.badge : 'bg-zinc-800 text-zinc-500'
-                              }`}>
-                                {reward.title}
-                              </span>
-                            </div>
-                            <span className={`px-2.5 py-1 rounded-lg text-xs font-medium ${
-                              isClaimed
-                                ? 'bg-teal-500/20 text-teal-400'
-                                : isUnlocked
-                                  ? 'bg-emerald-500/20 text-emerald-400 animate-pulse'
-                                  : 'bg-zinc-800 text-zinc-500'
-                            }`}>
-                              {isClaimed ? '✓ CLAIMED' : isUnlocked ? 'READY' : 'LOCKED'}
-                            </span>
+            {/* Payout History */}
+            <div className="bg-[#111111] border border-zinc-800/50 rounded-2xl overflow-hidden">
+              <div className="p-4 border-b border-zinc-800/50 flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-white">Payout History</h3>
+                {loadingPayouts && (
+                  <div className="w-5 h-5 border-2 border-teal-500/30 border-t-teal-500 rounded-full animate-spin"></div>
+                )}
+              </div>
+              {payoutHistory.length === 0 ? (
+                <div className="p-8 text-center text-zinc-400">
+                  <div className="text-3xl mb-2">📋</div>
+                  <div>No payout requests yet</div>
+                  <div className="text-sm text-zinc-500 mt-1">Your withdrawal history will appear here</div>
+                </div>
+              ) : (
+                <div className="divide-y divide-zinc-800/50">
+                  {payoutHistory.map((payout) => (
+                    <div key={payout.id} className="p-4 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                          payout.status === 'completed' ? 'bg-emerald-500/20' :
+                          payout.status === 'pending' ? 'bg-amber-500/20' :
+                          payout.status === 'processing' ? 'bg-blue-500/20' :
+                          'bg-red-500/20'
+                        }`}>
+                          <span className="text-lg">
+                            {payout.paymentMethod === 'bank' ? '🏦' :
+                             payout.paymentMethod === 'paypal' ? '💳' : '₿'}
+                          </span>
+                        </div>
+                        <div>
+                          <div className="font-medium text-white">€{payout.amount.toLocaleString()}</div>
+                          <div className="text-xs text-zinc-500">
+                            {new Date(payout.createdAt).toLocaleDateString('en-US', {
+                              month: 'short', day: 'numeric', year: 'numeric'
+                            })}
                           </div>
-
-                          {/* Progress Bar */}
-                          <div className="mb-4">
-                            <div className="h-2 bg-zinc-800/80 rounded-full overflow-hidden">
-                              <div
-                                className={`h-full rounded-full transition-all duration-700 ${isUnlocked ? accent.bar : 'bg-zinc-700'}`}
-                                style={{ width: `${progress}%` }}
-                              ></div>
-                            </div>
-                            <div className="flex justify-between mt-1.5">
-                              <span className="text-xs text-zinc-500">{reward.description}</span>
-                              <span className={`text-xs font-medium ${isUnlocked ? 'text-white' : 'text-zinc-500'}`}>
-                                {Math.min(bestStreak, reward.streak)}/{reward.streak}
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* Reward Display */}
-                          <div className={`flex items-center gap-2 mb-4 p-3 rounded-xl ${
-                            isUnlocked ? 'bg-[#1a1a1a] border border-zinc-800' : 'bg-zinc-900/50'
-                          }`}>
-                            <span className="text-xl">{reward.icon}</span>
-                            <span className={`font-medium ${isUnlocked ? 'text-teal-300' : 'text-zinc-500'}`}>
-                              {reward.reward}
-                            </span>
-                          </div>
-
-                          {/* Action Button */}
-                          {canClaim ? (
-                            <button
-                              onClick={() => {
-                                setClaimedRewards(prev => [...prev, reward.level]);
-                                setTotalEarnings(prev => prev + reward.value);
-                              }}
-                              className="w-full py-3 rounded-xl font-bold text-white bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-teal-400 transition-all shadow-lg shadow-teal-500/20"
-                            >
-                              Claim Reward
-                            </button>
-                          ) : isClaimed ? (
-                            <div className="w-full py-3 rounded-xl font-medium text-center bg-zinc-800/50 text-zinc-500 border border-zinc-700/30">
-                              Reward Claimed
-                            </div>
-                          ) : (
-                            <div className="w-full py-3 rounded-xl font-medium text-center bg-zinc-900/50 text-zinc-600 border border-zinc-800/50">
-                              <span className="opacity-60">🔒</span> {reward.streak - bestStreak} more wins needed
-                            </div>
-                          )}
                         </div>
                       </div>
-                    );
-                  })}
+                      <div className="text-right">
+                        <span className={`inline-block px-2 py-1 rounded-lg text-xs font-medium ${
+                          payout.status === 'completed' ? 'bg-emerald-500/20 text-emerald-400' :
+                          payout.status === 'pending' ? 'bg-amber-500/20 text-amber-400' :
+                          payout.status === 'processing' ? 'bg-blue-500/20 text-blue-400' :
+                          'bg-red-500/20 text-red-400'
+                        }`}>
+                          {payout.status.charAt(0).toUpperCase() + payout.status.slice(1)}
+                        </span>
+                        {payout.status === 'rejected' && payout.rejectionReason && (
+                          <div className="text-xs text-red-400 mt-1">{payout.rejectionReason}</div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              );
-            })()}
-
-            {/* Stats Summary - Teal Theme */}
-            <div className="bg-[#111111] border border-zinc-800/50 rounded-2xl p-6">
-              <h3 className="text-lg font-semibold text-white mb-4">Your Progress</h3>
-              {(() => {
-                const settledBets = bets.filter(b => b.result !== 'pending').sort((a, b) =>
-                  new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-                );
-                let currentStreak = 0;
-                for (const bet of settledBets) {
-                  if (bet.result === 'won') {
-                    currentStreak++;
-                  } else {
-                    break;
-                  }
-                }
-                let bestStreak = 0;
-                let tempStreak = 0;
-                for (const bet of [...settledBets].reverse()) {
-                  if (bet.result === 'won') {
-                    tempStreak++;
-                    bestStreak = Math.max(bestStreak, tempStreak);
-                  } else {
-                    tempStreak = 0;
-                  }
-                }
-                const rewardsUnlocked = [5, 10, 15, 20].filter(s => bestStreak >= s).length;
-                const rewardsClaimed = claimedRewards.length;
-
-                return (
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="bg-[#1a1a1a] border border-zinc-800/50 rounded-xl p-4">
-                      <div className="text-2xl font-bold text-teal-400">{currentStreak}</div>
-                      <div className="text-xs text-zinc-500">Current Streak</div>
-                    </div>
-                    <div className="bg-[#1a1a1a] border border-zinc-800/50 rounded-xl p-4">
-                      <div className="text-2xl font-bold text-white">{bestStreak}</div>
-                      <div className="text-xs text-zinc-500">Best Streak</div>
-                    </div>
-                    <div className="bg-[#1a1a1a] border border-zinc-800/50 rounded-xl p-4">
-                      <div className="text-2xl font-bold text-emerald-400">{rewardsUnlocked}/4</div>
-                      <div className="text-xs text-zinc-500">Unlocked</div>
-                    </div>
-                    <div className="bg-[#1a1a1a] border border-zinc-800/50 rounded-xl p-4">
-                      <div className="text-2xl font-bold text-[#7cc4c4]">{rewardsClaimed}/4</div>
-                      <div className="text-xs text-zinc-500">Claimed</div>
-                    </div>
-                  </div>
-                );
-              })()}
+              )}
             </div>
+
+            {/* Success Toast */}
+            {payoutSuccess && (
+              <div className="fixed bottom-4 right-4 bg-emerald-600 text-white px-4 py-3 rounded-xl shadow-lg flex items-center gap-2 animate-in slide-in-from-bottom-4">
+                <span>✓</span>
+                <span>{payoutSuccess}</span>
+                <button onClick={() => setPayoutSuccess(null)} className="ml-2 hover:opacity-70">×</button>
+              </div>
+            )}
           </div>
         )}
 
@@ -4168,6 +4076,7 @@ export default function Dashboard() {
                   setBetModalOpen(false);
                   setBetSuccess(false);
                   setBetStake(10);
+                  setSelectedBetChallengeIds([]);
                 }}
                 className="text-zinc-400 hover:text-white transition-colors"
               >
@@ -4258,68 +4167,89 @@ export default function Dashboard() {
                   );
                 })()}
 
-                {/* Stake Input */}
-                <div className="mb-6">
-                  <label className="block text-sm font-medium text-zinc-300 mb-2">Stake Amount (€)</label>
-                  <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 font-semibold">€</span>
-                    <input
-                      type="number"
-                      min="1"
-                      step="5"
-                      value={betStake}
-                      onChange={(e) => setBetStake(Math.max(1, Number(e.target.value)))}
-                      className="w-full pl-8 pr-4 py-3 bg-zinc-900/80 border border-teal-800/30 rounded-xl text-white font-mono text-lg focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500"
-                    />
-                  </div>
-                  {/* Quick stake buttons */}
-                  <div className="flex gap-2 mt-3">
-                    {[10, 25, 50, 100].map(amount => (
-                      <button
-                        key={amount}
-                        onClick={() => setBetStake(amount)}
-                        className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
-                          betStake === amount
-                            ? 'bg-teal-600 text-white'
-                            : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
-                        }`}
-                      >
-                        ${amount}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                {/* Challenge Selector - Only show if user has multiple challenges */}
+                {activeChallenges.length > 1 && (
+                  <div className="mb-6">
+                    <label className="block text-sm font-medium text-zinc-300 mb-2">Apply to Challenges</label>
+                    <div className="space-y-2">
+                      {activeChallenges.map((challenge) => {
+                        const isSelected = selectedBetChallengeIds.includes(challenge.id);
+                        const oddsDecimal = (() => {
+                          const selections: Record<string, { odds: number[] }> = {};
+                          swarmResult.analyses.forEach(a => {
+                            if (a.betSelection) {
+                              if (!selections[a.betSelection]) selections[a.betSelection] = { odds: [] };
+                              if (a.betOdds) selections[a.betSelection].odds.push(a.betOdds);
+                            }
+                          });
+                          const topSelection = Object.entries(selections).sort((a, b) => b[1].odds.length - a[1].odds.length)[0];
+                          return topSelection?.[1].odds.length
+                            ? topSelection[1].odds.reduce((a, b) => a + b, 0) / topSelection[1].odds.length
+                            : 1.91;
+                        })();
+                        const meetsMinOdds = oddsDecimal >= challenge.minOdds;
 
-                {/* Potential Return */}
-                {(() => {
-                  const selections: Record<string, { count: number; odds: number[] }> = {};
-                  swarmResult.analyses.forEach(a => {
-                    if (a.betSelection) {
-                      if (!selections[a.betSelection]) {
-                        selections[a.betSelection] = { count: 0, odds: [] };
-                      }
-                      selections[a.betSelection].count++;
-                      if (a.betOdds) selections[a.betSelection].odds.push(a.betOdds);
-                    }
-                  });
-                  const topSelection = Object.entries(selections).sort((a, b) => b[1].count - a[1].count)[0];
-                  const avgOdds = topSelection?.[1].odds.length
-                    ? topSelection[1].odds.reduce((a, b) => a + b, 0) / topSelection[1].odds.length
-                    : 1.91;
-                  const potentialReturn = betStake * avgOdds;
-
-                  return (
-                    <div className="bg-teal-900/30 border border-teal-800/30 rounded-xl p-4 mb-6">
-                      <div className="flex justify-between items-center">
-                        <span className="text-zinc-300">Potential Return</span>
-                        <div className="text-right">
-                          <div className="text-2xl font-bold text-teal-400 font-mono">€{potentialReturn.toFixed(2)}</div>
-                          <div className="text-xs text-teal-500">@ {avgOdds.toFixed(2)} odds</div>
-                        </div>
-                      </div>
+                        return (
+                          <button
+                            key={challenge.id}
+                            onClick={() => {
+                              if (!meetsMinOdds) return;
+                              setSelectedBetChallengeIds(prev =>
+                                prev.includes(challenge.id)
+                                  ? prev.filter(id => id !== challenge.id)
+                                  : [...prev, challenge.id]
+                              );
+                            }}
+                            disabled={!meetsMinOdds}
+                            className={`w-full p-3 rounded-lg border transition-all flex items-center justify-between ${
+                              !meetsMinOdds
+                                ? 'bg-zinc-900/30 border-zinc-800/50 opacity-50 cursor-not-allowed'
+                                : isSelected
+                                ? 'bg-teal-900/40 border-teal-500'
+                                : 'bg-zinc-900/50 border-zinc-700/50 hover:border-teal-600/50'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
+                                isSelected ? 'bg-teal-500 border-teal-500' : 'border-zinc-600'
+                              }`}>
+                                {isSelected && (
+                                  <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                  </svg>
+                                )}
+                              </div>
+                              <div className="text-left">
+                                <div className="font-semibold text-white">€{challenge.tier.toLocaleString()}</div>
+                                <div className="text-xs text-zinc-400">
+                                  {challenge.difficulty === 'pro' ? '⚡ Pro' : '🎯 Beginner'} • Min {challenge.minOdds.toFixed(2)} odds
+                                </div>
+                              </div>
+                            </div>
+                            {!meetsMinOdds && (
+                              <span className="text-xs text-red-400">Odds too low</span>
+                            )}
+                          </button>
+                        );
+                      })}
                     </div>
-                  );
-                })()}
+                    {selectedBetChallengeIds.length === 0 && (
+                      <p className="text-xs text-amber-400 mt-2">⚠️ Select at least one challenge or bet will apply to all eligible</p>
+                    )}
+                  </div>
+                )}
+
+                {/* Single challenge info - Show when user has exactly 1 challenge */}
+                {activeChallenges.length === 1 && (
+                  <div className="mb-6 p-3 bg-teal-900/20 border border-teal-800/30 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <span className="text-teal-400">🎯</span>
+                      <span className="text-sm text-zinc-300">
+                        Bet applies to your €{activeChallenges[0].tier.toLocaleString()} {activeChallenges[0].difficulty === 'pro' ? 'Pro' : 'Beginner'} challenge
+                      </span>
+                    </div>
+                  </div>
+                )}
 
                 {/* Action Buttons */}
                 <div className="flex gap-3">
@@ -4327,6 +4257,7 @@ export default function Dashboard() {
                     onClick={() => {
                       setBetModalOpen(false);
                       setBetStake(10);
+                      setSelectedBetChallengeIds([]);
                     }}
                     className="flex-1 py-3 px-4 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-medium rounded-xl transition-colors"
                   >
@@ -4370,6 +4301,7 @@ export default function Dashboard() {
                   setBetStake(10);
                   setQuickBetEvent(null);
                   setQuickBetSelection(null);
+                  setSelectedBetChallengeIds([]);
                 }}
                 className="text-zinc-400 hover:text-white transition-colors"
               >
@@ -4393,6 +4325,13 @@ export default function Dashboard() {
             ) : (
               /* Bet Form */
               <>
+                {/* Error Message */}
+                {betError && (
+                  <div className="mb-4 p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400 text-sm">
+                    {betError}
+                  </div>
+                )}
+
                 {/* Event Info */}
                 <div className="bg-teal-950/50 border border-teal-900/30 rounded-xl p-4 mb-5">
                   <div className="text-sm text-zinc-400 mb-1">{quickBetEvent.sportTitle}</div>
@@ -4432,110 +4371,102 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                {/* Stake Input */}
-                <div className="mb-6">
-                  <label className="block text-sm font-medium text-zinc-300 mb-2">Stake Amount (€)</label>
-                  <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 font-semibold">€</span>
-                    <input
-                      type="number"
-                      min="1"
-                      step="5"
-                      value={betStake}
-                      onChange={(e) => setBetStake(Math.max(1, Number(e.target.value)))}
-                      className="w-full pl-8 pr-4 py-3 bg-zinc-900/80 border border-teal-800/30 rounded-xl text-white font-mono text-lg focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500"
-                    />
-                  </div>
-                  {/* Quick stake buttons */}
-                  <div className="flex gap-2 mt-3">
-                    {[10, 25, 50, 100].map(amount => (
-                      <button
-                        key={amount}
-                        onClick={() => setBetStake(amount)}
-                        className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
-                          betStake === amount
-                            ? 'bg-teal-600 text-white'
-                            : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
-                        }`}
-                      >
-                        ${amount}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                {/* Challenge/Account Selector */}
+                {activeChallenges.length > 0 && (
+                  <div className="mb-6">
+                    <label className="block text-sm font-medium text-zinc-300 mb-2">Apply to Challenge</label>
+                    <div className="space-y-2">
+                      {activeChallenges.map((challenge) => {
+                        const isSelected = selectedBetChallengeIds.includes(challenge.id);
+                        const meetsMinOdds = quickBetSelection.odds >= challenge.minOdds;
+                        const difficultyLabel = challenge.difficulty === 'pro' ? 'Pro' : 'Beginner';
 
-                {/* Potential Return */}
-                {(() => {
-                  const potentialReturn = betStake * quickBetSelection.odds;
-
-                  return (
-                    <div className="bg-teal-900/30 border border-teal-800/30 rounded-xl p-4 mb-6">
-                      <div className="flex justify-between items-center">
-                        <span className="text-zinc-300">Potential Return</span>
-                        <div className="text-right">
-                          <div className="text-2xl font-bold text-teal-400 font-mono">€{potentialReturn.toFixed(2)}</div>
-                          <div className="text-xs text-teal-500">@ {quickBetSelection.odds.toFixed(2)} odds</div>
-                        </div>
-                      </div>
+                        return (
+                          <button
+                            key={challenge.id}
+                            onClick={() => {
+                              if (!meetsMinOdds) return;
+                              if (isSelected) {
+                                setSelectedBetChallengeIds(prev => prev.filter(id => id !== challenge.id));
+                              } else {
+                                setSelectedBetChallengeIds(prev => [...prev, challenge.id]);
+                              }
+                            }}
+                            disabled={!meetsMinOdds}
+                            className={`w-full p-3 rounded-xl border transition-all text-left ${
+                              !meetsMinOdds
+                                ? 'border-red-800/30 bg-red-900/10 opacity-50 cursor-not-allowed'
+                                : isSelected
+                                  ? 'border-teal-500 bg-teal-900/30'
+                                  : 'border-zinc-700 bg-zinc-800/50 hover:border-zinc-600'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
+                                  isSelected ? 'border-teal-500 bg-teal-500' : 'border-zinc-600'
+                                }`}>
+                                  {isSelected && (
+                                    <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                    </svg>
+                                  )}
+                                </div>
+                                <div>
+                                  <div className="text-white font-medium">
+                                    €{(challenge.tier / 1000)}K {difficultyLabel}
+                                  </div>
+                                  <div className="text-xs text-zinc-400">
+                                    Account {challenge.id.slice(-6).toLowerCase()} • Min odds: {challenge.minOdds.toFixed(2)}
+                                  </div>
+                                </div>
+                              </div>
+                              {!meetsMinOdds && (
+                                <span className="text-xs text-red-400">Odds too low</span>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
                     </div>
-                  );
-                })()}
+                    {selectedBetChallengeIds.length === 0 && (
+                      <p className="text-xs text-zinc-500 mt-2">Bet will be tracked but not applied to any challenge</p>
+                    )}
+                  </div>
+                )}
 
                 {/* Action Buttons */}
-                <div className="space-y-3">
-                  {/* Add to Parlay Button */}
+                <div className="flex gap-3">
                   <button
                     onClick={() => {
-                      addToParlay(quickBetEvent, quickBetSelection);
                       setBetModalOpen(false);
+                      setBetStake(10);
                       setQuickBetEvent(null);
                       setQuickBetSelection(null);
+                      setSelectedBetChallengeIds([]);
+                      setBetError(null);
                     }}
-                    className={`w-full py-3 px-4 font-medium rounded-xl transition-colors flex items-center justify-center gap-2 ${
-                      parlayLegs.some(leg => leg.eventId === quickBetEvent.id)
-                        ? 'bg-teal-600 text-white'
-                        : 'bg-teal-900/50 border border-teal-700/50 text-teal-300 hover:bg-teal-800/50'
-                    }`}
+                    className="flex-1 py-3 px-4 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-medium rounded-xl transition-colors"
                   >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                    </svg>
-                    {parlayLegs.some(leg => leg.eventId === quickBetEvent.id)
-                      ? 'Remove from Parlay'
-                      : `Add to Parlay ${parlayLegs.length > 0 ? `(${parlayLegs.length} legs)` : ''}`
-                    }
+                    Cancel
                   </button>
-
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() => {
-                        setBetModalOpen(false);
-                        setBetStake(10);
-                        setQuickBetEvent(null);
-                        setQuickBetSelection(null);
-                      }}
-                      className="flex-1 py-3 px-4 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-medium rounded-xl transition-colors"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleQuickBetPlace}
-                      disabled={placingBet}
-                      className="flex-1 py-3 px-4 bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-teal-400 text-white font-semibold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                    >
-                      {placingBet ? (
-                        <>
-                          <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                          </svg>
-                          <span>Placing...</span>
-                        </>
-                      ) : (
-                        <span>Straight Bet</span>
-                      )}
-                    </button>
-                  </div>
+                  <button
+                    onClick={handleQuickBetPlace}
+                    disabled={placingBet}
+                    className="flex-[2] py-3 px-4 bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-teal-400 text-white font-semibold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {placingBet ? (
+                      <>
+                        <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                        <span>Placing...</span>
+                      </>
+                    ) : (
+                      <span>Place Bet</span>
+                    )}
+                  </button>
                 </div>
               </>
             )}
@@ -4650,55 +4581,6 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                {/* Stake Input */}
-                <div className="mb-6">
-                  <label className="block text-sm font-medium text-zinc-300 mb-2">Stake Amount (€)</label>
-                  <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 font-semibold">€</span>
-                    <input
-                      type="number"
-                      min="1"
-                      step="5"
-                      value={parlayStake}
-                      onChange={(e) => setParlayStake(Math.max(1, Number(e.target.value)))}
-                      className="w-full pl-8 pr-4 py-3 bg-zinc-900/80 border border-teal-800/30 rounded-xl text-white font-mono text-lg focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500"
-                    />
-                  </div>
-                  {/* Quick stake buttons */}
-                  <div className="flex gap-2 mt-3">
-                    {[10, 25, 50, 100].map(amount => (
-                      <button
-                        key={amount}
-                        onClick={() => setParlayStake(amount)}
-                        className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
-                          parlayStake === amount
-                            ? 'bg-teal-600 text-white'
-                            : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
-                        }`}
-                      >
-                        ${amount}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Potential Return */}
-                {(() => {
-                  const parlayOdds = calculateParlayOdds();
-                  const potentialReturn = parlayStake * parlayOdds;
-
-                  return (
-                    <div className="bg-teal-900/30 border border-teal-800/30 rounded-xl p-4 mb-6">
-                      <div className="flex justify-between items-center">
-                        <span className="text-zinc-300">Potential Return</span>
-                        <div className="text-right">
-                          <div className="text-2xl font-bold text-teal-400 font-mono">€{potentialReturn.toFixed(2)}</div>
-                          <div className="text-xs text-teal-500">@ {parlayOdds.toFixed(2)} combined odds</div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })()}
 
                 {/* Action Buttons */}
                 <div className="flex gap-3">
@@ -4790,12 +4672,11 @@ export default function Dashboard() {
               {/* Claim Button */}
               <button
                 onClick={() => {
-                  const rewardValues: Record<number, number> = { 1: 3, 2: 100, 3: 500, 4: 1000 };
-                  setClaimedRewards(prev => [...prev, rewardToClaim]);
-                  setTotalEarnings(prev => prev + (rewardValues[rewardToClaim] || 0));
+                  setClaimedRewards(prev => [...prev, rewardToClaim!]);
                   setRewardModalOpen(false);
-                  // Navigate to rewards tab
+                  // Navigate to rewards tab and refresh payouts
                   setActiveTab('rewards');
+                  fetchPayouts();
                 }}
                 className="w-full py-4 rounded-xl font-bold text-white bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-teal-400 transition-all shadow-lg shadow-teal-500/30 mb-4"
               >
@@ -4820,19 +4701,12 @@ export default function Dashboard() {
       {/* CHALLENGE PURCHASE MODAL */}
       {purchaseModalOpen && selectedChallenge && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-3" onClick={() => setPurchaseModalOpen(false)}>
-          <div className="bg-gradient-to-b from-[#1a1a1a] to-[#111111] border border-zinc-800 rounded-xl p-4 w-full max-w-[360px] max-h-[85vh] overflow-y-auto relative" onClick={e => e.stopPropagation()}>
+          <div className="bg-gradient-to-b from-[#1a1a1a] to-[#111111] border border-zinc-800 rounded-2xl p-8 w-full max-w-[520px] max-h-[90vh] overflow-y-auto relative" onClick={e => e.stopPropagation()}>
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(45,180,180,0.12),transparent_60%)] pointer-events-none rounded-xl"></div>
             <button onClick={() => setPurchaseModalOpen(false)} className="absolute top-3 right-3 text-zinc-500 hover:text-white transition-colors z-10">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
             <div className="relative">
-              {/* Header */}
-              <div className="text-center mb-3">
-                <span className="text-2xl block">🎮</span>
-                <h2 className="text-lg font-bold text-white">Start Challenge</h2>
-                <p className="text-zinc-400 text-xs">Build your winning streak</p>
-              </div>
-
               {/* Difficulty Selector */}
               <div className="grid grid-cols-2 gap-2 mb-3">
                 <button
@@ -4996,9 +4870,9 @@ export default function Dashboard() {
 
       {/* PAYOUT REQUEST MODAL */}
       {payoutModalOpen && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setPayoutModalOpen(false)}>
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => { setPayoutModalOpen(false); setPayoutError(null); }}>
           <div
-            className="bg-gradient-to-b from-emerald-950/80 via-emerald-900/60 to-[#111111] border border-emerald-700/40 rounded-2xl p-6 w-full max-w-md relative overflow-hidden"
+            className="bg-gradient-to-b from-emerald-950/80 via-emerald-900/60 to-[#111111] border border-emerald-700/40 rounded-2xl p-6 w-full max-w-md relative overflow-hidden max-h-[90vh] overflow-y-auto"
             onClick={e => e.stopPropagation()}
           >
             {/* Background glow */}
@@ -5006,7 +4880,7 @@ export default function Dashboard() {
 
             {/* Close button */}
             <button
-              onClick={() => setPayoutModalOpen(false)}
+              onClick={() => { setPayoutModalOpen(false); setPayoutError(null); }}
               className="absolute top-4 right-4 text-zinc-500 hover:text-white transition-colors z-10"
             >
               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -5019,73 +4893,188 @@ export default function Dashboard() {
               <div className="text-center mb-6">
                 <span className="text-4xl mb-2 block">💸</span>
                 <h2 className="text-2xl font-bold text-white">Request Payout</h2>
-                <p className="text-emerald-400 text-sm mt-1">Available: ${totalEarnings.toLocaleString()}</p>
+                <p className="text-emerald-400 text-sm mt-1">Available: €{availableBalance.toLocaleString()}</p>
               </div>
 
+              {/* Error Message */}
+              {payoutError && (
+                <div className="mb-4 p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400 text-sm">
+                  {payoutError}
+                </div>
+              )}
+
               {/* Amount Input */}
-              <div className="mb-6">
+              <div className="mb-4">
                 <label className="block text-sm font-medium text-zinc-300 mb-2">Withdrawal Amount</label>
                 <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-400 font-bold text-xl">$</span>
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-400 font-bold text-xl">€</span>
                   <input
                     type="number"
-                    min="50"
-                    max={totalEarnings}
+                    min="10"
+                    max={availableBalance}
                     value={payoutAmount}
-                    onChange={(e) => setPayoutAmount(Math.max(50, Math.min(totalEarnings, Number(e.target.value))))}
-                    className="w-full pl-10 pr-4 py-4 bg-zinc-900/80 border border-emerald-800/30 rounded-xl text-white font-mono text-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500"
+                    onChange={(e) => setPayoutAmount(Math.max(10, Math.min(availableBalance, Number(e.target.value))))}
+                    className="w-full pl-10 pr-4 py-3 bg-zinc-900/80 border border-emerald-800/30 rounded-xl text-white font-mono text-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500"
                   />
                 </div>
-                <div className="text-xs text-zinc-500 mt-2">Minimum withdrawal: $50</div>
+                <div className="text-xs text-zinc-500 mt-1">Minimum withdrawal: €10</div>
               </div>
 
               {/* Quick Amount Buttons */}
-              <div className="grid grid-cols-4 gap-2 mb-6">
-                {[50, 100, 250, totalEarnings].map((amount, idx) => (
+              <div className="grid grid-cols-4 gap-2 mb-4">
+                {[10, 50, 100, availableBalance].map((amount, idx) => (
                   <button
                     key={idx}
-                    onClick={() => setPayoutAmount(Math.min(amount, totalEarnings))}
-                    disabled={amount > totalEarnings}
+                    onClick={() => setPayoutAmount(Math.min(amount, availableBalance))}
+                    disabled={amount > availableBalance}
                     className={`py-2 rounded-lg text-sm font-medium transition-all ${
                       payoutAmount === amount
                         ? 'bg-emerald-600 text-white'
-                        : amount > totalEarnings
+                        : amount > availableBalance
                           ? 'bg-zinc-800/50 text-zinc-600 cursor-not-allowed'
                           : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
                     }`}
                   >
-                    {idx === 3 ? 'Max' : `$${amount}`}
+                    {idx === 3 ? 'Max' : `€${amount}`}
                   </button>
                 ))}
               </div>
 
+              {/* Payment Method Selection */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-zinc-300 mb-2">Payment Method</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { id: 'bank', label: 'Bank', icon: '🏦' },
+                    { id: 'paypal', label: 'PayPal', icon: '💳' },
+                    { id: 'crypto', label: 'Crypto', icon: '₿' },
+                  ].map((method) => (
+                    <button
+                      key={method.id}
+                      onClick={() => setPayoutMethod(method.id as 'bank' | 'paypal' | 'crypto')}
+                      className={`py-3 rounded-lg text-sm font-medium transition-all flex flex-col items-center gap-1 ${
+                        payoutMethod === method.id
+                          ? 'bg-emerald-600 text-white'
+                          : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                      }`}
+                    >
+                      <span className="text-lg">{method.icon}</span>
+                      <span>{method.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Payment Details Form */}
+              <div className="mb-4 space-y-3">
+                {payoutMethod === 'bank' && (
+                  <>
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-400 mb-1">IBAN</label>
+                      <input
+                        type="text"
+                        placeholder="DE89 3704 0044 0532 0130 00"
+                        value={payoutDetails.iban || ''}
+                        onChange={(e) => setPayoutDetails(prev => ({ ...prev, iban: e.target.value }))}
+                        className="w-full px-3 py-2 bg-zinc-900/80 border border-zinc-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-400 mb-1">Account Holder Name</label>
+                      <input
+                        type="text"
+                        placeholder="John Doe"
+                        value={payoutDetails.accountName || ''}
+                        onChange={(e) => setPayoutDetails(prev => ({ ...prev, accountName: e.target.value }))}
+                        className="w-full px-3 py-2 bg-zinc-900/80 border border-zinc-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-400 mb-1">Bank Name (optional)</label>
+                      <input
+                        type="text"
+                        placeholder="Deutsche Bank"
+                        value={payoutDetails.bankName || ''}
+                        onChange={(e) => setPayoutDetails(prev => ({ ...prev, bankName: e.target.value }))}
+                        className="w-full px-3 py-2 bg-zinc-900/80 border border-zinc-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {payoutMethod === 'paypal' && (
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-400 mb-1">PayPal Email</label>
+                    <input
+                      type="email"
+                      placeholder="your@email.com"
+                      value={payoutDetails.paypalEmail || ''}
+                      onChange={(e) => setPayoutDetails(prev => ({ ...prev, paypalEmail: e.target.value }))}
+                      className="w-full px-3 py-2 bg-zinc-900/80 border border-zinc-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                    />
+                  </div>
+                )}
+
+                {payoutMethod === 'crypto' && (
+                  <>
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-400 mb-1">Network</label>
+                      <select
+                        value={payoutDetails.network || ''}
+                        onChange={(e) => setPayoutDetails(prev => ({ ...prev, network: e.target.value }))}
+                        className="w-full px-3 py-2 bg-zinc-900/80 border border-zinc-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                      >
+                        <option value="">Select network</option>
+                        <option value="bitcoin">Bitcoin (BTC)</option>
+                        <option value="ethereum">Ethereum (ETH)</option>
+                        <option value="usdt-trc20">USDT (TRC-20)</option>
+                        <option value="usdt-erc20">USDT (ERC-20)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-400 mb-1">Wallet Address</label>
+                      <input
+                        type="text"
+                        placeholder="Enter your wallet address"
+                        value={payoutDetails.walletAddress || ''}
+                        onChange={(e) => setPayoutDetails(prev => ({ ...prev, walletAddress: e.target.value }))}
+                        className="w-full px-3 py-2 bg-zinc-900/80 border border-zinc-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+
               {/* Summary */}
-              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 mb-6">
-                <div className="flex justify-between mb-2">
-                  <span className="text-zinc-400">Withdrawal Amount</span>
-                  <span className="text-white font-mono">${payoutAmount.toLocaleString()}</span>
+              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-3 mb-4">
+                <div className="flex justify-between mb-1">
+                  <span className="text-zinc-400 text-sm">Withdrawal Amount</span>
+                  <span className="text-white font-mono">€{payoutAmount.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-zinc-400">Remaining Balance</span>
-                  <span className="text-emerald-400 font-mono">${(totalEarnings - payoutAmount).toLocaleString()}</span>
+                  <span className="text-zinc-400 text-sm">Remaining Balance</span>
+                  <span className="text-emerald-400 font-mono">€{(availableBalance - payoutAmount).toLocaleString()}</span>
                 </div>
               </div>
 
               {/* Submit Button */}
               <button
-                onClick={() => {
-                  setTotalEarnings(prev => prev - payoutAmount);
-                  setPayoutModalOpen(false);
-                  alert(`Payout request for $${payoutAmount} submitted! You will receive your funds within 3-5 business days.`);
-                }}
-                disabled={payoutAmount < 50 || payoutAmount > totalEarnings}
-                className="w-full py-4 rounded-xl font-bold text-white bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={submitPayoutRequest}
+                disabled={payoutAmount < 10 || payoutAmount > availableBalance || submittingPayout}
+                className="w-full py-3 rounded-xl font-bold text-white bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                Submit Payout Request
+                {submittingPayout ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    Processing...
+                  </>
+                ) : (
+                  'Submit Payout Request'
+                )}
               </button>
 
-              <p className="text-xs text-zinc-500 text-center mt-4">
-                Payouts are processed within 3-5 business days via your preferred payment method.
+              <p className="text-xs text-zinc-500 text-center mt-3">
+                Payouts are processed within 1-3 business days.
               </p>
             </div>
           </div>

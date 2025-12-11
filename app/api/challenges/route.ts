@@ -66,6 +66,14 @@ export async function GET(req: NextRequest) {
         )
       );
 
+      // Calculate pending rewards (completed levels that haven't been paid yet)
+      const pendingRewards = (challenge.rewards || []).filter(
+        (r: any) => r.status === 'pending'
+      );
+      const paidRewards = (challenge.rewards || []).filter(
+        (r: any) => r.status === 'paid'
+      );
+
       return {
         ...challenge,
         tierLabel: tier?.label || `€${challenge.tier / 1000}K`,
@@ -80,6 +88,9 @@ export async function GET(req: NextRequest) {
           challenge.level3Completed,
           challenge.level4Completed,
         ].filter(Boolean).length,
+        pendingRewards,
+        paidRewards,
+        totalPendingAmount: pendingRewards.reduce((sum: number, r: any) => sum + r.amount, 0),
       };
     });
 
