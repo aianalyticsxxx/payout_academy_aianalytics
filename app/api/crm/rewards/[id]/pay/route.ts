@@ -8,12 +8,12 @@ import { markRewardAsPaid } from '@/lib/crm/analytics';
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { session } = await requireAdmin();
     const adminId = (session.user as any).id;
-    const { id } = params;
+    const { id } = await params;
 
     const reward = await markRewardAsPaid(id, adminId);
 

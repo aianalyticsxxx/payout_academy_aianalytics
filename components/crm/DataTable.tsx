@@ -17,6 +17,7 @@ interface DataTableProps<T> {
   data: T[];
   loading?: boolean;
   emptyMessage?: string;
+  maxItems?: number;
 }
 
 export function DataTable<T extends Record<string, any>>({
@@ -24,7 +25,9 @@ export function DataTable<T extends Record<string, any>>({
   data,
   loading = false,
   emptyMessage = 'No data available',
+  maxItems,
 }: DataTableProps<T>) {
+  const displayData = maxItems ? data.slice(0, maxItems) : data;
   if (loading) {
     return (
       <div className="bg-surface border border-zinc-800/50 rounded-lg overflow-hidden">
@@ -38,7 +41,7 @@ export function DataTable<T extends Record<string, any>>({
     );
   }
 
-  if (data.length === 0) {
+  if (displayData.length === 0) {
     return (
       <div className="bg-surface border border-zinc-800/50 rounded-lg p-12 text-center">
         <p className="text-zinc-500">{emptyMessage}</p>
@@ -63,7 +66,7 @@ export function DataTable<T extends Record<string, any>>({
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-800/30">
-            {data.map((row, index) => (
+            {displayData.map((row, index) => (
               <tr
                 key={index}
                 className="hover:bg-teal-900/10 transition-colors"

@@ -4,11 +4,20 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { StatCard } from '@/components/crm/StatCard';
 import { DataTable } from '@/components/crm/DataTable';
 import { Badge, StatusBadge } from '@/components/ui/Badge';
+import { CRMPageHeader } from '@/components/crm/CRMPageHeader';
+
+interface DifficultyStats {
+  count: number;
+  wins: number;
+  losses: number;
+  staked: number;
+  winRate: number;
+}
 
 interface BettingAnalytics {
   summary: {
@@ -22,6 +31,11 @@ interface BettingAnalytics {
   sportStats: Record<string, { count: number; staked: number; profitLoss: number }>;
   winRateBySport: Record<string, { wins: number; losses: number; rate: number }>;
   typeDistribution: Record<string, number>;
+  difficultyStats: {
+    beginner: DifficultyStats;
+    pro: DifficultyStats;
+    unlinked: DifficultyStats;
+  };
   recentBets: any[];
   highStakeBets: any[];
   unsettledBets: any[];
@@ -37,23 +51,25 @@ export default function BetsPage() {
   const [selectedBet, setSelectedBet] = useState<any>(null);
   const [settleResult, setSettleResult] = useState<'won' | 'lost' | 'push' | 'void'>('won');
   const [settleReason, setSettleReason] = useState('');
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   useEffect(() => {
     fetchData();
   }, [period]);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fetch(`/api/crm/analytics/bets?period=${period}`);
       const result = await response.json();
       setData(result);
+      setLastUpdated(new Date());
     } catch (error) {
       console.error('Failed to fetch betting analytics:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [period]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -103,19 +119,34 @@ export default function BetsPage() {
     setShowSettleModal(true);
   };
 
-  const sportLabels: Record<string, string> = {
-    basketball_nba: 'NBA',
-    basketball_euroleague: 'Euroleague',
-    soccer_epl: 'Premier League',
-    soccer_spain_la_liga: 'La Liga',
-    soccer_italy_serie_a: 'Serie A',
-    soccer_germany_bundesliga: 'Bundesliga',
-    americanfootball_nfl: 'NFL',
-    icehockey_nhl: 'NHL',
-    baseball_mlb: 'MLB',
+  // Map league keys to sport names for display (used in bets table)
+  const getSportName = (leagueKey: string): string => {
+    if (leagueKey.startsWith('basketball')) return 'Basketball';
+    if (leagueKey.startsWith('soccer')) return 'Football';
+    if (leagueKey.startsWith('americanfootball')) return 'American Football';
+    if (leagueKey.startsWith('icehockey')) return 'Ice Hockey';
+    if (leagueKey.startsWith('baseball')) return 'Baseball';
+    if (leagueKey.startsWith('tennis')) return 'Tennis';
+    if (leagueKey.startsWith('mma')) return 'MMA';
+    if (leagueKey.startsWith('boxing')) return 'Boxing';
+    if (leagueKey.startsWith('golf')) return 'Golf';
+    if (leagueKey.startsWith('aussierules')) return 'Aussie Rules';
+    if (leagueKey.startsWith('rugbyleague')) return 'Rugby League';
+    if (leagueKey.startsWith('rugbyunion')) return 'Rugby Union';
+    return leagueKey;
   };
 
   const betColumns = [
+    {
+      key: 'createdAt',
+      label: 'Date & Time',
+      render: (createdAt: string) => (
+        <div className="text-sm">
+          <div className="text-white">{new Date(createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
+          <div className="text-zinc-500 text-xs">{new Date(createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</div>
+        </div>
+      ),
+    },
     {
       key: 'user',
       label: 'User',
@@ -130,7 +161,7 @@ export default function BetsPage() {
       key: 'sport',
       label: 'Sport',
       render: (sport: string) => (
-        <span className="text-zinc-300">{sportLabels[sport] || sport}</span>
+        <span className="text-zinc-300">{getSportName(sport)}</span>
       ),
     },
     {
@@ -166,19 +197,6 @@ export default function BetsPage() {
       label: 'Result',
       render: (result: string) => <StatusBadge status={result} />,
     },
-    {
-      key: 'profitLoss',
-      label: 'P/L',
-      render: (pl: number | null, row: any) => (
-        row.result === 'PENDING' ? (
-          <span className="text-zinc-500">—</span>
-        ) : (
-          <span className={pl && pl >= 0 ? 'text-green-400' : 'text-red-400'}>
-            {formatCurrency(pl || 0)}
-          </span>
-        )
-      ),
-    },
   ];
 
   // Additional columns for unsettled bets with settle action
@@ -205,13 +223,17 @@ export default function BetsPage() {
 
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-white mb-2">Betting Analytics</h1>
-        <p className="text-zinc-400">
-          Betting activity, performance, and trends
-        </p>
-      </div>
+      <CRMPageHeader
+        title="Betting Analytics"
+        description="Betting activity, performance, and trends"
+        icon="🎲"
+        breadcrumbs={[{ label: 'Betting' }]}
+        onRefresh={fetchData}
+        loading={loading}
+        lastUpdated={lastUpdated}
+        autoRefresh={true}
+        autoRefreshInterval={30}
+      />
 
       {/* Period Selector */}
       <div className="mb-6 flex gap-2">
@@ -234,7 +256,7 @@ export default function BetsPage() {
       </div>
 
       {/* Summary Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <StatCard
           title="Total Bets"
           value={data?.summary.totalBets || 0}
@@ -243,24 +265,10 @@ export default function BetsPage() {
           loading={loading}
         />
         <StatCard
-          title="Total Staked"
-          value={data ? formatCurrency(data.summary.totalStaked) : '—'}
-          icon="💵"
-          description="All bets combined"
-          loading={loading}
-        />
-        <StatCard
           title="Win Rate"
           value={data ? `${data.summary.winRate}%` : '—'}
           icon="📊"
           description="Settled bets"
-          loading={loading}
-        />
-        <StatCard
-          title="Total P/L"
-          value={data ? formatCurrency(data.summary.totalProfitLoss) : '—'}
-          icon={data && data.summary.totalProfitLoss >= 0 ? '📈' : '📉'}
-          description="Platform-wide"
           loading={loading}
         />
         <StatCard
@@ -287,23 +295,33 @@ export default function BetsPage() {
           </CardHeader>
           <CardContent>
             {data && data.sportStats && Object.keys(data.sportStats).length > 0 ? (
-              <div className="space-y-3">
-                {Object.entries(data.sportStats)
-                  .sort(([, a], [, b]) => b.count - a.count)
-                  .map(([sport, stats]) => (
-                    <div key={sport} className="flex justify-between items-center">
-                      <span className="text-zinc-300">{sportLabels[sport] || sport}</span>
-                      <div className="text-right">
-                        <span className="text-white font-bold">{stats.count}</span>
-                        <span className="text-zinc-500 text-sm ml-2">
-                          ({formatCurrency(stats.staked)})
-                        </span>
-                      </div>
-                    </div>
-                  ))}
+              <div className="space-y-4">
+                {(() => {
+                  const totalBets = Object.values(data.sportStats).reduce((sum, s) => sum + s.count, 0);
+                  return Object.entries(data.sportStats)
+                    .sort(([, a], [, b]) => b.count - a.count)
+                    .map(([sport, stats]) => {
+                      const percentage = totalBets > 0 ? (stats.count / totalBets) * 100 : 0;
+                      return (
+                        <div key={sport} className="bg-zinc-800/30 rounded-lg p-3">
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="text-white font-medium">{sport}</span>
+                            <span className="text-teal-400 font-bold">{stats.count} bets</span>
+                          </div>
+                          <div className="h-2 bg-zinc-700 rounded-full overflow-hidden mb-2">
+                            <div
+                              className="h-full bg-gradient-to-r from-teal-600 to-teal-400 rounded-full transition-all"
+                              style={{ width: `${percentage}%` }}
+                            />
+                          </div>
+                          <div className="text-xs text-zinc-500">{percentage.toFixed(1)}% of all bets</div>
+                        </div>
+                      );
+                    });
+                })()}
               </div>
             ) : (
-              <div className="text-zinc-500 text-center py-4">No data</div>
+              <div className="text-zinc-500 text-center py-8">No betting data yet</div>
             )}
           </CardContent>
         </Card>
@@ -314,34 +332,124 @@ export default function BetsPage() {
           </CardHeader>
           <CardContent>
             {data && data.winRateBySport && Object.keys(data.winRateBySport).length > 0 ? (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {Object.entries(data.winRateBySport)
                   .filter(([, stats]) => stats.wins + stats.losses > 0)
                   .sort(([, a], [, b]) => b.rate - a.rate)
-                  .map(([sport, stats]) => (
-                    <div key={sport}>
-                      <div className="flex justify-between mb-1">
-                        <span className="text-zinc-300">{sportLabels[sport] || sport}</span>
-                        <span className="text-teal-400 font-bold">{stats.rate.toFixed(1)}%</span>
+                  .map(([sport, stats]) => {
+                    const total = stats.wins + stats.losses;
+                    return (
+                      <div key={sport} className="bg-zinc-800/30 rounded-lg p-3">
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="text-white font-medium">{sport}</span>
+                          <span className={`font-bold ${stats.rate >= 50 ? 'text-green-400' : 'text-red-400'}`}>
+                            {stats.rate.toFixed(1)}%
+                          </span>
+                        </div>
+                        <div className="h-2 bg-zinc-700 rounded-full overflow-hidden mb-2">
+                          <div
+                            className={`h-full rounded-full transition-all ${
+                              stats.rate >= 50
+                                ? 'bg-gradient-to-r from-green-600 to-green-400'
+                                : 'bg-gradient-to-r from-red-600 to-red-400'
+                            }`}
+                            style={{ width: `${stats.rate}%` }}
+                          />
+                        </div>
+                        <div className="flex justify-between text-xs">
+                          <span className="text-green-400">{stats.wins} wins</span>
+                          <span className="text-zinc-500">{total} total</span>
+                          <span className="text-red-400">{stats.losses} losses</span>
+                        </div>
                       </div>
-                      <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-teal-500 rounded-full"
-                          style={{ width: `${stats.rate}%` }}
-                        />
-                      </div>
-                      <div className="text-xs text-zinc-500 mt-1">
-                        {stats.wins}W - {stats.losses}L
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
               </div>
             ) : (
-              <div className="text-zinc-500 text-center py-4">No settled bets</div>
+              <div className="text-zinc-500 text-center py-8">No settled bets yet</div>
             )}
           </CardContent>
         </Card>
       </div>
+
+      {/* Beginner vs Pro Stats */}
+      {data && data.difficultyStats && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          <Card>
+            <CardHeader>
+              <CardTitle>Beginner Bets</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="bg-zinc-800/30 rounded-lg p-3">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-white font-medium">Total Bets</span>
+                    <span className="text-teal-400 font-bold">{data.difficultyStats.beginner.count}</span>
+                  </div>
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-white font-medium">Win Rate</span>
+                    <span className={`font-bold ${data.difficultyStats.beginner.winRate >= 50 ? 'text-green-400' : 'text-red-400'}`}>
+                      {data.difficultyStats.beginner.winRate}%
+                    </span>
+                  </div>
+                  <div className="h-2 bg-zinc-700 rounded-full overflow-hidden mb-2">
+                    <div
+                      className={`h-full rounded-full transition-all ${
+                        data.difficultyStats.beginner.winRate >= 50
+                          ? 'bg-gradient-to-r from-green-600 to-green-400'
+                          : 'bg-gradient-to-r from-red-600 to-red-400'
+                      }`}
+                      style={{ width: `${data.difficultyStats.beginner.winRate}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-green-400">{data.difficultyStats.beginner.wins} wins</span>
+                    <span className="text-zinc-500">{data.difficultyStats.beginner.wins + data.difficultyStats.beginner.losses} settled</span>
+                    <span className="text-red-400">{data.difficultyStats.beginner.losses} losses</span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Pro Bets</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="bg-zinc-800/30 rounded-lg p-3">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-white font-medium">Total Bets</span>
+                    <span className="text-teal-400 font-bold">{data.difficultyStats.pro.count}</span>
+                  </div>
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-white font-medium">Win Rate</span>
+                    <span className={`font-bold ${data.difficultyStats.pro.winRate >= 50 ? 'text-green-400' : 'text-red-400'}`}>
+                      {data.difficultyStats.pro.winRate}%
+                    </span>
+                  </div>
+                  <div className="h-2 bg-zinc-700 rounded-full overflow-hidden mb-2">
+                    <div
+                      className={`h-full rounded-full transition-all ${
+                        data.difficultyStats.pro.winRate >= 50
+                          ? 'bg-gradient-to-r from-green-600 to-green-400'
+                          : 'bg-gradient-to-r from-red-600 to-red-400'
+                      }`}
+                      style={{ width: `${data.difficultyStats.pro.winRate}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-green-400">{data.difficultyStats.pro.wins} wins</span>
+                    <span className="text-zinc-500">{data.difficultyStats.pro.wins + data.difficultyStats.pro.losses} settled</span>
+                    <span className="text-red-400">{data.difficultyStats.pro.losses} losses</span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Bet Type Distribution */}
       {data && data.typeDistribution && Object.keys(data.typeDistribution).length > 0 && (

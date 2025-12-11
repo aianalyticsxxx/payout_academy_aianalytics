@@ -42,8 +42,10 @@ export async function GET(req: NextRequest) {
       allTimeChallenges,
       revenueByTier,
       pendingRewards,
+      paidRewards,
       topRevenueUsers,
       recentPurchases,
+      allChallengesInPeriod,
     ] = await Promise.all([
       // Period revenue
       prisma.challenge.aggregate({
@@ -72,9 +74,9 @@ export async function GET(req: NextRequest) {
         _count: true,
       }),
 
-      // Revenue breakdown by tier
+      // Revenue breakdown by tier and difficulty
       prisma.challenge.groupBy({
-        by: ['tier'],
+        by: ['tier', 'difficulty'],
         where: { purchasedAt: { gte: startDate } },
         _sum: { cost: true },
         _count: true,
@@ -83,6 +85,13 @@ export async function GET(req: NextRequest) {
       // Pending rewards (liability)
       prisma.challengeReward.aggregate({
         where: { status: 'PENDING' },
+        _sum: { amount: true },
+        _count: true,
+      }),
+
+      // Paid rewards
+      prisma.challengeReward.aggregate({
+        where: { status: 'paid' },
         _sum: { amount: true },
         _count: true,
       }),
@@ -106,6 +115,12 @@ export async function GET(req: NextRequest) {
             select: { id: true, username: true, email: true, avatar: true },
           },
         },
+      }),
+
+      // All challenges in period for daily breakdown
+      prisma.challenge.findMany({
+        where: { purchasedAt: { gte: startDate } },
+        select: { purchasedAt: true, cost: true },
       }),
     ]);
 
@@ -134,41 +149,71 @@ export async function GET(req: NextRequest) {
       _count: true,
     });
 
-    // Format revenue by tier
-    const tierRevenue: Record<number, { revenue: number; count: number }> = {};
+    // Format revenue by tier with difficulty breakdown
+    const tierRevenue: Record<number, {
+      revenue: number;
+      count: number;
+      beginner: { revenue: number; count: number };
+      pro: { revenue: number; count: number };
+    }> = {};
+
     revenueByTier.forEach((t) => {
-      tierRevenue[t.tier] = {
-        revenue: t._sum.cost || 0,
-        count: t._count,
-      };
+      if (!tierRevenue[t.tier]) {
+        tierRevenue[t.tier] = {
+          revenue: 0,
+          count: 0,
+          beginner: { revenue: 0, count: 0 },
+          pro: { revenue: 0, count: 0 },
+        };
+      }
+      tierRevenue[t.tier].revenue += t._sum.cost || 0;
+      tierRevenue[t.tier].count += t._count;
+
+      if (t.difficulty === 'beginner') {
+        tierRevenue[t.tier].beginner.revenue += t._sum.cost || 0;
+        tierRevenue[t.tier].beginner.count += t._count;
+      } else if (t.difficulty === 'pro') {
+        tierRevenue[t.tier].pro.revenue += t._sum.cost || 0;
+        tierRevenue[t.tier].pro.count += t._count;
+      }
     });
 
-    // Daily revenue for chart (last 30 days)
-    const dailyRevenue: Array<{ date: string; revenue: number; count: number }> = [];
+    // Calculate difficulty totals
+    const difficultyRevenue = {
+      beginner: { revenue: 0, count: 0 },
+      pro: { revenue: 0, count: 0 },
+    };
+    Object.values(tierRevenue).forEach((t) => {
+      difficultyRevenue.beginner.revenue += t.beginner.revenue;
+      difficultyRevenue.beginner.count += t.beginner.count;
+      difficultyRevenue.pro.revenue += t.pro.revenue;
+      difficultyRevenue.pro.count += t.pro.count;
+    });
+
+    // Calculate daily revenue from the fetched data (efficient single query approach)
+    const dailyRevenueMap = new Map<string, { revenue: number; count: number }>();
+
+    // Initialize last 30 days
     for (let i = 29; i >= 0; i--) {
       const date = new Date();
       date.setDate(date.getDate() - i);
-      date.setHours(0, 0, 0, 0);
-      const nextDate = new Date(date);
-      nextDate.setDate(nextDate.getDate() + 1);
-
-      const dayRevenue = await prisma.challenge.aggregate({
-        where: {
-          purchasedAt: {
-            gte: date,
-            lt: nextDate,
-          },
-        },
-        _sum: { cost: true },
-        _count: true,
-      });
-
-      dailyRevenue.push({
-        date: date.toISOString().split('T')[0],
-        revenue: dayRevenue._sum.cost || 0,
-        count: dayRevenue._count,
-      });
+      const dateKey = date.toISOString().split('T')[0];
+      dailyRevenueMap.set(dateKey, { revenue: 0, count: 0 });
     }
+
+    // Aggregate from fetched challenges
+    allChallengesInPeriod.forEach((c) => {
+      const dateKey = c.purchasedAt.toISOString().split('T')[0];
+      const existing = dailyRevenueMap.get(dateKey);
+      if (existing) {
+        existing.revenue += c.cost;
+        existing.count += 1;
+      }
+    });
+
+    const dailyRevenue = Array.from(dailyRevenueMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, data]) => ({ date, ...data }));
 
     return NextResponse.json({
       summary: {
@@ -179,12 +224,15 @@ export async function GET(req: NextRequest) {
         allTimeRevenue: allTimeChallenges._sum.cost || 0,
         pendingRewards: pendingRewards._sum.amount || 0,
         pendingRewardsCount: pendingRewards._count,
+        paidRewards: paidRewards._sum.amount || 0,
+        paidRewardsCount: paidRewards._count,
         arpu: Math.round(arpu * 100) / 100,
         totalUsers,
         payingUsers: payingUsers.length,
         conversionRate: totalUsers > 0 ? (payingUsers.length / totalUsers) * 100 : 0,
       },
       tierRevenue,
+      difficultyRevenue,
       dailyRevenue,
       topUsers,
       recentPurchases,

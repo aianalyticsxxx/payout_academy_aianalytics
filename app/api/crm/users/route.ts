@@ -15,6 +15,7 @@ export async function GET(req: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '50');
     const search = searchParams.get('search') || '';
     const tier = searchParams.get('tier') || '';
+    const difficulty = searchParams.get('difficulty') || '';
     const hasChallenge = searchParams.get('hasChallenge') === 'true';
 
     const result = await getUserAnalytics({
@@ -22,6 +23,7 @@ export async function GET(req: NextRequest) {
       limit,
       search,
       tier,
+      difficulty,
       hasChallenge,
     });
 

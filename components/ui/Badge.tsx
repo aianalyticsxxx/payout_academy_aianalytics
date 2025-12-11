@@ -34,6 +34,7 @@ export function StatusBadge({ status }: { status: string }) {
     active: { variant: 'success', label: 'Active' },
     completed: { variant: 'info', label: 'Completed' },
     expired: { variant: 'danger', label: 'Expired' },
+    failed: { variant: 'danger', label: 'Failed' },
     cancelled: { variant: 'default', label: 'Cancelled' },
     pending: { variant: 'warning', label: 'Pending' },
     paid: { variant: 'success', label: 'Paid' },

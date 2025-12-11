@@ -39,6 +39,7 @@ export async function GET(req: NextRequest) {
       recentBets,
       highStakeBets,
       unsettledBets,
+      betsWithChallenge,
     ] = await Promise.all([
       // All bets in period
       prisma.bet.findMany({
@@ -112,7 +113,42 @@ export async function GET(req: NextRequest) {
           },
         },
       }),
+
+      // Bets with challenge info for difficulty tracking
+      prisma.bet.findMany({
+        where: {
+          createdAt: { gte: startDate },
+        },
+        include: {
+          challengeBet: {
+            include: {
+              challenge: {
+                select: { difficulty: true },
+              },
+            },
+          },
+        },
+      }),
     ]);
+
+    // Helper to convert league key to sport name
+    const getSportName = (leagueKey: string): string => {
+      const key = leagueKey.toLowerCase();
+      // Handle both formats: "basketball_nba" and "NBA"
+      if (key.startsWith('basketball') || key === 'nba' || key === 'euroleague' || key === 'ncaab') return 'Basketball';
+      if (key.startsWith('soccer') || key === 'epl' || key === 'la_liga' || key === 'serie_a' || key === 'bundesliga' || key === 'ligue_1' || key === 'champions_league' || key === 'europa_league') return 'Football';
+      if (key.startsWith('americanfootball') || key === 'nfl' || key === 'ncaaf') return 'American Football';
+      if (key.startsWith('icehockey') || key === 'nhl') return 'Ice Hockey';
+      if (key.startsWith('baseball') || key === 'mlb') return 'Baseball';
+      if (key.startsWith('tennis') || key === 'atp' || key === 'wta') return 'Tennis';
+      if (key.startsWith('mma') || key === 'ufc') return 'MMA';
+      if (key.startsWith('boxing')) return 'Boxing';
+      if (key.startsWith('golf') || key === 'pga') return 'Golf';
+      if (key.startsWith('aussierules') || key === 'afl') return 'Aussie Rules';
+      if (key.startsWith('rugbyleague') || key === 'nrl') return 'Rugby League';
+      if (key.startsWith('rugbyunion')) return 'Rugby Union';
+      return leagueKey;
+    };
 
     // Calculate summary stats
     const totalBets = bets.length;
@@ -127,14 +163,15 @@ export async function GET(req: NextRequest) {
 
     const totalProfitLoss = bets.reduce((sum, b) => sum + (b.profitLoss || 0), 0);
 
-    // Win rate by sport
+    // Win rate by sport (aggregated by sport name, not league)
     const winRateBySport: Record<string, { wins: number; losses: number; rate: number }> = {};
     bets.forEach((bet) => {
-      if (!winRateBySport[bet.sport]) {
-        winRateBySport[bet.sport] = { wins: 0, losses: 0, rate: 0 };
+      const sportName = getSportName(bet.sport);
+      if (!winRateBySport[sportName]) {
+        winRateBySport[sportName] = { wins: 0, losses: 0, rate: 0 };
       }
-      if (bet.result === 'WON') winRateBySport[bet.sport].wins++;
-      if (bet.result === 'LOST') winRateBySport[bet.sport].losses++;
+      if (bet.result === 'WON') winRateBySport[sportName].wins++;
+      if (bet.result === 'LOST') winRateBySport[sportName].losses++;
     });
     Object.keys(winRateBySport).forEach((sport) => {
       const s = winRateBySport[sport];
@@ -142,20 +179,48 @@ export async function GET(req: NextRequest) {
       s.rate = total > 0 ? (s.wins / total) * 100 : 0;
     });
 
-    // Format bets by sport
+    // Format bets by sport (aggregated by sport name, not league)
     const sportStats: Record<string, { count: number; staked: number; profitLoss: number }> = {};
     betsBySport.forEach((s) => {
-      sportStats[s.sport] = {
-        count: s._count,
-        staked: s._sum.stake || 0,
-        profitLoss: s._sum.profitLoss || 0,
-      };
+      const sportName = getSportName(s.sport);
+      if (!sportStats[sportName]) {
+        sportStats[sportName] = { count: 0, staked: 0, profitLoss: 0 };
+      }
+      sportStats[sportName].count += s._count;
+      sportStats[sportName].staked += s._sum.stake || 0;
+      sportStats[sportName].profitLoss += s._sum.profitLoss || 0;
     });
 
     // Format bet type distribution
     const typeDistribution: Record<string, number> = {};
     betsByType.forEach((t) => {
       typeDistribution[t.betType] = t._count;
+    });
+
+    // Calculate difficulty stats (Beginner vs Pro)
+    const difficultyStats = {
+      beginner: { count: 0, wins: 0, losses: 0, staked: 0, winRate: 0 },
+      pro: { count: 0, wins: 0, losses: 0, staked: 0, winRate: 0 },
+      unlinked: { count: 0, wins: 0, losses: 0, staked: 0, winRate: 0 }, // Bets not linked to a challenge
+    };
+
+    betsWithChallenge.forEach((bet) => {
+      const difficulty = bet.challengeBet?.challenge?.difficulty || 'unlinked';
+      const key = difficulty as keyof typeof difficultyStats;
+
+      if (difficultyStats[key]) {
+        difficultyStats[key].count++;
+        difficultyStats[key].staked += bet.stake;
+        if (bet.result === 'WON') difficultyStats[key].wins++;
+        if (bet.result === 'LOST') difficultyStats[key].losses++;
+      }
+    });
+
+    // Calculate win rates for each difficulty
+    Object.keys(difficultyStats).forEach((key) => {
+      const stats = difficultyStats[key as keyof typeof difficultyStats];
+      const settled = stats.wins + stats.losses;
+      stats.winRate = settled > 0 ? Math.round((stats.wins / settled) * 1000) / 10 : 0;
     });
 
     return NextResponse.json({
@@ -170,6 +235,7 @@ export async function GET(req: NextRequest) {
       sportStats,
       winRateBySport,
       typeDistribution,
+      difficultyStats,
       recentBets,
       highStakeBets,
       unsettledBets,

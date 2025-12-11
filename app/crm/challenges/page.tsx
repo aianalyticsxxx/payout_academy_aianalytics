@@ -4,11 +4,12 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { StatCard } from '@/components/crm/StatCard';
 import { DataTable } from '@/components/crm/DataTable';
 import { StatusBadge } from '@/components/ui/Badge';
+import { CRMPageHeader } from '@/components/crm/CRMPageHeader';
 
 interface ChallengeAnalytics {
   summary: {
@@ -16,11 +17,15 @@ interface ChallengeAnalytics {
     totalRevenue: number;
     avgDaysToComplete: number;
     completionRate: number;
+    totalRewardsEarned: number;
   };
   revenueByTier: Record<number, { revenue: number; count: number }>;
   statusDistribution: Record<string, number>;
   completionByTier: Record<number, { total: number; completed: number; rate: number }>;
   levelDistribution: Record<number, number>;
+  completedLevels: Record<number, number>;
+  difficultyBreakdown: Record<string, { count: number; revenue: number; rewardsEarned: number }>;
+  completionByDifficulty: Record<string, { total: number; completed: number; rate: number }>;
   recentChallenges: any[];
   expiringSoon: any[];
 }
@@ -29,23 +34,26 @@ export default function ChallengesPage() {
   const [data, setData] = useState<ChallengeAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState('30d');
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [levelTab, setLevelTab] = useState<'active' | 'completed'>('active');
 
   useEffect(() => {
     fetchData();
   }, [period]);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fetch(`/api/crm/analytics/challenges?period=${period}`);
       const result = await response.json();
       setData(result);
+      setLastUpdated(new Date());
     } catch (error) {
       console.error('Failed to fetch challenge analytics:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [period]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -82,6 +90,19 @@ export default function ChallengesPage() {
       ),
     },
     {
+      key: 'difficulty',
+      label: 'Difficulty',
+      render: (difficulty: string) => (
+        <span className={`px-2 py-1 rounded text-xs font-medium ${
+          difficulty === 'pro'
+            ? 'bg-purple-500/20 text-purple-400'
+            : 'bg-green-500/20 text-green-400'
+        }`}>
+          {difficulty === 'pro' ? '🔥 Pro' : '🌱 Beginner'}
+        </span>
+      ),
+    },
+    {
       key: 'currentLevel',
       label: 'Level',
       render: (level: number) => (
@@ -94,10 +115,12 @@ export default function ChallengesPage() {
       render: (status: string) => <StatusBadge status={status} />,
     },
     {
-      key: 'cost',
-      label: 'Cost',
-      render: (cost: number) => (
-        <span className="text-green-400">{formatCurrency(cost)}</span>
+      key: 'totalRewardsEarned',
+      label: 'Rewards',
+      render: (rewards: number) => (
+        <span className={`font-medium ${rewards > 0 ? 'text-orange-400' : 'text-zinc-600'}`}>
+          {formatCurrency(rewards || 0)}
+        </span>
       ),
     },
     {
@@ -130,6 +153,19 @@ export default function ChallengesPage() {
       ),
     },
     {
+      key: 'difficulty',
+      label: 'Difficulty',
+      render: (difficulty: string) => (
+        <span className={`px-2 py-1 rounded text-xs font-medium ${
+          difficulty === 'pro'
+            ? 'bg-purple-500/20 text-purple-400'
+            : 'bg-green-500/20 text-green-400'
+        }`}>
+          {difficulty === 'pro' ? '🔥 Pro' : '🌱 Beginner'}
+        </span>
+      ),
+    },
+    {
       key: 'currentLevel',
       label: 'Progress',
       render: (level: number) => (
@@ -142,6 +178,15 @@ export default function ChallengesPage() {
           ))}
           <span className="ml-2 text-zinc-400 text-sm">Level {level}</span>
         </div>
+      ),
+    },
+    {
+      key: 'totalRewardsEarned',
+      label: 'Rewards',
+      render: (rewards: number) => (
+        <span className={`font-medium ${rewards > 0 ? 'text-orange-400' : 'text-zinc-600'}`}>
+          {formatCurrency(rewards || 0)}
+        </span>
       ),
     },
     {
@@ -162,13 +207,16 @@ export default function ChallengesPage() {
 
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-white mb-2">Challenge Analytics</h1>
-        <p className="text-zinc-400">
-          Performance metrics and trends for challenge system
-        </p>
-      </div>
+      <CRMPageHeader
+        title="Challenge Analytics"
+        description="Performance metrics and trends for challenge system"
+        icon="🎯"
+        breadcrumbs={[{ label: 'Challenges' }]}
+        onRefresh={fetchData}
+        loading={loading}
+        lastUpdated={lastUpdated}
+        autoRefresh={false}
+      />
 
       {/* Period Selector */}
       <div className="mb-6 flex gap-2">
@@ -207,20 +255,81 @@ export default function ChallengesPage() {
           loading={loading}
         />
         <StatCard
+          title="Total Rewards Earned"
+          value={data ? formatCurrency(data.summary.totalRewardsEarned) : '—'}
+          icon="🏆"
+          description="Paid out to users"
+          loading={loading}
+        />
+        <StatCard
           title="Completion Rate"
           value={data ? `${data.summary.completionRate.toFixed(1)}%` : '—'}
           icon="✅"
           description="Challenges completed"
           loading={loading}
         />
-        <StatCard
-          title="Avg Days to Complete"
-          value={data?.summary.avgDaysToComplete || 0}
-          icon="⏱️"
-          description="Average completion time"
-          loading={loading}
-        />
       </div>
+
+      {/* Difficulty Breakdown */}
+      {data && data.difficultyBreakdown && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          <Card>
+            <CardHeader>
+              <CardTitle>Beginner Challenges</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-zinc-300">Count</span>
+                  <span className="text-white font-bold">{data.difficultyBreakdown.beginner?.count || 0}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-zinc-300">Revenue</span>
+                  <span className="text-teal-400 font-bold">{formatCurrency(data.difficultyBreakdown.beginner?.revenue || 0)}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-zinc-300">Rewards Paid</span>
+                  <span className="text-orange-400 font-bold">{formatCurrency(data.difficultyBreakdown.beginner?.rewardsEarned || 0)}</span>
+                </div>
+                {data.completionByDifficulty?.beginner && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-zinc-300">Completion Rate</span>
+                    <span className="text-white font-bold">{data.completionByDifficulty.beginner.rate.toFixed(1)}%</span>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Pro Challenges</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-zinc-300">Count</span>
+                  <span className="text-white font-bold">{data.difficultyBreakdown.pro?.count || 0}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-zinc-300">Revenue</span>
+                  <span className="text-teal-400 font-bold">{formatCurrency(data.difficultyBreakdown.pro?.revenue || 0)}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-zinc-300">Rewards Paid</span>
+                  <span className="text-orange-400 font-bold">{formatCurrency(data.difficultyBreakdown.pro?.rewardsEarned || 0)}</span>
+                </div>
+                {data.completionByDifficulty?.pro && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-zinc-300">Completion Rate</span>
+                    <span className="text-white font-bold">{data.completionByDifficulty.pro.rate.toFixed(1)}%</span>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Revenue by Tier */}
       {data && data.revenueByTier && Object.keys(data.revenueByTier).length > 0 && (
@@ -268,7 +377,7 @@ export default function ChallengesPage() {
             <CardTitle>Status Distribution</CardTitle>
           </CardHeader>
           <CardContent>
-            {data && data.statusDistribution ? (
+            {data && data.statusDistribution && Object.keys(data.statusDistribution).length > 0 ? (
               <div className="space-y-3">
                 {Object.entries(data.statusDistribution).map(([status, count]) => (
                   <div key={status} className="flex justify-between items-center">
@@ -278,23 +387,49 @@ export default function ChallengesPage() {
                 ))}
               </div>
             ) : (
-              <div className="text-zinc-500 text-center py-4">No data</div>
+              <div className="text-zinc-500 text-center py-4">No challenges in this period</div>
             )}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Active Challenges by Level</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle>Challenges by Level</CardTitle>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setLevelTab('active')}
+                  className={`px-3 py-1 rounded text-sm font-medium transition-all ${
+                    levelTab === 'active'
+                      ? 'bg-teal-600 text-white'
+                      : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                  }`}
+                >
+                  Active
+                </button>
+                <button
+                  onClick={() => setLevelTab('completed')}
+                  className={`px-3 py-1 rounded text-sm font-medium transition-all ${
+                    levelTab === 'completed'
+                      ? 'bg-teal-600 text-white'
+                      : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                  }`}
+                >
+                  Completed
+                </button>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
-            {data && data.levelDistribution ? (
+            {data ? (
               <div className="space-y-3">
                 {[1, 2, 3, 4].map((level) => (
                   <div key={level} className="flex justify-between items-center">
                     <span className="text-zinc-300">Level {level}</span>
                     <span className="text-teal-400 font-bold">
-                      {data.levelDistribution[level] || 0}
+                      {levelTab === 'active'
+                        ? data.levelDistribution?.[level] || 0
+                        : data.completedLevels?.[level] || 0}
                     </span>
                   </div>
                 ))}

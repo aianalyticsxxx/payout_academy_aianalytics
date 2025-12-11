@@ -30,6 +30,9 @@ function getPeriodStartDate(period: string): Date {
 
 export async function getDashboardMetrics(period: string = '30d') {
   const startDate = getPeriodStartDate(period);
+  const now = new Date();
+  const mtdStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const ytdStart = new Date(now.getFullYear(), 0, 1);
 
   const [
     totalUsers,
@@ -38,8 +41,15 @@ export async function getDashboardMetrics(period: string = '30d') {
     activeChallenges,
     challengeRevenue,
     pendingRewards,
+    paidRewards,
     totalBets,
     aiAccuracy,
+    mtdRevenue,
+    ytdRevenue,
+    allTimeRevenue,
+    payingUsersData,
+    topRevenueUsers,
+    dailyRevenueData,
   ] = await Promise.all([
     prisma.user.count(),
     prisma.user.count({ where: { createdAt: { gte: startDate } } }),
@@ -47,28 +57,124 @@ export async function getDashboardMetrics(period: string = '30d') {
     prisma.challenge.count({ where: { status: 'active' } }),
     getChallengeRevenue(startDate),
     getPendingRewardsTotal(),
+    getPaidRewardsTotal(),
     prisma.bet.count({ where: { createdAt: { gte: startDate } } }),
     getAIAccuracy(),
+    // MTD Revenue
+    prisma.challenge.aggregate({
+      where: { purchasedAt: { gte: mtdStart } },
+      _sum: { cost: true },
+    }),
+    // YTD Revenue
+    prisma.challenge.aggregate({
+      where: { purchasedAt: { gte: ytdStart } },
+      _sum: { cost: true },
+    }),
+    // All-time Revenue
+    prisma.challenge.aggregate({
+      _sum: { cost: true },
+    }),
+    // Paying users count
+    prisma.challenge.groupBy({
+      by: ['userId'],
+      _count: true,
+    }),
+    // Top revenue users
+    prisma.challenge.groupBy({
+      by: ['userId'],
+      _sum: { cost: true },
+      _count: true,
+      orderBy: { _sum: { cost: 'desc' } },
+      take: 10,
+    }),
+    // Daily revenue for last 30 days
+    getDailyRevenue(),
   ]);
+
+  // Get user details for top spenders
+  const userIds = topRevenueUsers.map((u) => u.userId);
+  const users = await prisma.user.findMany({
+    where: { id: { in: userIds } },
+    select: { id: true, username: true, email: true, avatar: true },
+  });
+  const userMap = new Map(users.map((u) => [u.id, u]));
+
+  const topSpenders = topRevenueUsers.map((u) => ({
+    ...userMap.get(u.userId),
+    totalSpent: u._sum.cost || 0,
+    challengeCount: u._count,
+  }));
+
+  // Calculate ARPU
+  const allTime = allTimeRevenue._sum.cost || 0;
+  const arpu = totalUsers > 0 ? allTime / totalUsers : 0;
+  const conversionRate = totalUsers > 0 ? (payingUsersData.length / totalUsers) * 100 : 0;
 
   return {
     users: {
       total: totalUsers,
       new: newUsers,
       active: activeUsers,
+      paying: payingUsersData.length,
     },
     challenges: {
       active: activeChallenges,
     },
-    revenue: challengeRevenue,
+    revenue: {
+      ...challengeRevenue,
+      mtd: mtdRevenue._sum.cost || 0,
+      ytd: ytdRevenue._sum.cost || 0,
+      allTime: allTime,
+      arpu: Math.round(arpu * 100) / 100,
+      conversionRate: Math.round(conversionRate * 10) / 10,
+    },
     rewards: {
       pending: pendingRewards,
+      paid: paidRewards,
     },
     bets: {
       total: totalBets,
     },
     ai: aiAccuracy,
+    topSpenders,
+    dailyRevenue: dailyRevenueData,
   };
+}
+
+async function getDailyRevenue() {
+  // Get all challenges from last 30 days in a single query
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  thirtyDaysAgo.setHours(0, 0, 0, 0);
+
+  const challenges = await prisma.challenge.findMany({
+    where: { purchasedAt: { gte: thirtyDaysAgo } },
+    select: { purchasedAt: true, cost: true },
+  });
+
+  // Initialize map for last 30 days
+  const dailyRevenueMap = new Map<string, { revenue: number; count: number }>();
+  for (let i = 29; i >= 0; i--) {
+    const date = new Date();
+    date.setDate(date.getDate() - i);
+    const dateKey = date.toISOString().split('T')[0];
+    dailyRevenueMap.set(dateKey, { revenue: 0, count: 0 });
+  }
+
+  // Aggregate from fetched challenges
+  challenges.forEach((c) => {
+    const dateKey = c.purchasedAt.toISOString().split('T')[0];
+    const existing = dailyRevenueMap.get(dateKey);
+    if (existing) {
+      existing.revenue += c.cost;
+      existing.count += 1;
+    }
+  });
+
+  // Convert to sorted array
+  return Array.from(dailyRevenueMap.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, data]) => ({ date, ...data }));
 }
 
 async function getActiveUsersCount(since: Date) {
@@ -89,9 +195,13 @@ async function getChallengeRevenue(since: Date) {
 
   const total = challenges.reduce((sum, c) => sum + c.cost, 0);
   const byTier = challenges.reduce((acc, c) => {
-    acc[c.tier] = (acc[c.tier] || 0) + c.cost;
+    if (!acc[c.tier]) {
+      acc[c.tier] = { revenue: 0, count: 0 };
+    }
+    acc[c.tier].revenue += c.cost;
+    acc[c.tier].count += 1;
     return acc;
-  }, {} as Record<number, number>);
+  }, {} as Record<number, { revenue: number; count: number }>);
 
   return {
     total,
@@ -103,6 +213,19 @@ async function getChallengeRevenue(since: Date) {
 async function getPendingRewardsTotal() {
   const result = await prisma.challengeReward.aggregate({
     where: { status: 'pending' },
+    _sum: { amount: true },
+    _count: true,
+  });
+
+  return {
+    total: result._sum.amount || 0,
+    count: result._count,
+  };
+}
+
+async function getPaidRewardsTotal() {
+  const result = await prisma.challengeReward.aggregate({
+    where: { status: 'paid' },
     _sum: { amount: true },
     _count: true,
   });
@@ -142,9 +265,10 @@ export async function getUserAnalytics(filters: {
   limit?: number;
   search?: string;
   tier?: string;
+  difficulty?: string;
   hasChallenge?: boolean;
 }) {
-  const { page = 1, limit = 50, search = '', tier = '', hasChallenge = false } = filters;
+  const { page = 1, limit = 50, search = '', tier = '', difficulty = '', hasChallenge = false } = filters;
   const skip = (page - 1) * limit;
 
   const where: any = {};
@@ -158,6 +282,15 @@ export async function getUserAnalytics(filters: {
 
   if (tier) {
     where.tier = tier;
+  }
+
+  // Filter by challenge difficulty - users with challenges of specified difficulty
+  if (difficulty) {
+    where.challenges = {
+      some: {
+        difficulty: difficulty,
+      },
+    };
   }
 
   let users = await prisma.user.findMany({

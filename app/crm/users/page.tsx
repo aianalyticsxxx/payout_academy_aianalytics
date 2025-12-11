@@ -4,12 +4,13 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { DataTable } from '@/components/crm/DataTable';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Badge, StatusBadge } from '@/components/ui/Badge';
+import { CRMPageHeader } from '@/components/crm/CRMPageHeader';
 
 interface User {
   id: string;
@@ -36,14 +37,16 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [tier, setTier] = useState('');
+  const [difficulty, setDifficulty] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   useEffect(() => {
     fetchUsers();
-  }, [search, tier, page]);
+  }, [search, tier, difficulty, page]);
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     try {
       setLoading(true);
       const params = new URLSearchParams({
@@ -51,6 +54,7 @@ export default function UsersPage() {
         limit: '50',
         ...(search && { search }),
         ...(tier && { tier }),
+        ...(difficulty && { difficulty }),
       });
 
       const response = await fetch(`/api/crm/users?${params}`);
@@ -58,12 +62,13 @@ export default function UsersPage() {
 
       setUsers(data.users || []);
       setTotalPages(data.pagination?.pages || 1);
+      setLastUpdated(new Date());
     } catch (error) {
       console.error('Failed to fetch users:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, search, tier, difficulty]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -160,16 +165,19 @@ export default function UsersPage() {
 
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-white mb-2">User Management</h1>
-        <p className="text-zinc-400">
-          View and manage all platform users
-        </p>
-      </div>
+      <CRMPageHeader
+        title="User Management"
+        description="View and manage all platform users"
+        icon="👥"
+        breadcrumbs={[{ label: 'Users' }]}
+        onRefresh={fetchUsers}
+        loading={loading}
+        lastUpdated={lastUpdated}
+        autoRefresh={false}
+      />
 
       {/* Filters */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <Input
           placeholder="Search by username or email..."
           value={search}
@@ -190,8 +198,20 @@ export default function UsersPage() {
             { value: 'Bronze', label: 'Bronze' },
             { value: 'Silver', label: 'Silver' },
             { value: 'Gold', label: 'Gold' },
-            { value: 'Platinum', label: 'Platinum' },
             { value: 'Diamond', label: 'Diamond' },
+          ]}
+        />
+
+        <Select
+          value={difficulty}
+          onChange={(e) => {
+            setDifficulty(e.target.value);
+            setPage(1);
+          }}
+          options={[
+            { value: '', label: 'All Difficulties' },
+            { value: 'beginner', label: 'Beginner' },
+            { value: 'pro', label: 'Pro' },
           ]}
         />
 

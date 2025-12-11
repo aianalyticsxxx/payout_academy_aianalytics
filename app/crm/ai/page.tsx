@@ -4,11 +4,12 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { StatCard } from '@/components/crm/StatCard';
 import { DataTable } from '@/components/crm/DataTable';
 import { Badge, StatusBadge } from '@/components/ui/Badge';
+import { CRMPageHeader } from '@/components/crm/CRMPageHeader';
 
 interface AIAnalytics {
   summary: {
@@ -39,23 +40,25 @@ export default function AIPage() {
   const [data, setData] = useState<AIAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState('30d');
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   useEffect(() => {
     fetchData();
   }, [period]);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fetch(`/api/crm/analytics/ai?period=${period}`);
       const result = await response.json();
       setData(result);
+      setLastUpdated(new Date());
     } catch (error) {
       console.error('Failed to fetch AI analytics:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [period]);
 
   const agentEmojis: Record<string, string> = {
     'Claude': '🧠',
@@ -206,13 +209,16 @@ export default function AIPage() {
 
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-white mb-2">AI Performance</h1>
-        <p className="text-zinc-400">
-          AI swarm prediction accuracy and agent leaderboard
-        </p>
-      </div>
+      <CRMPageHeader
+        title="AI Performance"
+        description="AI swarm prediction accuracy and agent leaderboard"
+        icon="🤖"
+        breadcrumbs={[{ label: 'AI Performance' }]}
+        onRefresh={fetchData}
+        loading={loading}
+        lastUpdated={lastUpdated}
+        autoRefresh={false}
+      />
 
       {/* Period Selector */}
       <div className="mb-6 flex gap-2">

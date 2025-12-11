@@ -131,6 +131,12 @@ model User {
   referralRewards   Float     @default(0)  // Total earned from referrals
   referralDiscount  Float     @default(0)  // Discount earned from being referred (10% off first purchase)
 
+  // Account status
+  isBanned          Boolean   @default(false)
+  bannedAt          DateTime?
+  bannedBy          String?
+  banReason         String?
+
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -616,15 +622,58 @@ model Referral {
   // The challenge that triggered the reward
   challengeId     String?  // First challenge purchased by referred user
 
+  // Custom link tracking
+  customLinkId    String?  // If referred via custom link
+
   createdAt       DateTime @default(now())
   qualifiedAt     DateTime?  // When referred user made first purchase
   paidAt          DateTime?  // When reward was paid to referrer
 
   referrer        User     @relation("Referrer", fields: [referrerId], references: [id], onDelete: Cascade)
   referred        User     @relation("Referred", fields: [referredId], references: [id], onDelete: Cascade)
+  customLink      CustomReferralLink? @relation(fields: [customLinkId], references: [id])
 
   @@unique([referrerId, referredId])
   @@index([referrerId])
   @@index([referredId])
   @@index([status])
+  @@index([customLinkId])
+}
+
+// Custom referral links for marketing campaigns
+model CustomReferralLink {
+  id              String   @id @default(cuid())
+
+  // Custom slug (e.g., "summer2024", "youtube", "twitter-promo")
+  slug            String   @unique
+
+  // Link details
+  name            String   // Display name for admin
+  description     String?  // Campaign description
+
+  // Custom rewards (override defaults)
+  referrerReward  Float    @default(0.15) // 15% default
+  referredDiscount Float   @default(0.15) // 15% default
+
+  // Attribution
+  createdBy       String?  // Admin who created
+
+  // Stats
+  clicks          Int      @default(0)
+  signups         Int      @default(0)
+  conversions     Int      @default(0)
+  totalRevenue    Float    @default(0)
+
+  // Status
+  isActive        Boolean  @default(true)
+  expiresAt       DateTime?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  referrals       Referral[]
+
+  @@index([slug])
+  @@index([isActive])
+  @@index([createdAt])
 }

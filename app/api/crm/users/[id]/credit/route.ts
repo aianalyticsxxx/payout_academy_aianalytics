@@ -10,11 +10,11 @@ import { logAdminAction } from '@/lib/crm/adminLog';
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { session } = await requireSuperAdmin();
-    const userId = params.id;
+    const { id: userId } = await params;
     const body = await req.json();
     const { action, tier, difficulty, reason } = body;
 
@@ -153,6 +153,55 @@ export async function POST(
       return NextResponse.json({
         success: true,
         message: `Challenge extended by ${days} days`,
+      });
+    }
+
+    if (action === 'cancel_challenge') {
+      // Cancel a challenge and refund
+      const { challengeId, refundAmount } = body;
+
+      if (!challengeId) {
+        return NextResponse.json({ error: 'Challenge ID required' }, { status: 400 });
+      }
+
+      const challenge = await prisma.challenge.findFirst({
+        where: { id: challengeId, userId },
+      });
+
+      if (!challenge) {
+        return NextResponse.json({ error: 'Challenge not found' }, { status: 404 });
+      }
+
+      if (challenge.status === 'CANCELLED') {
+        return NextResponse.json({ error: 'Challenge is already cancelled' }, { status: 400 });
+      }
+
+      // Update challenge to cancelled
+      await prisma.challenge.update({
+        where: { id: challengeId },
+        data: {
+          status: 'CANCELLED',
+          cancelledAt: new Date(),
+        },
+      });
+
+      // Log admin action
+      await logAdminAction({
+        adminId: (session.user as any).id,
+        action: 'CANCEL_CHALLENGE',
+        targetType: 'CHALLENGE',
+        targetId: challengeId,
+        metadata: {
+          userId,
+          tier: challenge.tier,
+          refundAmount: refundAmount || 0,
+          reason
+        },
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: `Challenge cancelled${refundAmount ? ` with $${refundAmount} refund` : ''}`,
       });
     }
 

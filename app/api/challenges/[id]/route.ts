@@ -14,7 +14,7 @@ import { getTierBySize, LEVEL_REQUIREMENTS } from '@/lib/challenges/constants';
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -23,7 +23,7 @@ export async function GET(
     }
 
     const userId = (session.user as any).id;
-    const challengeId = params.id;
+    const { id: challengeId } = await params;
 
     const challenge = await getChallengeById(challengeId, userId);
 

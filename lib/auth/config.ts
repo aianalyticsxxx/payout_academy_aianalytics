@@ -53,6 +53,10 @@ export const authOptions: NextAuthOptions = {
           email: user.email,
           name: user.name,
           image: user.image,
+          username: user.username,
+          avatar: user.avatar,
+          tier: user.tier,
+          role: user.role,
         };
       },
     }),
@@ -84,6 +88,17 @@ export const authOptions: NextAuthOptions = {
         token.username = session.username;
         token.avatar = session.avatar;
         token.role = session.role;
+      }
+
+      // Always fetch latest role from database to ensure admin access works
+      if (token.id) {
+        const dbUser = await prisma.user.findUnique({
+          where: { id: token.id as string },
+          select: { role: true },
+        });
+        if (dbUser) {
+          token.role = dbUser.role;
+        }
       }
 
       return token;

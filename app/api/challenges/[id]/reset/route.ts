@@ -14,7 +14,7 @@ import { getTierBySize } from '@/lib/challenges/constants';
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -23,7 +23,7 @@ export async function POST(
     }
 
     const userId = (session.user as any).id;
-    const challengeId = params.id;
+    const { id: challengeId } = await params;
 
     // Reset the challenge
     const challenge = await resetChallenge(challengeId, userId);

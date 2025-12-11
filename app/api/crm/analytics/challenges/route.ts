@@ -38,6 +38,8 @@ export async function GET(req: NextRequest) {
       statusCounts,
       recentChallenges,
       expiringSoon,
+      difficultyStats,
+      rewardsSummary,
     ] = await Promise.all([
       // All challenges in period
       prisma.challenge.findMany({
@@ -97,6 +99,24 @@ export async function GET(req: NextRequest) {
         },
         orderBy: { expiresAt: 'asc' },
       }),
+
+      // Difficulty breakdown
+      prisma.challenge.groupBy({
+        by: ['difficulty'],
+        where: {
+          purchasedAt: { gte: startDate },
+        },
+        _sum: { cost: true, totalRewardsEarned: true },
+        _count: true,
+      }),
+
+      // Rewards summary
+      prisma.challenge.aggregate({
+        where: {
+          purchasedAt: { gte: startDate },
+        },
+        _sum: { totalRewardsEarned: true },
+      }),
     ]);
 
     // Calculate completion rates by tier
@@ -115,12 +135,21 @@ export async function GET(req: NextRequest) {
       t.rate = t.total > 0 ? (t.completed / t.total) * 100 : 0;
     });
 
-    // Calculate level distribution
+    // Calculate level distribution (active challenges by current level)
     const levelDistribution = { 1: 0, 2: 0, 3: 0, 4: 0 };
     challenges.forEach((c) => {
       if (c.status === 'ACTIVE') {
         levelDistribution[c.currentLevel as 1 | 2 | 3 | 4]++;
       }
+    });
+
+    // Calculate completed levels count
+    const completedLevels = { 1: 0, 2: 0, 3: 0, 4: 0 };
+    challenges.forEach((c) => {
+      if (c.level1Completed) completedLevels[1]++;
+      if (c.level2Completed) completedLevels[2]++;
+      if (c.level3Completed) completedLevels[3]++;
+      if (c.level4Completed) completedLevels[4]++;
     });
 
     // Average days to complete
@@ -148,6 +177,32 @@ export async function GET(req: NextRequest) {
       statusData[s.status] = s._count;
     });
 
+    // Format difficulty breakdown
+    const difficultyBreakdown: Record<string, { count: number; revenue: number; rewardsEarned: number }> = {};
+    difficultyStats.forEach((d) => {
+      difficultyBreakdown[d.difficulty] = {
+        count: d._count,
+        revenue: d._sum.cost || 0,
+        rewardsEarned: d._sum.totalRewardsEarned || 0,
+      };
+    });
+
+    // Calculate completion rates by difficulty
+    const completionByDifficulty: Record<string, { total: number; completed: number; rate: number }> = {};
+    challenges.forEach((c) => {
+      if (!completionByDifficulty[c.difficulty]) {
+        completionByDifficulty[c.difficulty] = { total: 0, completed: 0, rate: 0 };
+      }
+      completionByDifficulty[c.difficulty].total++;
+      if (c.status === 'COMPLETED') {
+        completionByDifficulty[c.difficulty].completed++;
+      }
+    });
+    Object.keys(completionByDifficulty).forEach((diff) => {
+      const d = completionByDifficulty[diff];
+      d.rate = d.total > 0 ? (d.completed / d.total) * 100 : 0;
+    });
+
     return NextResponse.json({
       summary: {
         totalChallenges: challenges.length,
@@ -157,11 +212,15 @@ export async function GET(req: NextRequest) {
           challenges.length > 0
             ? (completedChallenges.length / challenges.length) * 100
             : 0,
+        totalRewardsEarned: rewardsSummary._sum.totalRewardsEarned || 0,
       },
       revenueByTier: revenueData,
       statusDistribution: statusData,
       completionByTier,
       levelDistribution,
+      completedLevels,
+      difficultyBreakdown,
+      completionByDifficulty,
       recentChallenges,
       expiringSoon,
     });

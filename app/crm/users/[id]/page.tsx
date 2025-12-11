@@ -22,6 +22,9 @@ interface UserDetail {
     role: string;
     createdAt: string;
     stripeCustomerId: string | null;
+    isBanned: boolean;
+    bannedAt: string | null;
+    banReason: string | null;
   };
   stats: {
     totalBets: number;
@@ -53,12 +56,14 @@ export default function UserDetailPage() {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [showCreditModal, setShowCreditModal] = useState(false);
-  const [creditAction, setCreditAction] = useState<'award' | 'reset' | 'extend'>('award');
+  const [creditAction, setCreditAction] = useState<'award' | 'reset' | 'extend' | 'cancel'>('award');
   const [selectedTier, setSelectedTier] = useState(1000);
   const [selectedDifficulty, setSelectedDifficulty] = useState('beginner');
   const [creditReason, setCreditReason] = useState('');
   const [selectedChallenge, setSelectedChallenge] = useState('');
   const [extendDays, setExtendDays] = useState(7);
+  const [showBanModal, setShowBanModal] = useState(false);
+  const [banReason, setBanReason] = useState('');
 
   useEffect(() => {
     fetchData();
@@ -112,6 +117,39 @@ export default function UserDetailPage() {
     }
   };
 
+  const handleBanAction = async (action: 'ban' | 'unban') => {
+    if (action === 'ban' && !banReason.trim()) {
+      alert('Please provide a reason for banning');
+      return;
+    }
+
+    try {
+      setUpdating(true);
+      const response = await fetch(`/api/crm/users/${userId}/ban`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, reason: banReason }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        alert(result.error || 'Action failed');
+        return;
+      }
+
+      alert(result.message);
+      setShowBanModal(false);
+      setBanReason('');
+      await fetchData();
+    } catch (error) {
+      console.error('Ban action error:', error);
+      alert('Action failed');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
   const handleCreditAction = async () => {
     try {
       setUpdating(true);
@@ -128,6 +166,9 @@ export default function UserDetailPage() {
         body.action = 'extend_challenge';
         body.challengeId = selectedChallenge;
         body.days = extendDays;
+      } else if (creditAction === 'cancel') {
+        body.action = 'cancel_challenge';
+        body.challengeId = selectedChallenge;
       }
 
       const response = await fetch(`/api/crm/users/${userId}/credit`, {
@@ -349,10 +390,88 @@ export default function UserDetailPage() {
             onClick={() => setShowCreditModal(true)}
             className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-medium transition-colors"
           >
-            Manage Credits
+            Manage Challenge
           </button>
+
+          {/* Ban/Unban Button */}
+          {data.user.role === 'USER' && (
+            data.user.isBanned ? (
+              <button
+                onClick={() => handleBanAction('unban')}
+                disabled={updating}
+                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+              >
+                Unban User
+              </button>
+            ) : (
+              <button
+                onClick={() => setShowBanModal(true)}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors"
+              >
+                Ban User
+              </button>
+            )
+          )}
         </div>
       </div>
+
+      {/* Banned Banner */}
+      {data.user.isBanned && (
+        <div className="mb-6 p-4 bg-red-900/30 border border-red-800 rounded-xl">
+          <div className="flex items-center gap-2 text-red-400 font-medium">
+            <span>🚫</span>
+            <span>This user is banned</span>
+          </div>
+          {data.user.banReason && (
+            <p className="text-red-300/70 text-sm mt-1">Reason: {data.user.banReason}</p>
+          )}
+          {data.user.bannedAt && (
+            <p className="text-red-300/50 text-xs mt-1">
+              Banned on {new Date(data.user.bannedAt).toLocaleString()}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Ban Modal */}
+      {showBanModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-surface border border-zinc-800 rounded-xl p-6 w-full max-w-md">
+            <h3 className="text-xl font-bold text-red-400 mb-4">Ban User</h3>
+            <p className="text-zinc-400 mb-4">
+              Are you sure you want to ban {data.user.username || data.user.email}?
+              They will no longer be able to access the platform.
+            </p>
+            <div className="mb-4">
+              <label className="block text-sm text-zinc-400 mb-1">Reason for ban *</label>
+              <textarea
+                value={banReason}
+                onChange={(e) => setBanReason(e.target.value)}
+                placeholder="Provide a reason..."
+                className="w-full bg-zinc-800 text-white px-3 py-2 rounded-lg border border-zinc-700 h-24 resize-none"
+              />
+            </div>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowBanModal(false);
+                  setBanReason('');
+                }}
+                className="px-4 py-2 bg-zinc-800 text-zinc-300 rounded-lg hover:bg-zinc-700"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleBanAction('ban')}
+                disabled={updating || !banReason.trim()}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+              >
+                {updating ? 'Banning...' : 'Confirm Ban'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Credit Management Modal */}
       {showCreditModal && (
@@ -361,19 +480,20 @@ export default function UserDetailPage() {
             <h3 className="text-xl font-bold text-white mb-4">Credit Management</h3>
 
             {/* Action Tabs */}
-            <div className="flex gap-2 mb-4">
+            <div className="flex flex-wrap gap-2 mb-4">
               {[
                 { key: 'award', label: 'Award Challenge' },
                 { key: 'reset', label: 'Reset Challenge' },
                 { key: 'extend', label: 'Extend Time' },
+                { key: 'cancel', label: 'Cancel Challenge', danger: true },
               ].map((tab) => (
                 <button
                   key={tab.key}
                   onClick={() => setCreditAction(tab.key as any)}
                   className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
                     creditAction === tab.key
-                      ? 'bg-teal-600 text-white'
-                      : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                      ? (tab as any).danger ? 'bg-red-600 text-white' : 'bg-teal-600 text-white'
+                      : (tab as any).danger ? 'bg-zinc-800 text-red-400 hover:bg-red-900/30' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
                   }`}
                 >
                   {tab.label}
@@ -413,8 +533,8 @@ export default function UserDetailPage() {
               </div>
             )}
 
-            {/* Reset/Extend Challenge Form */}
-            {(creditAction === 'reset' || creditAction === 'extend') && (
+            {/* Reset/Extend/Cancel Challenge Form */}
+            {(creditAction === 'reset' || creditAction === 'extend' || creditAction === 'cancel') && (
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm text-zinc-400 mb-1">Select Challenge</label>
@@ -444,6 +564,13 @@ export default function UserDetailPage() {
                     />
                   </div>
                 )}
+                {creditAction === 'cancel' && (
+                  <div className="p-3 bg-red-900/20 border border-red-800 rounded-lg">
+                    <p className="text-sm text-red-400">
+                      This will permanently cancel the selected challenge. This action cannot be undone.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 
@@ -469,9 +596,13 @@ export default function UserDetailPage() {
               <button
                 onClick={handleCreditAction}
                 disabled={updating || (creditAction !== 'award' && !selectedChallenge)}
-                className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50"
+                className={`px-4 py-2 text-white rounded-lg disabled:opacity-50 ${
+                  creditAction === 'cancel'
+                    ? 'bg-red-600 hover:bg-red-700'
+                    : 'bg-teal-600 hover:bg-teal-700'
+                }`}
               >
-                {updating ? 'Processing...' : 'Confirm'}
+                {updating ? 'Processing...' : creditAction === 'cancel' ? 'Cancel Challenge' : 'Confirm'}
               </button>
             </div>
           </div>

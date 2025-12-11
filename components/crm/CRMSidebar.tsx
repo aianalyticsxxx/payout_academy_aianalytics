@@ -20,9 +20,9 @@ const navItems: NavItem[] = [
   { href: '/crm/challenges', label: 'Challenges', icon: '🎯' },
   { href: '/crm/bets', label: 'Betting', icon: '🎲' },
   { href: '/crm/referrals', label: 'Referrals', icon: '🔗' },
-  { href: '/crm/ai', label: 'AI Performance', icon: '🤖' },
   { href: '/crm/revenue', label: 'Revenue', icon: '💰' },
   { href: '/crm/operations', label: 'Operations', icon: '⚙️' },
+  { href: '/crm/admin', label: 'Administration', icon: '🛡️' },
 ];
 
 export function CRMSidebar() {
@@ -62,16 +62,6 @@ export function CRMSidebar() {
         })}
       </nav>
 
-      {/* Back to App */}
-      <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-zinc-800/50 bg-surface">
-        <Link
-          href="/"
-          className="flex items-center gap-3 px-4 py-3 rounded-xl text-zinc-400 hover:bg-zinc-800/50 hover:text-white transition-all"
-        >
-          <span className="text-xl">←</span>
-          <span className="font-medium">Back to App</span>
-        </Link>
-      </div>
     </aside>
   );
 }

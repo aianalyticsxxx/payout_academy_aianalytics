@@ -83,27 +83,33 @@ export async function getAdminLogs(options: {
   };
 }
 
-// Action type constants
+// Action type constants - ONLY IMPORTANT ACTIONS
 export const AdminActions = {
-  // User actions
-  VIEW_USER: 'VIEW_USER',
+  // User actions (important changes only)
   UPDATE_USER_ROLE: 'UPDATE_USER_ROLE',
-
-  // Dashboard actions
-  VIEW_DASHBOARD: 'VIEW_DASHBOARD',
+  BAN_USER: 'BAN_USER',
+  UNBAN_USER: 'UNBAN_USER',
+  DELETE_USER: 'DELETE_USER',
 
   // Reward actions
-  VIEW_PENDING_REWARDS: 'VIEW_PENDING_REWARDS',
   PAY_REWARD: 'PAY_REWARD',
+  REJECT_REWARD: 'REJECT_REWARD',
 
   // Bet actions
-  VIEW_BETS: 'VIEW_BETS',
   SETTLE_BET: 'SETTLE_BET',
+  VOID_BET: 'VOID_BET',
 
   // Challenge actions
-  VIEW_CHALLENGES: 'VIEW_CHALLENGES',
+  AWARD_FREE_CHALLENGE: 'AWARD_FREE_CHALLENGE',
+  RESET_CHALLENGE_FREE: 'RESET_CHALLENGE_FREE',
+  EXTEND_CHALLENGE: 'EXTEND_CHALLENGE',
+  CANCEL_CHALLENGE: 'CANCEL_CHALLENGE',
 
-  // Analytics actions
-  VIEW_ANALYTICS: 'VIEW_ANALYTICS',
+  // Referral actions
+  CREATE_REFERRAL_LINK: 'CREATE_REFERRAL_LINK',
+  DELETE_REFERRAL_LINK: 'DELETE_REFERRAL_LINK',
+  UPDATE_REFERRAL_LINK: 'UPDATE_REFERRAL_LINK',
+
+  // Data actions
   EXPORT_DATA: 'EXPORT_DATA',
 } as const;

@@ -11,11 +11,11 @@ import { processChallengeSettlement } from '@/lib/challenges/challenge-service';
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { session } = await requireAdmin();
-    const betId = params.id;
+    const { id: betId } = await params;
     const body = await req.json();
     const { result, reason } = body;
 
@@ -80,10 +80,10 @@ export async function POST(
       }
     }
 
-    // Log admin action
+    // Log admin action with specific action type
     await logAdminAction({
       adminId: (session.user as any).id,
-      action: 'MANUAL_SETTLE_BET',
+      action: result === 'void' ? 'VOID_BET' : 'SETTLE_BET',
       targetType: 'BET',
       targetId: betId,
       metadata: {

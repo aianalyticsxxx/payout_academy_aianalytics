@@ -9,19 +9,11 @@ import { logAdminAction } from '@/lib/crm/adminLog';
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { session } = await requireAdmin();
-    const userId = params.id;
-
-    // Log admin action
-    await logAdminAction({
-      adminId: (session.user as any).id,
-      action: 'VIEW_USER',
-      targetType: 'USER',
-      targetId: userId,
-    });
+    await requireAdmin();
+    const { id: userId } = await params;
 
     // Fetch user with related data
     const user = await prisma.user.findUnique({
@@ -35,6 +27,9 @@ export async function GET(
         role: true,
         createdAt: true,
         stripeCustomerId: true,
+        isBanned: true,
+        bannedAt: true,
+        banReason: true,
       },
     });
 
@@ -127,11 +122,11 @@ export async function GET(
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { session, role } = await requireAdmin();
-    const userId = params.id;
+    const { id: userId } = await params;
     const body = await req.json();
     const { role: newRole } = body;
 
