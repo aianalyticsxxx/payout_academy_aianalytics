@@ -11,12 +11,15 @@ const RegisterSchema = z.object({
   email: z.string().email('Invalid email'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
   username: z.string().min(3, 'Username must be at least 3 characters').max(20),
+  firstName: z.string().min(1, 'First name is required'),
+  lastName: z.string().min(1, 'Last name is required'),
+  phone: z.string().optional(),
 });
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { email, password, username } = RegisterSchema.parse(body);
+    const { email, password, username, firstName, lastName, phone } = RegisterSchema.parse(body);
 
     // Check if email exists
     const existingEmail = await prisma.user.findUnique({
@@ -51,6 +54,8 @@ export async function POST(req: NextRequest) {
         email,
         username,
         hashedPassword,
+        name: `${firstName} ${lastName}`,
+        phoneNumber: phone || null,
         avatar: '🎲',
         tier: 'Bronze',
       },
