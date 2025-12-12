@@ -260,14 +260,9 @@ export default function LandingPage() {
         {/* Hero Content */}
         <div className="relative z-10 max-w-5xl mx-auto px-4 text-center">
           {/* Badge */}
-          <div className="inline-flex items-center gap-3 px-5 py-2.5 rounded-full bg-gradient-to-r from-teal-500/20 to-emerald-500/20 border border-teal-500/40 mb-8 animate-fade-in shadow-lg shadow-teal-500/10">
-            <div className="flex -space-x-2">
-              <div className="w-6 h-6 rounded-full bg-gradient-to-br from-teal-400 to-teal-600 border-2 border-[#0A0A0A] flex items-center justify-center text-[10px]">👤</div>
-              <div className="w-6 h-6 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 border-2 border-[#0A0A0A] flex items-center justify-center text-[10px]">👤</div>
-              <div className="w-6 h-6 rounded-full bg-gradient-to-br from-cyan-400 to-cyan-600 border-2 border-[#0A0A0A] flex items-center justify-center text-[10px]">👤</div>
-            </div>
-            <span className="text-sm font-semibold text-white">2,500+ Active Players</span>
-            <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-teal-500/10 border border-teal-500/30 mb-8 animate-fade-in">
+            <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse" />
+            <span className="text-sm text-teal-400 font-medium">Join 2,500+ Active Players</span>
           </div>
 
           {/* Main Headline */}
