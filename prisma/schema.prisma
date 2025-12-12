@@ -14,6 +14,9 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+// Note: If using Supabase connection pooling, ensure DATABASE_URL includes:
+// ?pgbouncer=true&connection_limit=1
+
 // ==========================================
 // AUTHENTICATION (NextAuth.js)
 // ==========================================
