@@ -406,7 +406,7 @@ function DashboardContent() {
       fetchActiveChallenge();
 
       // Clear URL parameters
-      router.replace('/', { scroll: false });
+      router.replace('/dashboard', { scroll: false });
 
       // Auto-hide message after 5 seconds
       setTimeout(() => setChallengeSuccessMessage(null), 5000);
@@ -415,7 +415,7 @@ function DashboardContent() {
     if (challengeCancelled === 'true') {
       setChallengeSuccessMessage(null);
       // Clear URL parameters
-      router.replace('/', { scroll: false });
+      router.replace('/dashboard', { scroll: false });
     }
   }, [searchParams, router]);
 

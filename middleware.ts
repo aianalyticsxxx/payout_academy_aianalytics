@@ -31,5 +31,6 @@ export default withAuth(
 export const config = {
   matcher: [
     '/crm/:path*', // Protect all CRM routes
+    '/dashboard/:path*', // Protect dashboard routes
   ],
 };
