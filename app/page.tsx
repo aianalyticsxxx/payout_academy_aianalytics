@@ -197,14 +197,14 @@ export default function LandingPage() {
               <a href="#how-it-works" className="text-sm font-medium text-zinc-400 hover:text-white transition-colors">
                 How it Works
               </a>
+              <a href="#reviews" className="text-sm font-medium text-zinc-400 hover:text-white transition-colors">
+                Reviews
+              </a>
               <a href="#challenges" className="text-sm font-medium text-zinc-400 hover:text-white transition-colors">
                 Challenges
               </a>
               <a href="#benefits" className="text-sm font-medium text-zinc-400 hover:text-white transition-colors">
                 Benefits
-              </a>
-              <a href="#compare" className="text-sm font-medium text-zinc-400 hover:text-white transition-colors">
-                Compare
               </a>
             </nav>
 
@@ -458,6 +458,126 @@ export default function LandingPage() {
                   <h3 className="text-xl font-bold mb-3">{item.title}</h3>
                   <p className="text-zinc-400">{item.description}</p>
                 </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ==========================================
+          TESTIMONIALS / REVIEWS
+          ========================================== */}
+      <section id="reviews" className="py-20 md:py-32 bg-[#0A0A0A]">
+        <div className="max-w-6xl mx-auto px-4">
+          {/* Section Header */}
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-5xl font-black mb-4">
+              What Players Are <span className="text-teal-400">Saying</span>
+            </h2>
+            <p className="text-zinc-400 text-lg max-w-2xl mx-auto">
+              Join thousands of players already winning with Zalogche
+            </p>
+          </div>
+
+          {/* Testimonials Grid */}
+          <div className="grid md:grid-cols-3 gap-6">
+            {[
+              {
+                name: 'Marcus R.',
+                avatar: '🇩🇪',
+                tier: '€10K Pro',
+                reward: '€8,500',
+                quote: 'Hit Level 4 on my second try. The streak system keeps me disciplined - no more random bets. Already withdrew €8.5K!',
+                rating: 5,
+              },
+              {
+                name: 'Sophie L.',
+                avatar: '🇫🇷',
+                tier: '€5K Beginner',
+                reward: '€3,200',
+                quote: 'Started with Beginner mode to learn the ropes. The lower odds requirement (1.5x) made it much easier to build streaks.',
+                rating: 5,
+              },
+              {
+                name: 'James T.',
+                avatar: '🇬🇧',
+                tier: '€25K Pro',
+                reward: '€21,000',
+                quote: 'Been betting for years but never had a system. Zalogche changed that. The level rewards keep you motivated.',
+                rating: 5,
+              },
+              {
+                name: 'Elena K.',
+                avatar: '🇪🇸',
+                tier: '€1K Beginner',
+                reward: '€950',
+                quote: 'Perfect for starting out. Low entry cost, and even if I lose my streak, I keep the rewards I already earned!',
+                rating: 5,
+              },
+              {
+                name: 'David M.',
+                avatar: '🇳🇱',
+                tier: '€50K Pro',
+                reward: '€45,000',
+                quote: 'The 45-day window is generous. No pressure to rush. Completed all 4 levels with 2 weeks to spare.',
+                rating: 5,
+              },
+              {
+                name: 'Anna P.',
+                avatar: '🇵🇱',
+                tier: '€5K Pro',
+                reward: '€4,800',
+                quote: 'Love that I can reset my streak if I mess up. The €10 reset fee is nothing compared to the potential rewards.',
+                rating: 5,
+              },
+            ].map((testimonial, i) => (
+              <div
+                key={i}
+                className="bg-gradient-to-b from-zinc-900/80 to-zinc-900/40 border border-zinc-800/50 rounded-2xl p-6 hover:border-teal-500/30 transition-all duration-300 group"
+              >
+                {/* Stars */}
+                <div className="flex gap-1 mb-4">
+                  {[...Array(testimonial.rating)].map((_, j) => (
+                    <span key={j} className="text-amber-400">★</span>
+                  ))}
+                </div>
+
+                {/* Quote */}
+                <p className="text-zinc-300 mb-6 leading-relaxed">
+                  &ldquo;{testimonial.quote}&rdquo;
+                </p>
+
+                {/* Author */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-teal-500/20 to-cyan-500/20 border border-teal-500/30 flex items-center justify-center text-lg">
+                      {testimonial.avatar}
+                    </div>
+                    <div>
+                      <div className="font-semibold text-white">{testimonial.name}</div>
+                      <div className="text-xs text-zinc-500">{testimonial.tier}</div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-emerald-400 font-bold">{testimonial.reward}</div>
+                    <div className="text-[10px] text-zinc-500">EARNED</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Trust Stats */}
+          <div className="mt-16 grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[
+              { value: '2,500+', label: 'Active Players' },
+              { value: '€850K+', label: 'Total Rewards Paid' },
+              { value: '92%', label: 'Payout Rate' },
+              { value: '4.8/5', label: 'Player Rating' },
+            ].map((stat, i) => (
+              <div key={i} className="text-center p-4">
+                <div className="text-2xl md:text-3xl font-black text-white mb-1">{stat.value}</div>
+                <div className="text-sm text-zinc-500">{stat.label}</div>
               </div>
             ))}
           </div>
