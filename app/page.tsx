@@ -262,7 +262,7 @@ export default function LandingPage() {
           {/* Badge */}
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-teal-500/10 border border-teal-500/30 mb-8 animate-fade-in">
             <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse" />
-            <span className="text-sm text-teal-400 font-medium">AI-Powered Sports Analysis</span>
+            <span className="text-sm text-teal-400 font-medium">Join 2,500+ Active Players</span>
           </div>
 
           {/* Main Headline */}
