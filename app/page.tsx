@@ -120,6 +120,16 @@ export default function LandingPage() {
   const [selectedTier, setSelectedTier] = useState<typeof BEGINNER_CHALLENGE_TIERS[number] | typeof PRO_CHALLENGE_TIERS[number] | null>(null);
   const [purchaseStep, setPurchaseStep] = useState<'select' | 'checkout'>('select');
   const [selectedDifficulty, setSelectedDifficulty] = useState<'beginner' | 'pro'>('beginner');
+  const [isScrolled, setIsScrolled] = useState(false);
+
+  // Track scroll for floating header
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 50);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -162,6 +172,61 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-white">
+      {/* ==========================================
+          FLOATING HEADER
+          ========================================== */}
+      <header
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+          isScrolled
+            ? 'bg-[#0A0A0A]/80 backdrop-blur-xl border-b border-white/5 shadow-lg shadow-black/20'
+            : 'bg-transparent'
+        }`}
+      >
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16 md:h-20">
+            {/* Logo */}
+            <a href="#" className="flex items-center gap-2 group">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500 to-teal-600 flex items-center justify-center shadow-lg shadow-teal-500/20 group-hover:shadow-teal-500/40 transition-shadow">
+                <span className="text-xl font-black text-white">Z</span>
+              </div>
+              <span className="text-xl font-bold text-white hidden sm:block">Zalogche</span>
+            </a>
+
+            {/* Navigation Links */}
+            <nav className="hidden md:flex items-center gap-8">
+              <a href="#how-it-works" className="text-sm font-medium text-zinc-400 hover:text-white transition-colors">
+                How it Works
+              </a>
+              <a href="#challenges" className="text-sm font-medium text-zinc-400 hover:text-white transition-colors">
+                Challenges
+              </a>
+              <a href="#benefits" className="text-sm font-medium text-zinc-400 hover:text-white transition-colors">
+                Benefits
+              </a>
+              <a href="#compare" className="text-sm font-medium text-zinc-400 hover:text-white transition-colors">
+                Compare
+              </a>
+            </nav>
+
+            {/* CTA Buttons */}
+            <div className="flex items-center gap-3">
+              <a
+                href="/login"
+                className="hidden sm:inline-flex px-4 py-2 text-sm font-medium text-zinc-300 hover:text-white transition-colors"
+              >
+                Log In
+              </a>
+              <a
+                href="#challenges"
+                className="px-4 py-2 rounded-lg text-sm font-semibold bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-teal-400 transition-all duration-300 shadow-lg shadow-teal-500/20 hover:shadow-teal-500/30"
+              >
+                Get Started
+              </a>
+            </div>
+          </div>
+        </div>
+      </header>
+
       {/* ==========================================
           HERO SECTION
           ========================================== */}
@@ -625,7 +690,7 @@ export default function LandingPage() {
       {/* ==========================================
           KEY BENEFITS GRID
           ========================================== */}
-      <section className="py-20 md:py-32 bg-[#0D0D0D]">
+      <section id="benefits" className="py-20 md:py-32 bg-[#0D0D0D]">
         <div className="max-w-6xl mx-auto px-4">
           {/* Section Header */}
           <div className="text-center mb-16">
@@ -689,7 +754,7 @@ export default function LandingPage() {
       {/* ==========================================
           COMPARISON TABLE
           ========================================== */}
-      <section className="py-20 md:py-32">
+      <section id="compare" className="py-20 md:py-32">
         <div className="max-w-4xl mx-auto px-4">
           {/* Section Header */}
           <div className="text-center mb-16">
