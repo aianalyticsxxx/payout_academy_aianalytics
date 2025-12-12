@@ -11,6 +11,10 @@ import { z } from 'zod';
 const UpdateProfileSchema = z.object({
   username: z.string().min(3).max(20).optional(),
   avatar: z.string().optional(),
+  phoneNumber: z.string().optional(),
+  dateOfBirth: z.string().optional(), // ISO date string
+  country: z.string().optional(),
+  timezone: z.string().optional(),
 });
 
 // ==========================================
@@ -34,7 +38,18 @@ export async function GET(req: NextRequest) {
         username: true,
         avatar: true,
         tier: true,
+        role: true,
         createdAt: true,
+        phoneNumber: true,
+        dateOfBirth: true,
+        country: true,
+        timezone: true,
+        kycStatus: true,
+        kycSubmittedAt: true,
+        kycVerifiedAt: true,
+        lastLoginAt: true,
+        lastLoginIp: true,
+        lastLoginLocation: true,
       },
     });
 
@@ -239,12 +254,20 @@ export async function PATCH(req: NextRequest) {
       data: {
         ...(data.username && { username: data.username }),
         ...(data.avatar && { avatar: data.avatar }),
+        ...(data.phoneNumber !== undefined && { phoneNumber: data.phoneNumber || null }),
+        ...(data.dateOfBirth !== undefined && { dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : null }),
+        ...(data.country !== undefined && { country: data.country || null }),
+        ...(data.timezone !== undefined && { timezone: data.timezone || null }),
       },
       select: {
         id: true,
         username: true,
         avatar: true,
         tier: true,
+        phoneNumber: true,
+        dateOfBirth: true,
+        country: true,
+        timezone: true,
       },
     });
 

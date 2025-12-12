@@ -270,7 +270,7 @@ function DashboardContent() {
   const searchParams = useSearchParams();
 
   // State
-  const [activeTab, setActiveTab] = useState<'events' | 'challenges' | 'ai' | 'bets' | 'rewards' | 'competition' | 'achievements' | 'referral'>('bets');
+  const [activeTab, setActiveTab] = useState<'events' | 'challenges' | 'ai' | 'bets' | 'rewards' | 'achievements' | 'referral'>('bets');
   const [challengeSuccessMessage, setChallengeSuccessMessage] = useState<string | null>(null);
   const [purchaseModalOpen, setPurchaseModalOpen] = useState(false);
   const [selectedChallenge, setSelectedChallenge] = useState<{ size: number; cost: number; label: string; profit: number; target: number; resetFee: number } | null>(null);
@@ -1216,7 +1216,6 @@ function DashboardContent() {
             { id: 'challenges', label: 'Challenges', icon: '🎮' },
             { id: 'ai', label: 'AI Hub', icon: '🤖' },
             { id: 'rewards', label: 'Rewards', icon: '🎁' },
-            { id: 'competition', label: 'Competition', icon: '🏆' },
             { id: 'achievements', label: 'Achievements', icon: '⭐' },
             { id: 'referral', label: 'Referral', icon: '👥' },
           ].map(tab => (
@@ -1832,6 +1831,14 @@ function DashboardContent() {
                                     </div>
                                   ))}
                                 </div>
+
+                                {/* Place Bet Button */}
+                                <button
+                                  onClick={() => setActiveTab('events')}
+                                  className="w-full py-2 rounded-lg font-semibold text-sm transition-all bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 text-white"
+                                >
+                                  Place a Bet
+                                </button>
 
                                 {/* Rewards Earned */}
                                 <div className="flex items-center justify-between pt-3 border-t border-zinc-800">
@@ -3338,6 +3345,16 @@ function DashboardContent() {
                         </div>
                       )}
 
+                      {/* Place Bet Button */}
+                      <div className="mt-4 flex justify-center">
+                        <button
+                          onClick={() => setActiveTab('events')}
+                          className="w-1/3 py-3 px-4 rounded-lg font-semibold text-sm transition-all flex items-center justify-center shadow-lg bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white shadow-amber-900/30"
+                        >
+                          Place a Bet
+                        </button>
+                      </div>
+
                       {/* Recent Results - Simple W/L */}
                       <div className="pt-4 border-t border-zinc-800/50 mt-4">
                         <div className="flex items-center justify-between mb-2">
@@ -3765,12 +3782,20 @@ function DashboardContent() {
                           <button
                             onClick={() => claimRewards(challenge.id)}
                             disabled={claimingRewards}
-                            className="w-full py-2.5 bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-teal-400 text-white text-sm font-semibold rounded-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 shadow-lg shadow-teal-500/20"
+                            className="w-full py-2.5 bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-teal-400 text-white text-sm font-semibold rounded-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 shadow-lg shadow-teal-500/20 mb-2"
                           >
                             <span>{claimingRewards ? '⏳' : '💰'}</span>
                             <span>{claimingRewards ? 'Claiming...' : `Claim €${(challenge.totalPendingAmount || 0).toLocaleString()}`}</span>
                           </button>
                         )}
+
+                        {/* Place Bet Button */}
+                        <button
+                          onClick={() => setActiveTab('events')}
+                          className="w-full py-2 rounded-lg font-semibold text-sm transition-all bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 text-white"
+                        >
+                          Place a Bet
+                        </button>
                       </div>
                     );
                   })}
@@ -3870,132 +3895,6 @@ function DashboardContent() {
                 <button onClick={() => setPayoutSuccess(null)} className="ml-2 hover:opacity-70">×</button>
               </div>
             )}
-          </div>
-        )}
-
-        {/* COMPETITION TAB */}
-        {activeTab === 'competition' && (
-          <div className="space-y-6">
-            {/* User Profile Card */}
-            <div className="bg-gradient-to-r from-teal-900/30 to-teal-800/20 border border-teal-700/30 rounded-2xl p-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="text-5xl">{(session.user as any)?.avatar || '🎲'}</div>
-                  <div>
-                    <div className="text-xl font-bold">
-                      {(session.user as any)?.username || 'Set Username'}
-                    </div>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className={`${getTierInfo((session.user as any)?.tier || 'Bronze').color}`}>
-                        {getTierInfo((session.user as any)?.tier || 'Bronze').icon} {(session.user as any)?.tier || 'Bronze'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setShowProfileModal(true)}
-                  className="p-2 rounded-lg bg-teal-600/20 hover:bg-teal-600/40 text-teal-400 transition-colors"
-                  title="Edit Profile"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-
-            {/* Global Leaderboard */}
-            <div className="bg-surface border border-zinc-800/50 rounded-2xl overflow-hidden">
-              <div className="p-4 border-b border-zinc-800/50 bg-gradient-to-r from-gold/10 to-teal-900/10">
-                <h3 className="font-semibold text-gold">Global Leaderboard</h3>
-              </div>
-
-              {leaderboard.length === 0 ? (
-                <div className="p-8 text-center text-zinc-400">
-                  No ranked players yet. Get 10+ bets to appear on the leaderboard!
-                </div>
-              ) : (
-                <table className="w-full">
-                  <thead className="bg-teal-900/30">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-zinc-300">Rank</th>
-                      <th className="px-4 py-3 text-left text-zinc-300">Player</th>
-                      <th className="px-4 py-3 text-right text-zinc-300">Record</th>
-                      <th className="px-4 py-3 text-right text-zinc-300">Win %</th>
-                      <th className="px-4 py-3 text-right text-zinc-300">Best Streak</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {leaderboard.map((player, i) => (
-                      <tr
-                        key={player.userId}
-                        className={`border-t border-zinc-800/50 ${
-                          i < 3 ? 'bg-gold/5' : ''
-                        } ${player.userId === (session.user as any)?.id ? 'bg-teal-900/30' : ''} hover:bg-teal-900/10 transition-colors`}
-                      >
-                        <td className="px-4 py-3 font-bold">
-                          {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : player.rank}
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="text-xl mr-2">{player.avatar}</span>
-                          <span className={getTierInfo(player.tier).color}>{player.username}</span>
-                          {player.userId === (session.user as any)?.id && (
-                            <span className="text-zinc-500 ml-1">(You)</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-right font-mono">
-                          {player.wins}W-{player.losses}L
-                        </td>
-                        <td className={`px-4 py-3 text-right ${
-                          player.winRate >= 55 ? 'text-teal-400' :
-                          player.winRate >= 50 ? 'text-gold' : 'text-red-400'
-                        }`}>
-                          {player.winRate?.toFixed(1)}%
-                        </td>
-                        <td className="px-4 py-3 text-right text-amber-400 font-medium">
-                          🔥 {player.bestStreak || 0}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-
-            {/* Tier Progress */}
-            <div className="bg-surface border border-zinc-800/50 rounded-2xl p-6">
-              <h3 className="font-semibold mb-4">Tier Progress</h3>
-              <div className="flex justify-between">
-                {['Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond'].map((tier, i) => {
-                  const tierInfo = getTierInfo(tier);
-                  const currentTierIndex = ['Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond'].indexOf(
-                    (session.user as any)?.tier || 'Bronze'
-                  );
-                  const isAchieved = i <= currentTierIndex;
-
-                  return (
-                    <div
-                      key={tier}
-                      className={`text-center ${isAchieved ? '' : 'opacity-30'}`}
-                    >
-                      <div className="text-2xl">{tierInfo.icon}</div>
-                      <div className={`text-xs mt-1 ${tierInfo.color}`}>{tier}</div>
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="mt-4 h-2 bg-zinc-800 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-teal-500 to-teal-400"
-                  style={{
-                    width: `${((['Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond'].indexOf(
-                      (session.user as any)?.tier || 'Bronze'
-                    ) + 1) / 5) * 100}%`,
-                  }}
-                />
-              </div>
-            </div>
-
           </div>
         )}
 

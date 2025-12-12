@@ -109,6 +109,22 @@ model User {
   avatar        String    @default("🎲")
   tier          String    @default("Bronze")
 
+  // Personal information
+  phoneNumber   String?
+  dateOfBirth   DateTime?
+  country       String?
+  timezone      String?
+
+  // KYC & Verification
+  kycStatus     String    @default("unverified") // unverified, pending, verified, rejected
+  kycSubmittedAt DateTime?
+  kycVerifiedAt DateTime?
+
+  // Last login tracking
+  lastLoginAt   DateTime?
+  lastLoginIp   String?
+  lastLoginLocation String?
+
   // Role-based access control
   role          String    @default("USER") // USER, ADMIN, SUPER_ADMIN
   roleUpdatedAt DateTime?

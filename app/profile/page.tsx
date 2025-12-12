@@ -15,28 +15,6 @@ import { DeleteAccountModal } from '@/components/DeleteAccountModal';
 import { TwoFactorModal } from '@/components/TwoFactorModal';
 import { ActiveSessionsModal } from '@/components/ActiveSessionsModal';
 
-const AVATAR_OPTIONS = [
-  '🎲', '🎯', '🏀', '🏈', '⚽', '🏒', '⚾', '🎾', '🥊', '💰',
-  '🔥', '⚡', '🌟', '👑', '🦁', '🐺', '🦅', '🐉', '💎', '🏆',
-];
-
-const TIER_INFO: Record<string, { color: string; icon: string; bg: string; next: string | null; requirement: string }> = {
-  Bronze: { color: 'text-orange-400', icon: '🥉', bg: 'from-orange-900/30 to-orange-800/20', next: 'Silver', requirement: '20+ bets, 52%+ win rate' },
-  Silver: { color: 'text-zinc-300', icon: '🥈', bg: 'from-zinc-700/30 to-zinc-600/20', next: 'Gold', requirement: '50+ bets, 55%+ win rate' },
-  Gold: { color: 'text-yellow-400', icon: '🥇', bg: 'from-yellow-900/30 to-yellow-800/20', next: 'Platinum', requirement: '100+ bets, 57%+ win rate' },
-  Platinum: { color: 'text-cyan-400', icon: '💠', bg: 'from-cyan-900/30 to-cyan-800/20', next: 'Diamond', requirement: '200+ bets, 60%+ win rate' },
-  Diamond: { color: 'text-purple-400', icon: '💎', bg: 'from-purple-900/30 to-purple-800/20', next: null, requirement: 'Maximum tier achieved!' },
-};
-
-const CHALLENGE_TIERS: Record<number, { label: string; color: string }> = {
-  1000: { label: '$1K', color: 'text-zinc-400' },
-  5000: { label: '$5K', color: 'text-green-400' },
-  10000: { label: '$10K', color: 'text-blue-400' },
-  25000: { label: '$25K', color: 'text-purple-400' },
-  50000: { label: '$50K', color: 'text-orange-400' },
-  100000: { label: '$100K', color: 'text-yellow-400' },
-};
-
 interface ProfileData {
   user: {
     id: string;
@@ -46,6 +24,16 @@ interface ProfileData {
     tier: string;
     role?: string;
     createdAt: string;
+    phoneNumber: string | null;
+    dateOfBirth: string | null;
+    country: string | null;
+    timezone: string | null;
+    kycStatus: string;
+    kycSubmittedAt: string | null;
+    kycVerifiedAt: string | null;
+    lastLoginAt: string | null;
+    lastLoginIp: string | null;
+    lastLoginLocation: string | null;
   };
   stats: {
     wins: number;
@@ -84,13 +72,15 @@ export default function ProfilePage() {
   const router = useRouter();
 
   const [username, setUsername] = useState('');
-  const [avatar, setAvatar] = useState('🎲');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState('');
+  const [country, setCountry] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview' | 'account' | 'bets' | 'challenges' | 'achievements' | 'settings'>('overview');
+  const [activeTab, setActiveTab] = useState<'account' | 'settings'>('account');
 
   // Settings state
   const [notifications, setNotifications] = useState({
@@ -99,11 +89,6 @@ export default function ProfilePage() {
     betResults: true,
     challengeUpdates: true,
     promotions: false,
-  });
-  const [displaySettings, setDisplaySettings] = useState({
-    showEmail: false,
-    showStats: true,
-    showOnLeaderboard: true,
   });
 
   // Security modal states
@@ -124,7 +109,6 @@ export default function ProfilePage() {
   useEffect(() => {
     if (session?.user) {
       setUsername((session.user as any)?.username || '');
-      setAvatar((session.user as any)?.avatar || '🎲');
     }
   }, [session]);
 
@@ -136,6 +120,12 @@ export default function ProfilePage() {
         if (res.ok) {
           const data = await res.json();
           setProfileData(data);
+          // Initialize editable fields from fetched data
+          if (data.user) {
+            setPhoneNumber(data.user.phoneNumber || '');
+            setDateOfBirth(data.user.dateOfBirth ? data.user.dateOfBirth.split('T')[0] : '');
+            setCountry(data.user.country || '');
+          }
         }
       } catch (err) {
         console.error('Failed to fetch profile:', err);
@@ -169,12 +159,12 @@ export default function ProfilePage() {
   }, [session]);
 
   const handleSave = async () => {
-    if (username.length < 3) {
-      setError('Username must be at least 3 characters');
+    if (username.length < 2) {
+      setError('Full name must be at least 2 characters');
       return;
     }
-    if (username.length > 20) {
-      setError('Username must be 20 characters or less');
+    if (username.length > 50) {
+      setError('Full name must be 50 characters or less');
       return;
     }
 
@@ -186,7 +176,12 @@ export default function ProfilePage() {
       const res = await fetch('/api/user/profile', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, avatar }),
+        body: JSON.stringify({
+          username,
+          phoneNumber: phoneNumber || undefined,
+          dateOfBirth: dateOfBirth || undefined,
+          country: country || undefined,
+        }),
       });
 
       if (!res.ok) {
@@ -194,7 +189,7 @@ export default function ProfilePage() {
         throw new Error(data.error || 'Failed to update profile');
       }
 
-      await update({ username, avatar });
+      await update({ username });
       setSuccess('Profile updated successfully!');
       setTimeout(() => setSuccess(''), 3000);
     } catch (err: any) {
@@ -218,9 +213,6 @@ export default function ProfilePage() {
 
   if (!session) return null;
 
-  const tier = (session.user as any)?.tier || 'Bronze';
-  const tierInfo = TIER_INFO[tier] || TIER_INFO.Bronze;
-  const stats = profileData?.stats;
   const user = profileData?.user;
 
   // Calculate account age
@@ -248,55 +240,10 @@ export default function ProfilePage() {
 
       {/* Main Content */}
       <main className="max-w-6xl mx-auto p-4 md:p-6 space-y-6">
-        {/* Profile Header Card */}
-        <div className={`bg-gradient-to-r ${tierInfo.bg} border border-teal-700/30 rounded-2xl p-6`}>
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div className="text-6xl">{avatar}</div>
-              <div>
-                <div className="text-2xl font-bold">{username || 'Set Username'}</div>
-                <div className="flex items-center gap-3 mt-1">
-                  <span className={tierInfo.color}>
-                    {tierInfo.icon} {tier}
-                  </span>
-                  {profileData?.rank && (
-                    <span className="text-zinc-400 text-sm">
-                      Rank #{profileData.rank} of {profileData.totalRankedUsers}
-                    </span>
-                  )}
-                </div>
-                <div className="text-sm text-zinc-500 mt-1">{session.user?.email}</div>
-              </div>
-            </div>
-
-            {/* Quick Stats */}
-            <div className="flex gap-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-teal-400">{stats?.totalBets || 0}</div>
-                <div className="text-xs text-zinc-500">Bets</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-emerald-400">{stats?.winRate?.toFixed(1) || 0}%</div>
-                <div className="text-xs text-zinc-500">Win Rate</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-amber-400">
-                  🔥 {stats?.bestStreak || 0}
-                </div>
-                <div className="text-xs text-zinc-500">Best Streak</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
         {/* Navigation Tabs */}
         <div className="flex gap-2 overflow-x-auto pb-2">
           {[
-            { id: 'overview', label: 'Overview', icon: '📊' },
             { id: 'account', label: 'Account', icon: '👤' },
-            { id: 'bets', label: 'Bets', icon: '🎯' },
-            { id: 'challenges', label: 'Challenges', icon: '🏆' },
-            { id: 'achievements', label: 'Achievements', icon: '⭐' },
             { id: 'settings', label: 'Settings', icon: '⚙️' },
           ].map((tab) => (
             <button
@@ -313,122 +260,6 @@ export default function ProfilePage() {
           ))}
         </div>
 
-        {/* Overview Tab */}
-        {activeTab === 'overview' && (
-          <div className="grid md:grid-cols-2 gap-6">
-            {/* Edit Profile */}
-            <div className="bg-surface border border-zinc-800/50 rounded-2xl p-6">
-              <h2 className="text-lg font-semibold mb-4">Edit Profile</h2>
-
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-zinc-300 mb-3">Choose Avatar</label>
-                <div className="grid grid-cols-10 gap-2">
-                  {AVATAR_OPTIONS.map((emoji) => (
-                    <button
-                      key={emoji}
-                      type="button"
-                      onClick={() => setAvatar(emoji)}
-                      className={`text-2xl p-2 rounded-lg transition-all ${
-                        avatar === emoji
-                          ? 'bg-teal-600 ring-2 ring-teal-400 scale-110'
-                          : 'bg-zinc-800 hover:bg-zinc-700'
-                      }`}
-                    >
-                      {emoji}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-zinc-300 mb-2">Username</label>
-                <Input
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Enter username"
-                  maxLength={20}
-                />
-                <p className="text-xs text-zinc-500 mt-1">{username.length}/20 characters (min 3)</p>
-              </div>
-
-              {error && (
-                <div className="bg-red-900/30 border border-red-700/50 rounded-lg p-3 mb-4">
-                  <p className="text-red-400 text-sm">{error}</p>
-                </div>
-              )}
-
-              {success && (
-                <div className="bg-green-900/30 border border-green-700/50 rounded-lg p-3 mb-4">
-                  <p className="text-green-400 text-sm">{success}</p>
-                </div>
-              )}
-
-              <Button onClick={handleSave} disabled={loading} className="w-full">
-                {loading ? 'Saving...' : 'Save Changes'}
-              </Button>
-            </div>
-
-            {/* Performance Stats */}
-            <div className="bg-surface border border-zinc-800/50 rounded-2xl p-6">
-              <h2 className="text-lg font-semibold mb-4">Performance Stats</h2>
-
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-zinc-800/50 rounded-xl p-4">
-                    <div className="text-2xl font-bold text-green-400">{stats?.wins || 0}</div>
-                    <div className="text-xs text-zinc-500">Wins</div>
-                  </div>
-                  <div className="bg-zinc-800/50 rounded-xl p-4">
-                    <div className="text-2xl font-bold text-red-400">{stats?.losses || 0}</div>
-                    <div className="text-xs text-zinc-500">Losses</div>
-                  </div>
-                </div>
-
-                <div className="bg-zinc-800/50 rounded-xl p-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-zinc-400">Current Streak</span>
-                    <span className={`font-bold ${(stats?.currentStreak || 0) > 0 ? 'text-green-400' : (stats?.currentStreak || 0) < 0 ? 'text-red-400' : 'text-zinc-400'}`}>
-                      {(stats?.currentStreak || 0) > 0 ? '🔥' : (stats?.currentStreak || 0) < 0 ? '❄️' : ''} {stats?.currentStreak || 0}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="bg-zinc-800/50 rounded-xl p-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-zinc-400">Total Staked</span>
-                    <span className="font-bold text-zinc-300">${stats?.totalStaked?.toFixed(2) || '0.00'}</span>
-                  </div>
-                </div>
-
-                <div className="bg-zinc-800/50 rounded-xl p-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-zinc-400">Current Streak</span>
-                    <span className={`font-bold ${(stats?.currentStreak || 0) > 0 ? 'text-green-400' : (stats?.currentStreak || 0) < 0 ? 'text-red-400' : 'text-zinc-400'}`}>
-                      {(stats?.currentStreak || 0) > 0 ? `🔥 ${stats?.currentStreak}W` : (stats?.currentStreak || 0) < 0 ? `❄️ ${Math.abs(stats?.currentStreak || 0)}L` : '-'}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="bg-zinc-800/50 rounded-xl p-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-zinc-400">Best Streak</span>
-                    <span className="font-bold text-yellow-400">{stats?.bestStreak || 0}W</span>
-                  </div>
-                </div>
-
-                <div className="bg-zinc-800/50 rounded-xl p-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-zinc-400">Parlays</span>
-                    <span className="font-bold text-zinc-300">
-                      {profileData?.parlayStats?.wins || 0}W / {profileData?.parlayStats?.total || 0}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Account Tab */}
         {activeTab === 'account' && (
           <div className="grid md:grid-cols-2 gap-6">
@@ -438,19 +269,154 @@ export default function ProfilePage() {
 
               <div className="space-y-4">
                 <div className="bg-zinc-800/50 rounded-xl p-4">
-                  <div className="text-xs text-zinc-500 mb-1">User ID</div>
-                  <div className="font-mono text-sm text-zinc-300 break-all">{user?.id}</div>
-                </div>
-
-                <div className="bg-zinc-800/50 rounded-xl p-4">
                   <div className="text-xs text-zinc-500 mb-1">Email Address</div>
                   <div className="text-zinc-300">{user?.email}</div>
                   <div className="text-xs text-green-400 mt-1">✓ Verified</div>
                 </div>
 
                 <div className="bg-zinc-800/50 rounded-xl p-4">
-                  <div className="text-xs text-zinc-500 mb-1">Username</div>
-                  <div className="text-zinc-300">{user?.username || 'Not set'}</div>
+                  <div className="text-xs text-zinc-500 mb-2">Full Name</div>
+                  <Input
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="Enter your full name"
+                    maxLength={50}
+                  />
+                </div>
+
+                <div className="bg-zinc-800/50 rounded-xl p-4">
+                  <div className="text-xs text-zinc-500 mb-2">Phone Number</div>
+                  <Input
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    placeholder="+1 (555) 123-4567"
+                    type="tel"
+                  />
+                </div>
+
+                <div className="bg-zinc-800/50 rounded-xl p-4">
+                  <div className="text-xs text-zinc-500 mb-2">Date of Birth</div>
+                  <Input
+                    value={dateOfBirth}
+                    onChange={(e) => setDateOfBirth(e.target.value)}
+                    type="date"
+                    className="[color-scheme:dark]"
+                  />
+                </div>
+
+                <div className="bg-zinc-800/50 rounded-xl p-4">
+                  <div className="text-xs text-zinc-500 mb-2">Country</div>
+                  <select
+                    value={country}
+                    onChange={(e) => setCountry(e.target.value)}
+                    className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-zinc-300 focus:outline-none focus:border-teal-500"
+                  >
+                    <option value="">Select country</option>
+                    <option value="US">United States</option>
+                    <option value="GB">United Kingdom</option>
+                    <option value="CA">Canada</option>
+                    <option value="AU">Australia</option>
+                    <option value="DE">Germany</option>
+                    <option value="FR">France</option>
+                    <option value="ES">Spain</option>
+                    <option value="IT">Italy</option>
+                    <option value="NL">Netherlands</option>
+                    <option value="BE">Belgium</option>
+                    <option value="AT">Austria</option>
+                    <option value="CH">Switzerland</option>
+                    <option value="SE">Sweden</option>
+                    <option value="NO">Norway</option>
+                    <option value="DK">Denmark</option>
+                    <option value="FI">Finland</option>
+                    <option value="IE">Ireland</option>
+                    <option value="PT">Portugal</option>
+                    <option value="PL">Poland</option>
+                    <option value="BG">Bulgaria</option>
+                    <option value="OTHER">Other</option>
+                  </select>
+                </div>
+
+                {error && (
+                  <div className="bg-red-900/30 border border-red-700/50 rounded-lg p-3">
+                    <p className="text-red-400 text-sm">{error}</p>
+                  </div>
+                )}
+
+                {success && (
+                  <div className="bg-green-900/30 border border-green-700/50 rounded-lg p-3">
+                    <p className="text-green-400 text-sm">{success}</p>
+                  </div>
+                )}
+
+                <Button onClick={handleSave} disabled={loading} className="w-full">
+                  {loading ? 'Saving...' : 'Save Changes'}
+                </Button>
+
+              </div>
+            </div>
+
+            {/* Verification & Security */}
+            <div className="bg-surface border border-zinc-800/50 rounded-2xl p-6">
+              <h2 className="text-lg font-semibold mb-4">Verification & Security</h2>
+
+              <div className="space-y-4">
+                <div className="bg-zinc-800/50 rounded-xl p-4">
+                  <div className="text-xs text-zinc-500 mb-1">KYC Verification Status</div>
+                  <div className="flex items-center gap-2">
+                    {user?.kycStatus === 'verified' ? (
+                      <>
+                        <span className="text-green-400">Verified</span>
+                        <span className="px-2 py-0.5 bg-green-600/30 text-green-400 text-xs rounded-full">✓ Complete</span>
+                      </>
+                    ) : user?.kycStatus === 'pending' ? (
+                      <>
+                        <span className="text-yellow-400">Pending Review</span>
+                        <span className="px-2 py-0.5 bg-yellow-600/30 text-yellow-400 text-xs rounded-full">In Progress</span>
+                      </>
+                    ) : user?.kycStatus === 'rejected' ? (
+                      <>
+                        <span className="text-red-400">Rejected</span>
+                        <span className="px-2 py-0.5 bg-red-600/30 text-red-400 text-xs rounded-full">Resubmit Required</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-zinc-400">Not Verified</span>
+                        <span className="px-2 py-0.5 bg-zinc-600/30 text-zinc-400 text-xs rounded-full">Optional</span>
+                      </>
+                    )}
+                  </div>
+                  {user?.kycVerifiedAt && (
+                    <div className="text-xs text-zinc-500 mt-1">
+                      Verified on {new Date(user.kycVerifiedAt).toLocaleDateString()}
+                    </div>
+                  )}
+                </div>
+
+                <div className="bg-zinc-800/50 rounded-xl p-4">
+                  <div className="text-xs text-zinc-500 mb-1">Last Login</div>
+                  <div className="text-zinc-300">
+                    {user?.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString('en-US', {
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    }) : 'N/A'}
+                  </div>
+                </div>
+
+                <div className="bg-zinc-800/50 rounded-xl p-4">
+                  <div className="text-xs text-zinc-500 mb-1">Last Login IP</div>
+                  <div className="font-mono text-sm text-zinc-300">
+                    {user?.lastLoginIp || 'N/A'}
+                  </div>
+                </div>
+
+                <div className="bg-zinc-800/50 rounded-xl p-4">
+                  <div className="text-xs text-zinc-500 mb-1">Last Login Location</div>
+                  <div className="text-zinc-300">
+                    {user?.lastLoginLocation || 'N/A'}
+                  </div>
                 </div>
 
                 <div className="bg-zinc-800/50 rounded-xl p-4">
@@ -464,289 +430,9 @@ export default function ProfilePage() {
                   </div>
                   <div className="text-xs text-zinc-500 mt-1">{accountAge} days ago</div>
                 </div>
-
-                <div className="bg-zinc-800/50 rounded-xl p-4">
-                  <div className="text-xs text-zinc-500 mb-1">Account Type</div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-zinc-300">
-                      {user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN' ? 'Administrator' : 'Standard User'}
-                    </span>
-                    {(user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN') && (
-                      <span className="px-2 py-0.5 bg-teal-600/30 text-teal-400 text-xs rounded-full">Admin</span>
-                    )}
-                  </div>
-                </div>
               </div>
             </div>
 
-            {/* Tier Progress */}
-            <div className="bg-surface border border-zinc-800/50 rounded-2xl p-6">
-              <h2 className="text-lg font-semibold mb-4">Tier Progress</h2>
-
-              {/* Current Tier */}
-              <div className={`bg-gradient-to-r ${tierInfo.bg} border border-zinc-700/50 rounded-xl p-4 mb-4`}>
-                <div className="flex items-center gap-3">
-                  <span className="text-4xl">{tierInfo.icon}</span>
-                  <div>
-                    <div className={`text-xl font-bold ${tierInfo.color}`}>{tier} Tier</div>
-                    <div className="text-sm text-zinc-400">Current Level</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Tier Ladder */}
-              <div className="space-y-2 mb-4">
-                {Object.entries(TIER_INFO).map(([tierName, info], index) => {
-                  const isCurrentTier = tierName === tier;
-                  const tierOrder = ['Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond'];
-                  const currentIndex = tierOrder.indexOf(tier);
-                  const thisTierIndex = tierOrder.indexOf(tierName);
-                  const isAchieved = thisTierIndex <= currentIndex;
-
-                  return (
-                    <div
-                      key={tierName}
-                      className={`flex items-center gap-3 p-3 rounded-lg ${
-                        isCurrentTier ? 'bg-teal-900/30 border border-teal-700/50' :
-                        isAchieved ? 'bg-zinc-800/30' : 'bg-zinc-900/30 opacity-50'
-                      }`}
-                    >
-                      <span className="text-2xl">{info.icon}</span>
-                      <div className="flex-1">
-                        <div className={`font-medium ${isAchieved ? info.color : 'text-zinc-500'}`}>{tierName}</div>
-                      </div>
-                      {isAchieved && <span className="text-green-400">✓</span>}
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Next Tier Requirement */}
-              {tierInfo.next && (
-                <div className="bg-zinc-800/50 rounded-xl p-4">
-                  <div className="text-sm text-zinc-400 mb-1">Next Tier: {tierInfo.next}</div>
-                  <div className="text-xs text-zinc-500">Requirement: {TIER_INFO[tierInfo.next]?.requirement || tierInfo.requirement}</div>
-                </div>
-              )}
-              {!tierInfo.next && (
-                <div className="bg-gradient-to-r from-purple-900/30 to-pink-900/30 border border-purple-700/50 rounded-xl p-4">
-                  <div className="text-sm text-purple-300">🎉 Maximum tier achieved!</div>
-                  <div className="text-xs text-zinc-500">You've reached the highest tier.</div>
-                </div>
-              )}
-            </div>
-
-            {/* Activity Summary */}
-            <div className="bg-surface border border-zinc-800/50 rounded-2xl p-6 md:col-span-2">
-              <h2 className="text-lg font-semibold mb-4">Activity Summary</h2>
-
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="bg-zinc-800/50 rounded-xl p-4 text-center">
-                  <div className="text-3xl font-bold text-teal-400">{stats?.totalBets || 0}</div>
-                  <div className="text-sm text-zinc-500">Total Bets</div>
-                </div>
-                <div className="bg-zinc-800/50 rounded-xl p-4 text-center">
-                  <div className="text-3xl font-bold text-purple-400">{profileData?.parlayStats?.total || 0}</div>
-                  <div className="text-sm text-zinc-500">Total Parlays</div>
-                </div>
-                <div className="bg-zinc-800/50 rounded-xl p-4 text-center">
-                  <div className="text-3xl font-bold text-yellow-400">
-                    {(profileData?.activeChallenges?.length || 0) + (profileData?.completedChallenges || 0)}
-                  </div>
-                  <div className="text-sm text-zinc-500">Total Challenges</div>
-                </div>
-                <div className="bg-zinc-800/50 rounded-xl p-4 text-center">
-                  <div className="text-3xl font-bold text-emerald-400">{profileData?.achievements?.length || 0}</div>
-                  <div className="text-sm text-zinc-500">Achievements</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Bets Tab */}
-        {activeTab === 'bets' && (
-          <div className="bg-surface border border-zinc-800/50 rounded-2xl overflow-hidden">
-            <div className="p-4 border-b border-zinc-800/50">
-              <h2 className="text-lg font-semibold">Recent Bets</h2>
-            </div>
-
-            {profileData?.recentBets && profileData.recentBets.length > 0 ? (
-              <div className="divide-y divide-zinc-800/50">
-                {profileData.recentBets.map((bet: any) => (
-                  <div key={bet.id} className="p-4 hover:bg-zinc-800/30 transition-colors">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <div className="font-medium">{bet.matchup}</div>
-                        <div className="text-sm text-zinc-400">{bet.sport} - {bet.league}</div>
-                        <div className="text-sm text-teal-400 mt-1">
-                          {bet.betType}: {bet.selection} @ {bet.odds}
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className={`px-3 py-1 rounded-lg font-bold uppercase text-sm inline-block ${
-                          bet.result === 'won' ? 'bg-green-900/30 text-green-400' :
-                          bet.result === 'lost' ? 'bg-red-900/30 text-red-400' :
-                          bet.result === 'push' ? 'bg-yellow-900/30 text-yellow-400' :
-                          'bg-zinc-800 text-zinc-400'
-                        }`}>
-                          {bet.result === 'won' ? 'Won' :
-                           bet.result === 'lost' ? 'Lost' :
-                           bet.result === 'push' ? 'Push' : 'Pending'}
-                        </div>
-                        <div className="text-xs text-zinc-500 mt-1">
-                          {new Date(bet.createdAt).toLocaleDateString()}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="p-8 text-center text-zinc-500">
-                No bets yet. Start betting to see your history!
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Challenges Tab */}
-        {activeTab === 'challenges' && (
-          <div className="space-y-6">
-            {/* Challenge Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-surface border border-zinc-800/50 rounded-xl p-4 text-center">
-                <div className="text-2xl font-bold text-teal-400">{profileData?.activeChallenges?.length || 0}</div>
-                <div className="text-xs text-zinc-500">Active</div>
-              </div>
-              <div className="bg-surface border border-zinc-800/50 rounded-xl p-4 text-center">
-                <div className="text-2xl font-bold text-emerald-400">{profileData?.completedChallenges || 0}</div>
-                <div className="text-xs text-zinc-500">Completed</div>
-              </div>
-              <div className="bg-surface border border-zinc-800/50 rounded-xl p-4 text-center">
-                <div className="text-2xl font-bold text-yellow-400">{profileData?.rewardsCount || 0}</div>
-                <div className="text-xs text-zinc-500">Rewards Earned</div>
-              </div>
-              <div className="bg-surface border border-zinc-800/50 rounded-xl p-4 text-center">
-                <div className="text-2xl font-bold text-green-400">${profileData?.totalRewardsEarned?.toFixed(0) || 0}</div>
-                <div className="text-xs text-zinc-500">Total Earned</div>
-              </div>
-            </div>
-
-            {/* Active Challenges */}
-            <div className="bg-surface border border-zinc-800/50 rounded-2xl overflow-hidden">
-              <div className="p-4 border-b border-zinc-800/50">
-                <h2 className="text-lg font-semibold">Active Challenges</h2>
-              </div>
-
-              {profileData?.activeChallenges && profileData.activeChallenges.length > 0 ? (
-                <div className="divide-y divide-zinc-800/50">
-                  {profileData.activeChallenges.map((challenge: any) => {
-                    const tierConfig = CHALLENGE_TIERS[challenge.tier] || { label: `$${challenge.tier}`, color: 'text-zinc-400' };
-                    const daysLeft = challenge.expiresAt ? Math.ceil((new Date(challenge.expiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : 0;
-
-                    return (
-                      <div key={challenge.id} className="p-4">
-                        <div className="flex justify-between items-start mb-3">
-                          <div>
-                            <span className={`text-lg font-bold ${tierConfig.color}`}>{tierConfig.label}</span>
-                            <span className="text-zinc-500 ml-2">Challenge</span>
-                          </div>
-                          <div className={`text-sm ${daysLeft <= 3 ? 'text-red-400' : 'text-zinc-400'}`}>
-                            {daysLeft} days left
-                          </div>
-                        </div>
-
-                        <div className="flex gap-2 mb-2">
-                          {[1, 2, 3, 4].map((level) => (
-                            <div
-                              key={level}
-                              className={`flex-1 h-2 rounded-full ${
-                                challenge[`level${level}Completed`]
-                                  ? 'bg-teal-500'
-                                  : challenge.currentLevel === level
-                                  ? 'bg-teal-900'
-                                  : 'bg-zinc-800'
-                              }`}
-                            />
-                          ))}
-                        </div>
-
-                        <div className="flex justify-between text-sm">
-                          <span className="text-zinc-400">Level {challenge.currentLevel}/4</span>
-                          <span className="text-zinc-400">Streak: {challenge.currentStreak}</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="p-8 text-center text-zinc-500">
-                  No active challenges. Purchase a challenge to get started!
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Achievements Tab */}
-        {activeTab === 'achievements' && (
-          <div className="bg-surface border border-zinc-800/50 rounded-2xl p-6">
-            <h2 className="text-lg font-semibold mb-4">
-              Achievements ({profileData?.achievements?.length || 0})
-            </h2>
-
-            {profileData?.achievements && profileData.achievements.length > 0 ? (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {profileData.achievements.map((achievement) => (
-                  <div
-                    key={achievement.id}
-                    className="bg-gradient-to-br from-teal-900/30 to-teal-800/20 border border-teal-700/30 rounded-xl p-4 text-center hover:scale-105 transition-transform"
-                  >
-                    <div className="text-4xl mb-2">{achievement.icon}</div>
-                    <div className="font-medium text-white">{achievement.name}</div>
-                    <div className="text-xs text-zinc-400 mt-1">{achievement.description}</div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-12">
-                <div className="text-6xl mb-4">🎯</div>
-                <div className="text-zinc-400 mb-2">No achievements yet</div>
-                <div className="text-sm text-zinc-500">
-                  Start betting and completing challenges to earn achievements!
-                </div>
-              </div>
-            )}
-
-            {/* Locked Achievements */}
-            <div className="mt-8">
-              <h3 className="text-sm font-medium text-zinc-500 mb-4">Locked Achievements</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {[
-                  { icon: '💯', name: 'Century Club', description: '100 bets placed' },
-                  { icon: '🎰', name: 'High Roller', description: '500 bets placed' },
-                  { icon: '💥', name: 'On Fire', description: '10 win streak' },
-                  { icon: '💰', name: 'Money Maker', description: '15 win streak' },
-                  { icon: '👑', name: 'Champion', description: 'Complete 5 challenges' },
-                  { icon: '🃏', name: 'Parlay Master', description: 'Win 5 parlays' },
-                  { icon: '💎', name: 'Diamond Tier', description: 'Reach Diamond tier' },
-                  { icon: '⭐', name: 'Elite Bettor', description: '60%+ win rate' },
-                ]
-                  .filter((a) => !profileData?.achievements?.find((ua) => ua.name === a.name))
-                  .slice(0, 4)
-                  .map((achievement, i) => (
-                    <div
-                      key={i}
-                      className="bg-zinc-800/30 border border-zinc-700/30 rounded-xl p-4 text-center opacity-50"
-                    >
-                      <div className="text-3xl mb-2 grayscale">{achievement.icon}</div>
-                      <div className="font-medium text-zinc-500">{achievement.name}</div>
-                      <div className="text-xs text-zinc-600 mt-1">{achievement.description}</div>
-                    </div>
-                  ))}
-              </div>
-            </div>
           </div>
         )}
 
@@ -778,36 +464,6 @@ export default function ProfilePage() {
                     >
                       <div className={`w-5 h-5 bg-white rounded-full transition-transform ${
                         notifications[setting.key as keyof typeof notifications] ? 'translate-x-6' : 'translate-x-0.5'
-                      }`} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Privacy Settings */}
-            <div className="bg-surface border border-zinc-800/50 rounded-2xl p-6">
-              <h2 className="text-lg font-semibold mb-4">Privacy Settings</h2>
-
-              <div className="space-y-4">
-                {[
-                  { key: 'showEmail', label: 'Show Email', description: 'Display email on public profile' },
-                  { key: 'showStats', label: 'Show Stats', description: 'Make your stats visible to others' },
-                  { key: 'showOnLeaderboard', label: 'Appear on Leaderboard', description: 'Show your rank publicly' },
-                ].map((setting) => (
-                  <div key={setting.key} className="flex items-center justify-between p-3 bg-zinc-800/50 rounded-xl">
-                    <div>
-                      <div className="font-medium text-zinc-300">{setting.label}</div>
-                      <div className="text-xs text-zinc-500">{setting.description}</div>
-                    </div>
-                    <button
-                      onClick={() => setDisplaySettings(prev => ({ ...prev, [setting.key]: !prev[setting.key as keyof typeof prev] }))}
-                      className={`w-12 h-6 rounded-full transition-colors ${
-                        displaySettings[setting.key as keyof typeof displaySettings] ? 'bg-teal-600' : 'bg-zinc-700'
-                      }`}
-                    >
-                      <div className={`w-5 h-5 bg-white rounded-full transition-transform ${
-                        displaySettings[setting.key as keyof typeof displaySettings] ? 'translate-x-6' : 'translate-x-0.5'
                       }`} />
                     </button>
                   </div>
