@@ -183,11 +183,11 @@ function LoginForm() {
   return (
     <div className="relative z-10 w-full max-w-md mx-4">
       {/* Logo with glow effect */}
-      <div className="text-center mb-10">
+      <div className="text-center mb-6">
         <h1 className="text-4xl font-bold tracking-tight animate-shimmer bg-gradient-to-r from-teal-400 via-cyan-300 to-teal-400 bg-[length:200%_100%] bg-clip-text text-transparent">
           ZALOGCHE
         </h1>
-        <p className="text-zinc-400 mt-4 text-sm tracking-wide">Enter the arena</p>
+        <p className="text-zinc-400 mt-2 text-sm tracking-wide">Enter the arena</p>
       </div>
 
       {/* Glass morphism card */}
