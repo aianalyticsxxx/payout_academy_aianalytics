@@ -138,7 +138,6 @@ export default function RegisterPage() {
     phone: '',
     username: '',
     password: '',
-    confirmPassword: '',
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -156,12 +155,6 @@ export default function RegisterPage() {
     setError('');
 
     // Validate
-    if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
-      setLoading(false);
-      return;
-    }
-
     if (formData.password.length < 8) {
       setError('Password must be at least 8 characters');
       setLoading(false);
@@ -203,36 +196,36 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6">
+    <div className="min-h-screen flex items-center justify-center p-4">
       <AnimatedBackground />
 
       <div className="relative z-10 w-full max-w-md mx-4">
         {/* Logo with glow effect */}
-        <div className="text-center mb-8">
+        <div className="text-center mb-6">
           <h1 className="text-4xl font-bold tracking-tight animate-shimmer bg-gradient-to-r from-teal-400 via-cyan-300 to-teal-400 bg-[length:200%_100%] bg-clip-text text-transparent">
             ZALOGCHE
           </h1>
-          <p className="text-zinc-400 mt-4 text-sm tracking-wide">Create your account</p>
+          <p className="text-zinc-400 mt-2 text-sm tracking-wide">Create your account</p>
         </div>
 
         {/* Glass morphism card */}
         <div className="relative group">
           {/* Animated border glow */}
-          <div className="absolute -inset-0.5 bg-gradient-to-r from-teal-500 via-cyan-500 to-violet-500 rounded-2xl opacity-20 group-hover:opacity-40 blur transition-all duration-500" />
+          <div className="absolute -inset-[1px] bg-gradient-to-r from-teal-500/50 via-cyan-500/50 to-violet-500/50 rounded-3xl blur-sm opacity-75 group-hover:opacity-100 transition-opacity duration-500 animate-border-glow" />
 
-          {/* Main card */}
-          <div className="relative bg-[#0A0A0A]/90 backdrop-blur-xl border border-white/10 rounded-2xl p-8 shadow-2xl">
+          {/* Card content */}
+          <div className="relative backdrop-blur-xl bg-zinc-900/70 border border-white/10 rounded-3xl p-8 shadow-2xl shadow-black/50">
             {error && (
-              <div className="bg-red-900/30 border border-red-800/50 text-red-400 px-4 py-3 rounded-xl mb-6 text-sm">
+              <div className="bg-red-900/30 border border-red-500/30 text-red-400 px-4 py-3 rounded-xl mb-6 backdrop-blur-sm">
                 {error}
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-5">
               {/* First Name & Last Name Row */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-zinc-400 mb-2 uppercase tracking-wider">
+                  <label className="block text-sm font-medium text-zinc-300 mb-2">
                     First Name
                   </label>
                   <input
@@ -240,13 +233,13 @@ export default function RegisterPage() {
                     name="firstName"
                     value={formData.firstName}
                     onChange={handleChange}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500/50 transition-all"
+                    className="w-full bg-zinc-800/50 border border-zinc-700/50 rounded-xl px-4 py-3.5 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500/50 transition-all duration-300 backdrop-blur-sm"
                     placeholder="John"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-zinc-400 mb-2 uppercase tracking-wider">
+                  <label className="block text-sm font-medium text-zinc-300 mb-2">
                     Last Name
                   </label>
                   <input
@@ -254,7 +247,7 @@ export default function RegisterPage() {
                     name="lastName"
                     value={formData.lastName}
                     onChange={handleChange}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500/50 transition-all"
+                    className="w-full bg-zinc-800/50 border border-zinc-700/50 rounded-xl px-4 py-3.5 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500/50 transition-all duration-300 backdrop-blur-sm"
                     placeholder="Doe"
                     required
                   />
@@ -263,7 +256,7 @@ export default function RegisterPage() {
 
               {/* Email */}
               <div>
-                <label className="block text-xs font-medium text-zinc-400 mb-2 uppercase tracking-wider">
+                <label className="block text-sm font-medium text-zinc-300 mb-2">
                   Email
                 </label>
                 <input
@@ -271,7 +264,7 @@ export default function RegisterPage() {
                   name="email"
                   value={formData.email}
                   onChange={handleChange}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500/50 transition-all"
+                  className="w-full bg-zinc-800/50 border border-zinc-700/50 rounded-xl px-4 py-3.5 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500/50 transition-all duration-300 backdrop-blur-sm"
                   placeholder="you@example.com"
                   required
                 />
@@ -279,7 +272,7 @@ export default function RegisterPage() {
 
               {/* Phone Number */}
               <div>
-                <label className="block text-xs font-medium text-zinc-400 mb-2 uppercase tracking-wider">
+                <label className="block text-sm font-medium text-zinc-300 mb-2">
                   Phone Number
                 </label>
                 <input
@@ -287,14 +280,15 @@ export default function RegisterPage() {
                   name="phone"
                   value={formData.phone}
                   onChange={handleChange}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500/50 transition-all"
+                  className="w-full bg-zinc-800/50 border border-zinc-700/50 rounded-xl px-4 py-3.5 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500/50 transition-all duration-300 backdrop-blur-sm"
                   placeholder="+1 (555) 000-0000"
+                  required
                 />
               </div>
 
               {/* Username */}
               <div>
-                <label className="block text-xs font-medium text-zinc-400 mb-2 uppercase tracking-wider">
+                <label className="block text-sm font-medium text-zinc-300 mb-2">
                   Username
                 </label>
                 <input
@@ -302,18 +296,17 @@ export default function RegisterPage() {
                   name="username"
                   value={formData.username}
                   onChange={handleChange}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500/50 transition-all"
+                  className="w-full bg-zinc-800/50 border border-zinc-700/50 rounded-xl px-4 py-3.5 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500/50 transition-all duration-300 backdrop-blur-sm"
                   placeholder="your_username"
                   minLength={3}
                   maxLength={20}
                   required
                 />
-                <p className="text-[10px] text-zinc-600 mt-1">3-20 characters, shown on leaderboard</p>
               </div>
 
               {/* Password */}
               <div>
-                <label className="block text-xs font-medium text-zinc-400 mb-2 uppercase tracking-wider">
+                <label className="block text-sm font-medium text-zinc-300 mb-2">
                   Password
                 </label>
                 <input
@@ -321,25 +314,9 @@ export default function RegisterPage() {
                   name="password"
                   value={formData.password}
                   onChange={handleChange}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500/50 transition-all"
-                  placeholder="Min 8 characters"
+                  className="w-full bg-zinc-800/50 border border-zinc-700/50 rounded-xl px-4 py-3.5 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500/50 transition-all duration-300 backdrop-blur-sm"
+                  placeholder="••••••••"
                   minLength={8}
-                  required
-                />
-              </div>
-
-              {/* Confirm Password */}
-              <div>
-                <label className="block text-xs font-medium text-zinc-400 mb-2 uppercase tracking-wider">
-                  Confirm Password
-                </label>
-                <input
-                  type="password"
-                  name="confirmPassword"
-                  value={formData.confirmPassword}
-                  onChange={handleChange}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500/50 transition-all"
-                  placeholder="Confirm your password"
                   required
                 />
               </div>
@@ -348,17 +325,18 @@ export default function RegisterPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full relative group/btn overflow-hidden font-semibold py-3.5 rounded-xl transition-all duration-300 disabled:opacity-50 mt-2"
+                className="w-full font-semibold py-3.5 rounded-xl transition-all duration-300 disabled:opacity-50 text-zinc-900 relative overflow-hidden group/btn"
+                style={{
+                  background: 'linear-gradient(135deg, #2DD4BF 0%, #14B8A6 50%, #0D9488 100%)',
+                }}
               >
-                <div className="absolute inset-0 bg-gradient-to-r from-teal-500 via-cyan-500 to-teal-500 bg-[length:200%_100%] group-hover/btn:animate-shimmer" />
-                <span className="relative text-black font-bold">
-                  {loading ? 'Creating account...' : 'Create Account'}
-                </span>
+                <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover/btn:translate-x-full transition-transform duration-700" />
+                <span className="relative">{loading ? 'Creating account...' : 'Create Account'}</span>
               </button>
             </form>
 
             {/* Sign in link */}
-            <p className="mt-6 text-center text-sm text-zinc-500">
+            <p className="mt-8 text-center text-sm text-zinc-500">
               Already have an account?{' '}
               <Link
                 href="/login"
@@ -371,7 +349,7 @@ export default function RegisterPage() {
         </div>
 
         {/* Disclaimer */}
-        <p className="mt-6 text-center text-[10px] text-zinc-600">
+        <p className="mt-8 text-center text-xs text-zinc-600">
           By creating an account, you confirm you are 18+ and agree to our Terms of Service.
         </p>
       </div>

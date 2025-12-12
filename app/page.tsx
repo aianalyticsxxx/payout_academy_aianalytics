@@ -948,15 +948,15 @@ export default function LandingPage() {
             Starting from just <span className="text-amber-400 font-bold">$20</span>
           </p>
 
-          <button
-            onClick={() => openPurchaseModal()}
+          <a
+            href="#challenges"
             className="inline-flex items-center gap-3 px-10 py-5 rounded-2xl font-bold text-xl bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-teal-400 transition-all duration-300 hover:scale-105 shadow-xl shadow-teal-500/25"
           >
             Start Your Challenge Now
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
             </svg>
-          </button>
+          </a>
 
           {/* Trust Badges */}
           <div className="flex items-center justify-center gap-6 mt-12 text-zinc-500 text-sm">

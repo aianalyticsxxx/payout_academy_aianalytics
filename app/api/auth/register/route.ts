@@ -13,7 +13,7 @@ const RegisterSchema = z.object({
   username: z.string().min(3, 'Username must be at least 3 characters').max(20),
   firstName: z.string().min(1, 'First name is required'),
   lastName: z.string().min(1, 'Last name is required'),
-  phone: z.string().optional(),
+  phone: z.string().min(1, 'Phone number is required'),
 });
 
 export async function POST(req: NextRequest) {
