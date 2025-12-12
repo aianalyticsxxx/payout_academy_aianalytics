@@ -355,57 +355,8 @@ export default function LandingPage() {
             </p>
           </div>
 
-          {/* Steps */}
-          <div className="relative grid md:grid-cols-3 gap-8">
-            {/* Connection Line (desktop only) */}
-            <div className="hidden md:block absolute top-24 left-[20%] right-[20%] h-0.5 bg-gradient-to-r from-teal-500/0 via-teal-500/50 to-teal-500/0" />
-
-            {[
-              {
-                step: '01',
-                icon: '🎮',
-                title: 'Choose Your Challenge',
-                description: 'Pick your account size (€1K - €100K) and difficulty mode (Beginner or Pro)',
-              },
-              {
-                step: '02',
-                icon: '🔥',
-                title: 'Build Your Streak',
-                description: 'Win consecutive bets at minimum odds. Each streak milestone unlocks a reward level',
-              },
-              {
-                step: '03',
-                icon: '💰',
-                title: 'Collect Rewards',
-                description: 'Get paid instantly at each level. Keep your rewards even if your streak breaks later',
-              },
-            ].map((item, i) => (
-              <div
-                key={i}
-                className="relative group"
-              >
-                {/* Step Number Circle */}
-                <div className="relative w-16 h-16 mx-auto mb-6">
-                  <div className="absolute inset-0 rounded-full bg-gradient-to-br from-teal-500 to-teal-600 opacity-20 group-hover:opacity-40 transition-opacity" />
-                  <div className="absolute inset-1 rounded-full bg-[#0A0A0A] flex items-center justify-center">
-                    <span className="text-2xl">{item.icon}</span>
-                  </div>
-                  <div className="absolute -top-2 -right-2 w-8 h-8 rounded-full bg-teal-500 flex items-center justify-center text-xs font-bold">
-                    {item.step}
-                  </div>
-                </div>
-
-                {/* Card */}
-                <div className="bg-[#111111] border border-zinc-800/50 rounded-2xl p-6 text-center group-hover:border-teal-500/30 transition-all duration-300">
-                  <h3 className="text-xl font-bold mb-3">{item.title}</h3>
-                  <p className="text-zinc-400">{item.description}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-
           {/* Video Section */}
-          <div className="mt-16">
+          <div className="mb-16">
             <div className="relative max-w-4xl mx-auto">
               {/* Video Container */}
               <div className="relative aspect-video rounded-2xl overflow-hidden border border-zinc-800/50 bg-zinc-900/50 group">
@@ -460,6 +411,55 @@ export default function LandingPage() {
                 See how easy it is to start earning rewards with Zalogche
               </p>
             </div>
+          </div>
+
+          {/* Steps */}
+          <div className="relative grid md:grid-cols-3 gap-8">
+            {/* Connection Line (desktop only) */}
+            <div className="hidden md:block absolute top-24 left-[20%] right-[20%] h-0.5 bg-gradient-to-r from-teal-500/0 via-teal-500/50 to-teal-500/0" />
+
+            {[
+              {
+                step: '01',
+                icon: '🎮',
+                title: 'Choose Your Challenge',
+                description: 'Pick your account size (€1K - €100K) and difficulty mode (Beginner or Pro)',
+              },
+              {
+                step: '02',
+                icon: '🔥',
+                title: 'Build Your Streak',
+                description: 'Win consecutive bets at minimum odds. Each streak milestone unlocks a reward level',
+              },
+              {
+                step: '03',
+                icon: '💰',
+                title: 'Collect Rewards',
+                description: 'Get paid instantly at each level. Keep your rewards even if your streak breaks later',
+              },
+            ].map((item, i) => (
+              <div
+                key={i}
+                className="relative group"
+              >
+                {/* Step Number Circle */}
+                <div className="relative w-16 h-16 mx-auto mb-6">
+                  <div className="absolute inset-0 rounded-full bg-gradient-to-br from-teal-500 to-teal-600 opacity-20 group-hover:opacity-40 transition-opacity" />
+                  <div className="absolute inset-1 rounded-full bg-[#0A0A0A] flex items-center justify-center">
+                    <span className="text-2xl">{item.icon}</span>
+                  </div>
+                  <div className="absolute -top-2 -right-2 w-8 h-8 rounded-full bg-teal-500 flex items-center justify-center text-xs font-bold">
+                    {item.step}
+                  </div>
+                </div>
+
+                {/* Card */}
+                <div className="bg-[#111111] border border-zinc-800/50 rounded-2xl p-6 text-center group-hover:border-teal-500/30 transition-all duration-300">
+                  <h3 className="text-xl font-bold mb-3">{item.title}</h3>
+                  <p className="text-zinc-400">{item.description}</p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
