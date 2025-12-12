@@ -19,7 +19,7 @@ export async function POST(
     const { reason } = body;
 
     // Find the reward
-    const reward = await prisma.reward.findUnique({
+    const reward = await prisma.challengeReward.findUnique({
       where: { id: rewardId },
       include: {
         challenge: {
@@ -42,7 +42,7 @@ export async function POST(
     }
 
     // Update reward status to rejected
-    await prisma.reward.update({
+    await prisma.challengeReward.update({
       where: { id: rewardId },
       data: {
         status: 'rejected',

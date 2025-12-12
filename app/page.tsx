@@ -1467,7 +1467,7 @@ function DashboardContent() {
                                         {market.outcomes?.slice(0, 6).map((outcome: any, idx: number) => (
                                           <button
                                             key={idx}
-                                            onClick={() => session && outcome.price && openQuickBet(event, marketKey, `${outcome.name}${outcome.point ? ` ${outcome.point > 0 ? '+' : ''}${outcome.point}` : ''}`, outcome.price)}
+                                            onClick={() => session && outcome.price && openQuickBet(event, marketKey as 'home' | 'draw' | 'away', `${outcome.name}${outcome.point ? ` ${outcome.point > 0 ? '+' : ''}${outcome.point}` : ''}`, outcome.price)}
                                             disabled={!session || !outcome.price}
                                             className={`bg-zinc-800/50 rounded-lg p-2 text-left border border-zinc-700/30 transition-all ${
                                               session && outcome.price

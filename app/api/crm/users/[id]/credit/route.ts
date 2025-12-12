@@ -180,8 +180,7 @@ export async function POST(
       await prisma.challenge.update({
         where: { id: challengeId },
         data: {
-          status: 'CANCELLED',
-          cancelledAt: new Date(),
+          status: 'cancelled',
         },
       });
 
