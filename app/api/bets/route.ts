@@ -14,6 +14,10 @@ import { safePagination, paginationMeta } from '@/lib/security/pagination';
 // VALIDATION SCHEMAS
 // ==========================================
 
+// SECURITY: Safe integer limits to prevent overflow attacks
+const MAX_SAFE_STAKE = 1000000; // €1M max stake (well within Number.MAX_SAFE_INTEGER)
+const MIN_STAKE = 0.01; // Minimum €0.01 stake
+
 const CreateBetSchema = z.object({
   sport: z.string().min(1).max(100),
   league: z.string().max(200).optional(),
@@ -21,7 +25,13 @@ const CreateBetSchema = z.object({
   betType: z.string().min(1).max(100),
   selection: z.string().min(1).max(500),
   odds: z.string().min(1).max(20),
-  stake: z.number().positive().max(100000), // Max €100k stake
+  stake: z.number()
+    .min(MIN_STAKE, `Minimum stake is €${MIN_STAKE}`)
+    .max(MAX_SAFE_STAKE, `Maximum stake is €${MAX_SAFE_STAKE.toLocaleString()}`)
+    .refine(
+      (val) => Number.isFinite(val) && val <= Number.MAX_SAFE_INTEGER,
+      'Invalid stake amount'
+    ),
   eventId: z.string().max(100).optional(),
   notes: z.string().max(1000).optional(), // Limit notes to 1000 chars
   challengeIds: z.array(z.string()).max(10).optional(), // Max 10 challenges per bet

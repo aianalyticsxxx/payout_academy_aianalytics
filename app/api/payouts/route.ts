@@ -8,6 +8,7 @@ import { authOptions } from '@/lib/auth/config';
 import { prisma } from '@/lib/db/prisma';
 import { z } from 'zod';
 import { safePagination, paginationMeta } from '@/lib/security/pagination';
+import { encryptJson, decryptJson } from '@/lib/security/encryption';
 
 // ==========================================
 // VALIDATION SCHEMAS
@@ -27,6 +28,35 @@ const CryptoDetailsSchema = z.object({
   walletAddress: z.string().min(26).max(100),
   network: z.enum(['bitcoin', 'ethereum', 'usdt-trc20', 'usdt-erc20']),
 });
+
+// Helper to mask sensitive payment data in responses
+function maskPaymentDetails(details: any, method: string): any {
+  if (!details) return null;
+
+  switch (method) {
+    case 'bank':
+      return {
+        iban: details.iban ? `****${details.iban.slice(-4)}` : null,
+        accountName: details.accountName,
+        bankName: details.bankName,
+      };
+    case 'paypal':
+      return {
+        paypalEmail: details.paypalEmail
+          ? details.paypalEmail.replace(/^(.{2}).*(@.*)$/, '$1****$2')
+          : null,
+      };
+    case 'crypto':
+      return {
+        walletAddress: details.walletAddress
+          ? `${details.walletAddress.slice(0, 6)}...${details.walletAddress.slice(-4)}`
+          : null,
+        network: details.network,
+      };
+    default:
+      return {};
+  }
+}
 
 const CreatePayoutRequestSchema = z.object({
   amount: z.number().positive().min(10), // Minimum €10 withdrawal
@@ -98,10 +128,29 @@ export async function GET(req: NextRequest) {
 
     // Get available balance
     const availableBalance = await getAvailableBalance(userId);
-    console.log('[Payouts API] availableBalance:', availableBalance);
+
+    // SECURITY: Decrypt and mask payment details before returning
+    const maskedPayouts = payouts.map((payout) => {
+      let decryptedDetails = payout.paymentDetails;
+
+      // Try to decrypt if encrypted
+      if (typeof payout.paymentDetails === 'string') {
+        try {
+          decryptedDetails = decryptJson(payout.paymentDetails as string);
+        } catch {
+          // Not encrypted or invalid - use as-is
+          decryptedDetails = payout.paymentDetails;
+        }
+      }
+
+      return {
+        ...payout,
+        paymentDetails: maskPaymentDetails(decryptedDetails, payout.paymentMethod),
+      };
+    });
 
     return NextResponse.json({
-      payouts,
+      payouts: maskedPayouts,
       total,
       availableBalance,
       limit,
@@ -169,20 +218,27 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Create payout request
+    // SECURITY: Encrypt payment details before storing
+    const encryptedPaymentDetails = encryptJson(data.paymentDetails);
+
+    // Create payout request with encrypted payment details
     const payout = await prisma.payoutRequest.create({
       data: {
         userId,
         amount: data.amount,
         paymentMethod: data.paymentMethod,
-        paymentDetails: data.paymentDetails,
+        paymentDetails: encryptedPaymentDetails, // Stored encrypted
         status: 'pending',
       },
     });
 
     return NextResponse.json(
       {
-        payout,
+        payout: {
+          ...payout,
+          // Return masked details, not encrypted or raw
+          paymentDetails: maskPaymentDetails(data.paymentDetails, data.paymentMethod),
+        },
         message: 'Payout request submitted successfully. Processing typically takes 1-3 business days.',
       },
       { status: 201 }

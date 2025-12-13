@@ -13,6 +13,73 @@ import { nanoid } from 'nanoid';
 // Referral reward: 10% of referred user's first purchase
 const REFERRAL_REWARD_PERCENT = 0.10;
 
+// SECURITY: Fraud detection for referral abuse
+async function detectReferralFraud(
+  userId: string,
+  referrerId: string,
+  req: NextRequest
+): Promise<{ fraud: boolean; reason?: string }> {
+  const ip =
+    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    req.headers.get('x-real-ip') ||
+    'unknown';
+
+  // Check 1: Same IP as referrer's last login
+  const referrer = await prisma.user.findUnique({
+    where: { id: referrerId },
+    select: { lastLoginIp: true },
+  });
+
+  if (referrer?.lastLoginIp && referrer.lastLoginIp === ip) {
+    return { fraud: true, reason: 'Same IP address as referrer' };
+  }
+
+  // Check 2: Too many referrals from same IP in last 7 days
+  const recentReferrals = await prisma.referral.count({
+    where: {
+      referrerId,
+      createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
+    },
+  });
+
+  if (recentReferrals >= 10) {
+    return { fraud: true, reason: 'Too many referrals in short period' };
+  }
+
+  // Check 3: Detect referral chains (A refers B refers C refers D...)
+  let chainLength = 0;
+  let currentId = referrerId;
+  const visited = new Set<string>();
+
+  while (currentId && chainLength < 10) {
+    if (visited.has(currentId)) {
+      return { fraud: true, reason: 'Circular referral chain detected' };
+    }
+    visited.add(currentId);
+
+    const ref = await prisma.user.findUnique({
+      where: { id: currentId },
+      select: { referredBy: true, createdAt: true },
+    });
+
+    if (!ref || !ref.referredBy) break;
+
+    // Check if this user in chain is very new (< 7 days old)
+    const ageDays = (Date.now() - ref.createdAt.getTime()) / (1000 * 60 * 60 * 24);
+    if (ageDays < 7) {
+      chainLength++;
+    }
+
+    currentId = ref.referredBy;
+  }
+
+  if (chainLength >= 5) {
+    return { fraud: true, reason: 'Suspicious referral chain detected' };
+  }
+
+  return { fraud: false };
+}
+
 // Generate a unique referral code
 function generateReferralCode(): string {
   return nanoid(8).toUpperCase();
@@ -162,6 +229,16 @@ export async function POST(req: NextRequest) {
     if (referrer.id === user.id) {
       return NextResponse.json(
         { error: 'You cannot use your own referral code' },
+        { status: 400 }
+      );
+    }
+
+    // SECURITY: Check for referral fraud
+    const fraudCheck = await detectReferralFraud(user.id, referrer.id, req);
+    if (fraudCheck.fraud) {
+      console.warn(`[Referral Fraud] User ${user.id} blocked - ${fraudCheck.reason}`);
+      return NextResponse.json(
+        { error: 'Unable to apply referral code. Please contact support.' },
         { status: 400 }
       );
     }

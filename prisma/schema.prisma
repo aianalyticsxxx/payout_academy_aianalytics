@@ -137,6 +137,8 @@ model User {
   twoFactorEnabled  Boolean   @default(false)
   twoFactorSecret   String?   // Encrypted TOTP secret
   twoFactorBackupCodes String? // Encrypted backup codes JSON
+  twoFactorAttempts Int       @default(0) // Failed 2FA attempts
+  twoFactorLockedUntil DateTime? // 2FA lockout timestamp
 
   // Subscription
   stripeCustomerId       String?   @unique

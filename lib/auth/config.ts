@@ -104,6 +104,18 @@ export const authOptions: NextAuthOptions = {
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
 
+  cookies: {
+    sessionToken: {
+      name: `next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: 'strict', // SECURITY: Strict SameSite prevents CSRF
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+      },
+    },
+  },
+
   pages: {
     signIn: '/login',
     newUser: '/register',
@@ -129,12 +141,17 @@ export const authOptions: NextAuthOptions = {
 
       // Always fetch latest role from database to ensure admin access works
       if (token.id) {
-        const dbUser = await prisma.user.findUnique({
-          where: { id: token.id as string },
-          select: { role: true },
-        });
-        if (dbUser) {
-          token.role = dbUser.role;
+        try {
+          const dbUser = await prisma.user.findUnique({
+            where: { id: token.id as string },
+            select: { role: true },
+          });
+          if (dbUser) {
+            token.role = dbUser.role;
+          }
+        } catch (error) {
+          // SECURITY: Never log token contents on error
+          console.error('[Auth] JWT callback error for user:', token.id);
         }
       }
 
@@ -164,5 +181,6 @@ export const authOptions: NextAuthOptions = {
     },
   },
 
-  debug: process.env.NODE_ENV === 'development',
+  // SECURITY: Never enable debug in production - tokens would be logged
+  debug: false,
 };

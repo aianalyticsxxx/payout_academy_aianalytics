@@ -126,9 +126,10 @@ export async function PATCH(
 ) {
   try {
     const { session, role } = await requireAdmin();
-    const { id: userId } = await params;
+    const { id: targetUserId } = await params;
     const body = await req.json();
     const { role: newRole } = body;
+    const currentUserId = (session.user as any).id;
 
     // Only super admins can change roles
     if (newRole && role !== 'SUPER_ADMIN') {
@@ -143,14 +144,67 @@ export async function PATCH(
       return NextResponse.json({ error: 'Invalid role' }, { status: 400 });
     }
 
+    // SECURITY: Prevent self-role modification
+    if (newRole && targetUserId === currentUserId) {
+      return NextResponse.json(
+        { error: 'You cannot change your own role' },
+        { status: 403 }
+      );
+    }
+
+    // Get target user's current role
+    const targetUser = await prisma.user.findUnique({
+      where: { id: targetUserId },
+      select: { role: true, email: true },
+    });
+
+    if (!targetUser) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    // SECURITY: Protect root super admin (first super admin or env-configured)
+    const ROOT_SUPER_ADMIN_EMAIL = process.env.INITIAL_SUPER_ADMIN_EMAIL || 'admin@payoutacademy.com';
+    if (newRole && targetUser.email === ROOT_SUPER_ADMIN_EMAIL) {
+      return NextResponse.json(
+        { error: 'Cannot modify root super admin role' },
+        { status: 403 }
+      );
+    }
+
+    // Get current user's email for root check
+    const currentUser = await prisma.user.findUnique({
+      where: { id: currentUserId },
+      select: { email: true },
+    });
+
+    // SECURITY: Only root super admin can create new super admins
+    if (newRole === 'SUPER_ADMIN' && targetUser.role !== 'SUPER_ADMIN') {
+      if (currentUser?.email !== ROOT_SUPER_ADMIN_EMAIL) {
+        return NextResponse.json(
+          { error: 'Only root super admin can promote users to super admin' },
+          { status: 403 }
+        );
+      }
+    }
+
+    // SECURITY: Only root super admin can demote other super admins
+    if (targetUser.role === 'SUPER_ADMIN' && newRole && newRole !== 'SUPER_ADMIN') {
+      if (currentUser?.email !== ROOT_SUPER_ADMIN_EMAIL) {
+        return NextResponse.json(
+          { error: 'Only root super admin can demote super admins' },
+          { status: 403 }
+        );
+      }
+    }
+
     // Update user
     const updatedUser = await prisma.user.update({
-      where: { id: userId },
+      where: { id: targetUserId },
       data: {
         ...(newRole && {
           role: newRole,
           roleUpdatedAt: new Date(),
-          roleUpdatedBy: (session.user as any).id,
+          roleUpdatedBy: currentUserId,
         }),
       },
       select: {
@@ -163,11 +217,11 @@ export async function PATCH(
 
     // Log admin action
     await logAdminAction({
-      adminId: (session.user as any).id,
+      adminId: currentUserId,
       action: 'UPDATE_USER_ROLE',
       targetType: 'USER',
-      targetId: userId,
-      metadata: { oldRole: body.oldRole, newRole },
+      targetId: targetUserId,
+      metadata: { oldRole: targetUser.role, newRole, targetEmail: targetUser.email },
     });
 
     return NextResponse.json(updatedUser);
