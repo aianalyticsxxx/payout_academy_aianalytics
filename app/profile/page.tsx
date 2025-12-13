@@ -14,6 +14,7 @@ import { ChangePasswordModal } from '@/components/ChangePasswordModal';
 import { DeleteAccountModal } from '@/components/DeleteAccountModal';
 import { TwoFactorModal } from '@/components/TwoFactorModal';
 import { ActiveSessionsModal } from '@/components/ActiveSessionsModal';
+import { useLanguage, LanguageSwitcher } from '@/lib/i18n';
 
 interface ProfileData {
   user: {
@@ -70,6 +71,7 @@ interface ProfileData {
 export default function ProfilePage() {
   const { data: session, status, update } = useSession();
   const router = useRouter();
+  const { t } = useLanguage();
 
   const [username, setUsername] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -227,14 +229,17 @@ export default function ProfilePage() {
             <Link href="/" className="text-2xl md:text-3xl font-bold text-teal-400 tracking-tight hover:text-teal-300 transition-colors">
               ZALOGCHE
             </Link>
-            <p className="text-zinc-500 text-sm tracking-widest">Profile</p>
+            <p className="text-zinc-500 text-sm tracking-widest">{t.profile.title}</p>
           </div>
-          <Link
-            href="/"
-            className="bg-surface-light hover:bg-zinc-800 text-teal-400 px-4 py-2 rounded-xl text-sm font-medium border border-zinc-700 transition-all"
-          >
-            Back to Dashboard
-          </Link>
+          <div className="flex items-center gap-3">
+            <LanguageSwitcher />
+            <Link
+              href="/dashboard"
+              className="bg-surface-light hover:bg-zinc-800 text-teal-400 px-4 py-2 rounded-xl text-sm font-medium border border-zinc-700 transition-all"
+            >
+              {t.profile.backToDashboard}
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -243,8 +248,8 @@ export default function ProfilePage() {
         {/* Navigation Tabs */}
         <div className="flex gap-2 overflow-x-auto pb-2">
           {[
-            { id: 'account', label: 'Account', icon: '👤' },
-            { id: 'settings', label: 'Settings', icon: '⚙️' },
+            { id: 'account', label: t.profile.tabs.account, icon: '👤' },
+            { id: 'settings', label: t.profile.tabs.settings, icon: '⚙️' },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -265,27 +270,27 @@ export default function ProfilePage() {
           <div className="grid md:grid-cols-2 gap-6">
             {/* Account Information */}
             <div className="bg-surface border border-zinc-800/50 rounded-2xl p-6">
-              <h2 className="text-lg font-semibold mb-4">Account Information</h2>
+              <h2 className="text-lg font-semibold mb-4">{t.profile.accountInfo.title}</h2>
 
               <div className="space-y-4">
                 <div className="bg-zinc-800/50 rounded-xl p-4">
-                  <div className="text-xs text-zinc-500 mb-1">Email Address</div>
+                  <div className="text-xs text-zinc-500 mb-1">{t.profile.accountInfo.emailAddress}</div>
                   <div className="text-zinc-300">{user?.email}</div>
-                  <div className="text-xs text-green-400 mt-1">✓ Verified</div>
+                  <div className="text-xs text-green-400 mt-1">✓ {t.profile.accountInfo.verified}</div>
                 </div>
 
                 <div className="bg-zinc-800/50 rounded-xl p-4">
-                  <div className="text-xs text-zinc-500 mb-2">Full Name</div>
+                  <div className="text-xs text-zinc-500 mb-2">{t.profile.accountInfo.fullName}</div>
                   <Input
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    placeholder="Enter your full name"
+                    placeholder={t.profile.accountInfo.enterFullName}
                     maxLength={50}
                   />
                 </div>
 
                 <div className="bg-zinc-800/50 rounded-xl p-4">
-                  <div className="text-xs text-zinc-500 mb-2">Phone Number</div>
+                  <div className="text-xs text-zinc-500 mb-2">{t.profile.accountInfo.phoneNumber}</div>
                   <Input
                     value={phoneNumber}
                     onChange={(e) => setPhoneNumber(e.target.value)}
@@ -295,7 +300,7 @@ export default function ProfilePage() {
                 </div>
 
                 <div className="bg-zinc-800/50 rounded-xl p-4">
-                  <div className="text-xs text-zinc-500 mb-2">Date of Birth</div>
+                  <div className="text-xs text-zinc-500 mb-2">{t.profile.accountInfo.dateOfBirth}</div>
                   <Input
                     value={dateOfBirth}
                     onChange={(e) => setDateOfBirth(e.target.value)}
@@ -305,34 +310,34 @@ export default function ProfilePage() {
                 </div>
 
                 <div className="bg-zinc-800/50 rounded-xl p-4">
-                  <div className="text-xs text-zinc-500 mb-2">Country</div>
+                  <div className="text-xs text-zinc-500 mb-2">{t.profile.accountInfo.country}</div>
                   <select
                     value={country}
                     onChange={(e) => setCountry(e.target.value)}
                     className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-zinc-300 focus:outline-none focus:border-teal-500"
                   >
-                    <option value="">Select country</option>
-                    <option value="US">United States</option>
-                    <option value="GB">United Kingdom</option>
-                    <option value="CA">Canada</option>
-                    <option value="AU">Australia</option>
-                    <option value="DE">Germany</option>
-                    <option value="FR">France</option>
-                    <option value="ES">Spain</option>
-                    <option value="IT">Italy</option>
-                    <option value="NL">Netherlands</option>
-                    <option value="BE">Belgium</option>
-                    <option value="AT">Austria</option>
-                    <option value="CH">Switzerland</option>
-                    <option value="SE">Sweden</option>
-                    <option value="NO">Norway</option>
-                    <option value="DK">Denmark</option>
-                    <option value="FI">Finland</option>
-                    <option value="IE">Ireland</option>
-                    <option value="PT">Portugal</option>
-                    <option value="PL">Poland</option>
-                    <option value="BG">Bulgaria</option>
-                    <option value="OTHER">Other</option>
+                    <option value="">{t.profile.accountInfo.selectCountry}</option>
+                    <option value="US">{t.profile.countries.US}</option>
+                    <option value="GB">{t.profile.countries.GB}</option>
+                    <option value="CA">{t.profile.countries.CA}</option>
+                    <option value="AU">{t.profile.countries.AU}</option>
+                    <option value="DE">{t.profile.countries.DE}</option>
+                    <option value="FR">{t.profile.countries.FR}</option>
+                    <option value="ES">{t.profile.countries.ES}</option>
+                    <option value="IT">{t.profile.countries.IT}</option>
+                    <option value="NL">{t.profile.countries.NL}</option>
+                    <option value="BE">{t.profile.countries.BE}</option>
+                    <option value="AT">{t.profile.countries.AT}</option>
+                    <option value="CH">{t.profile.countries.CH}</option>
+                    <option value="SE">{t.profile.countries.SE}</option>
+                    <option value="NO">{t.profile.countries.NO}</option>
+                    <option value="DK">{t.profile.countries.DK}</option>
+                    <option value="FI">{t.profile.countries.FI}</option>
+                    <option value="IE">{t.profile.countries.IE}</option>
+                    <option value="PT">{t.profile.countries.PT}</option>
+                    <option value="PL">{t.profile.countries.PL}</option>
+                    <option value="BG">{t.profile.countries.BG}</option>
+                    <option value="OTHER">{t.profile.countries.OTHER}</option>
                   </select>
                 </div>
 
@@ -349,7 +354,7 @@ export default function ProfilePage() {
                 )}
 
                 <Button onClick={handleSave} disabled={loading} className="w-full">
-                  {loading ? 'Saving...' : 'Save Changes'}
+                  {loading ? t.profile.accountInfo.saving : t.profile.accountInfo.saveChanges}
                 </Button>
 
               </div>
@@ -357,43 +362,43 @@ export default function ProfilePage() {
 
             {/* Verification & Security */}
             <div className="bg-surface border border-zinc-800/50 rounded-2xl p-6">
-              <h2 className="text-lg font-semibold mb-4">Verification & Security</h2>
+              <h2 className="text-lg font-semibold mb-4">{t.profile.verification.title}</h2>
 
               <div className="space-y-4">
                 <div className="bg-zinc-800/50 rounded-xl p-4">
-                  <div className="text-xs text-zinc-500 mb-1">KYC Verification Status</div>
+                  <div className="text-xs text-zinc-500 mb-1">{t.profile.verification.kycStatus}</div>
                   <div className="flex items-center gap-2">
                     {user?.kycStatus === 'verified' ? (
                       <>
-                        <span className="text-green-400">Verified</span>
-                        <span className="px-2 py-0.5 bg-green-600/30 text-green-400 text-xs rounded-full">✓ Complete</span>
+                        <span className="text-green-400">{t.profile.verification.verified}</span>
+                        <span className="px-2 py-0.5 bg-green-600/30 text-green-400 text-xs rounded-full">✓ {t.profile.verification.complete}</span>
                       </>
                     ) : user?.kycStatus === 'pending' ? (
                       <>
-                        <span className="text-yellow-400">Pending Review</span>
-                        <span className="px-2 py-0.5 bg-yellow-600/30 text-yellow-400 text-xs rounded-full">In Progress</span>
+                        <span className="text-yellow-400">{t.profile.verification.pendingReview}</span>
+                        <span className="px-2 py-0.5 bg-yellow-600/30 text-yellow-400 text-xs rounded-full">{t.profile.verification.inProgress}</span>
                       </>
                     ) : user?.kycStatus === 'rejected' ? (
                       <>
-                        <span className="text-red-400">Rejected</span>
-                        <span className="px-2 py-0.5 bg-red-600/30 text-red-400 text-xs rounded-full">Resubmit Required</span>
+                        <span className="text-red-400">{t.profile.verification.rejected}</span>
+                        <span className="px-2 py-0.5 bg-red-600/30 text-red-400 text-xs rounded-full">{t.profile.verification.resubmitRequired}</span>
                       </>
                     ) : (
                       <>
-                        <span className="text-zinc-400">Not Verified</span>
-                        <span className="px-2 py-0.5 bg-zinc-600/30 text-zinc-400 text-xs rounded-full">Optional</span>
+                        <span className="text-zinc-400">{t.profile.verification.notVerified}</span>
+                        <span className="px-2 py-0.5 bg-zinc-600/30 text-zinc-400 text-xs rounded-full">{t.profile.verification.optional}</span>
                       </>
                     )}
                   </div>
                   {user?.kycVerifiedAt && (
                     <div className="text-xs text-zinc-500 mt-1">
-                      Verified on {new Date(user.kycVerifiedAt).toLocaleDateString()}
+                      {t.profile.verification.verifiedOn} {new Date(user.kycVerifiedAt).toLocaleDateString()}
                     </div>
                   )}
                 </div>
 
                 <div className="bg-zinc-800/50 rounded-xl p-4">
-                  <div className="text-xs text-zinc-500 mb-1">Last Login</div>
+                  <div className="text-xs text-zinc-500 mb-1">{t.profile.verification.lastLogin}</div>
                   <div className="text-zinc-300">
                     {user?.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString('en-US', {
                       year: 'numeric',
@@ -401,34 +406,34 @@ export default function ProfilePage() {
                       day: 'numeric',
                       hour: '2-digit',
                       minute: '2-digit',
-                    }) : 'N/A'}
+                    }) : t.profile.verification.na}
                   </div>
                 </div>
 
                 <div className="bg-zinc-800/50 rounded-xl p-4">
-                  <div className="text-xs text-zinc-500 mb-1">Last Login IP</div>
+                  <div className="text-xs text-zinc-500 mb-1">{t.profile.verification.lastLoginIp}</div>
                   <div className="font-mono text-sm text-zinc-300">
-                    {user?.lastLoginIp || 'N/A'}
+                    {user?.lastLoginIp || t.profile.verification.na}
                   </div>
                 </div>
 
                 <div className="bg-zinc-800/50 rounded-xl p-4">
-                  <div className="text-xs text-zinc-500 mb-1">Last Login Location</div>
+                  <div className="text-xs text-zinc-500 mb-1">{t.profile.verification.lastLoginLocation}</div>
                   <div className="text-zinc-300">
-                    {user?.lastLoginLocation || 'N/A'}
+                    {user?.lastLoginLocation || t.profile.verification.na}
                   </div>
                 </div>
 
                 <div className="bg-zinc-800/50 rounded-xl p-4">
-                  <div className="text-xs text-zinc-500 mb-1">Account Created</div>
+                  <div className="text-xs text-zinc-500 mb-1">{t.profile.verification.accountCreated}</div>
                   <div className="text-zinc-300">
                     {user?.createdAt ? new Date(user.createdAt).toLocaleDateString('en-US', {
                       year: 'numeric',
                       month: 'long',
                       day: 'numeric',
-                    }) : 'N/A'}
+                    }) : t.profile.verification.na}
                   </div>
-                  <div className="text-xs text-zinc-500 mt-1">{accountAge} days ago</div>
+                  <div className="text-xs text-zinc-500 mt-1">{accountAge} {t.profile.verification.daysAgo}</div>
                 </div>
               </div>
             </div>
@@ -441,15 +446,15 @@ export default function ProfilePage() {
           <div className="grid md:grid-cols-2 gap-6">
             {/* Notification Settings */}
             <div className="bg-surface border border-zinc-800/50 rounded-2xl p-6">
-              <h2 className="text-lg font-semibold mb-4">Notification Settings</h2>
+              <h2 className="text-lg font-semibold mb-4">{t.profile.notifications.title}</h2>
 
               <div className="space-y-4">
                 {[
-                  { key: 'email', label: 'Email Notifications', description: 'Receive important updates via email' },
-                  { key: 'push', label: 'Push Notifications', description: 'Browser push notifications' },
-                  { key: 'betResults', label: 'Bet Results', description: 'Get notified when bets are settled' },
-                  { key: 'challengeUpdates', label: 'Challenge Updates', description: 'Progress and expiration alerts' },
-                  { key: 'promotions', label: 'Promotions', description: 'Special offers and announcements' },
+                  { key: 'email', label: t.profile.notifications.email, description: t.profile.notifications.emailDesc },
+                  { key: 'push', label: t.profile.notifications.push, description: t.profile.notifications.pushDesc },
+                  { key: 'betResults', label: t.profile.notifications.betResults, description: t.profile.notifications.betResultsDesc },
+                  { key: 'challengeUpdates', label: t.profile.notifications.challengeUpdates, description: t.profile.notifications.challengeUpdatesDesc },
+                  { key: 'promotions', label: t.profile.notifications.promotions, description: t.profile.notifications.promotionsDesc },
                 ].map((setting) => (
                   <div key={setting.key} className="flex items-center justify-between p-3 bg-zinc-800/50 rounded-xl">
                     <div>
@@ -473,7 +478,7 @@ export default function ProfilePage() {
 
             {/* Security */}
             <div className="bg-surface border border-zinc-800/50 rounded-2xl p-6">
-              <h2 className="text-lg font-semibold mb-4">Security</h2>
+              <h2 className="text-lg font-semibold mb-4">{t.profile.security.title}</h2>
 
               <div className="space-y-4">
                 <button
@@ -482,8 +487,8 @@ export default function ProfilePage() {
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <div className="font-medium text-zinc-300">Change Password</div>
-                      <div className="text-xs text-zinc-500">Update your account password</div>
+                      <div className="font-medium text-zinc-300">{t.profile.security.changePassword}</div>
+                      <div className="text-xs text-zinc-500">{t.profile.security.changePasswordDesc}</div>
                     </div>
                     <svg className="w-5 h-5 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -497,13 +502,13 @@ export default function ProfilePage() {
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <div className="font-medium text-zinc-300">Two-Factor Authentication</div>
+                      <div className="font-medium text-zinc-300">{t.profile.security.twoFactor}</div>
                       <div className="text-xs text-zinc-500">
-                        {twoFactorEnabled ? 'Enabled - Manage your 2FA settings' : 'Add an extra layer of security'}
+                        {twoFactorEnabled ? t.profile.security.twoFactorDescEnabled : t.profile.security.twoFactorDescDisabled}
                       </div>
                     </div>
                     {twoFactorEnabled ? (
-                      <span className="px-2 py-0.5 bg-green-600/30 text-green-400 text-xs rounded-full">Enabled</span>
+                      <span className="px-2 py-0.5 bg-green-600/30 text-green-400 text-xs rounded-full">{t.profile.security.enabled}</span>
                     ) : (
                       <svg className="w-5 h-5 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -518,8 +523,8 @@ export default function ProfilePage() {
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <div className="font-medium text-zinc-300">Active Sessions</div>
-                      <div className="text-xs text-zinc-500">Manage your logged-in devices</div>
+                      <div className="font-medium text-zinc-300">{t.profile.security.activeSessions}</div>
+                      <div className="text-xs text-zinc-500">{t.profile.security.activeSessionsDesc}</div>
                     </div>
                     <svg className="w-5 h-5 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -531,23 +536,23 @@ export default function ProfilePage() {
 
             {/* Danger Zone */}
             <div className="bg-surface border border-red-900/50 rounded-2xl p-6">
-              <h2 className="text-lg font-semibold mb-4 text-red-400">Danger Zone</h2>
+              <h2 className="text-lg font-semibold mb-4 text-red-400">{t.profile.dangerZone.title}</h2>
 
               <div className="space-y-4">
                 <button
                   onClick={handleSignOut}
                   className="w-full p-4 bg-zinc-800/50 rounded-xl text-left hover:bg-zinc-800 transition-colors border border-zinc-700"
                 >
-                  <div className="font-medium text-orange-400">Sign Out</div>
-                  <div className="text-xs text-zinc-500">Log out of your account</div>
+                  <div className="font-medium text-orange-400">{t.profile.dangerZone.signOut}</div>
+                  <div className="text-xs text-zinc-500">{t.profile.dangerZone.signOutDesc}</div>
                 </button>
 
                 <button
                   onClick={() => setShowDeleteModal(true)}
                   className="w-full p-4 bg-red-900/20 rounded-xl text-left hover:bg-red-900/30 transition-colors border border-red-900/50"
                 >
-                  <div className="font-medium text-red-400">Delete Account</div>
-                  <div className="text-xs text-zinc-500">Permanently delete your account and all data</div>
+                  <div className="font-medium text-red-400">{t.profile.dangerZone.deleteAccount}</div>
+                  <div className="text-xs text-zinc-500">{t.profile.dangerZone.deleteAccountDesc}</div>
                 </button>
               </div>
             </div>

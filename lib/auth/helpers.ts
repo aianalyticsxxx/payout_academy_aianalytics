@@ -47,11 +47,20 @@ export async function requireAdmin() {
 
 /**
  * Require super admin role
+ * Checks role from DATABASE (not JWT) to handle role updates without re-login
  * @throws Error if not super admin
  */
 export async function requireSuperAdmin() {
   const session = await requireAuth();
-  const role = (session.user as any).role as UserRole;
+  const userId = (session.user as any).id;
+
+  // Fetch current role from database (not stale JWT)
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { role: true },
+  });
+
+  const role = (user?.role || 'USER') as UserRole;
 
   if (role !== 'SUPER_ADMIN') {
     throw new Error('Super admin access required');
@@ -62,13 +71,20 @@ export async function requireSuperAdmin() {
 
 /**
  * Check if user has admin role (without throwing)
+ * Fetches from DATABASE for accurate role check
  */
 export async function isAdmin(): Promise<boolean> {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) return false;
 
-    const role = (session.user as any).role as UserRole;
+    const userId = (session.user as any).id;
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+
+    const role = (user?.role || 'USER') as UserRole;
     return role === 'ADMIN' || role === 'SUPER_ADMIN';
   } catch {
     return false;
@@ -77,13 +93,20 @@ export async function isAdmin(): Promise<boolean> {
 
 /**
  * Check if user has super admin role (without throwing)
+ * Fetches from DATABASE for accurate role check
  */
 export async function isSuperAdmin(): Promise<boolean> {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) return false;
 
-    const role = (session.user as any).role as UserRole;
+    const userId = (session.user as any).id;
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+
+    const role = (user?.role || 'USER') as UserRole;
     return role === 'SUPER_ADMIN';
   } catch {
     return false;

@@ -58,34 +58,55 @@ export async function POST(req: NextRequest) {
       rewardsByChallenge.set(reward.challengeId, current + reward.amount);
     }
 
-    // Mark all pending rewards as paid
-    await prisma.challengeReward.updateMany({
-      where: {
-        id: { in: pendingRewards.map((r) => r.id) },
-      },
-      data: {
-        status: 'paid',
-        paidAt: new Date(),
-      },
-    });
-
-    // Update totalRewardsEarned for each challenge
-    for (const [chalId, amount] of rewardsByChallenge) {
-      await prisma.challenge.update({
-        where: { id: chalId },
-        data: {
-          totalRewardsEarned: {
-            increment: amount,
-          },
+    // Use atomic transaction to prevent race conditions (double claiming)
+    const result = await prisma.$transaction(async (tx) => {
+      // Re-fetch rewards inside transaction with row locking
+      const rewardsToUpdate = await tx.challengeReward.findMany({
+        where: {
+          id: { in: pendingRewards.map((r) => r.id) },
+          status: 'pending', // Only claim if still pending (prevents double claim)
         },
       });
-    }
+
+      if (rewardsToUpdate.length === 0) {
+        throw new Error('Rewards already claimed');
+      }
+
+      // Mark all pending rewards as paid atomically
+      await tx.challengeReward.updateMany({
+        where: {
+          id: { in: rewardsToUpdate.map((r) => r.id) },
+          status: 'pending', // Double-check status in WHERE clause
+        },
+        data: {
+          status: 'paid',
+          paidAt: new Date(),
+        },
+      });
+
+      // Update totalRewardsEarned for each challenge atomically
+      for (const [chalId, amount] of rewardsByChallenge) {
+        await tx.challenge.update({
+          where: { id: chalId },
+          data: {
+            totalRewardsEarned: {
+              increment: amount,
+            },
+          },
+        });
+      }
+
+      return {
+        claimedCount: rewardsToUpdate.length,
+        totalAmount: rewardsToUpdate.reduce((sum, r) => sum + r.amount, 0),
+      };
+    });
 
     return NextResponse.json({
       success: true,
-      claimedCount: pendingRewards.length,
-      totalAmount,
-      message: `Successfully claimed €${totalAmount.toLocaleString()} in rewards!`,
+      claimedCount: result.claimedCount,
+      totalAmount: result.totalAmount,
+      message: `Successfully claimed €${result.totalAmount.toLocaleString()} in rewards!`,
     });
   } catch (error) {
     console.error('Claim rewards error:', error);

@@ -7,6 +7,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useLanguage, LanguageSwitcher } from '@/lib/i18n';
 
 // ==========================================
 // ANIMATED ORB COMPONENT
@@ -129,6 +130,7 @@ function AnimatedBackground() {
 // REGISTER PAGE COMPONENT
 // ==========================================
 export default function RegisterPage() {
+  const { t } = useLanguage();
   const router = useRouter();
 
   const [formData, setFormData] = useState({
@@ -156,13 +158,13 @@ export default function RegisterPage() {
 
     // Validate
     if (formData.password.length < 8) {
-      setError('Password must be at least 8 characters');
+      setError(t.auth.register.errors.passwordLength);
       setLoading(false);
       return;
     }
 
     if (formData.username.length < 3) {
-      setError('Username must be at least 3 characters');
+      setError(t.auth.register.errors.usernameLength);
       setLoading(false);
       return;
     }
@@ -184,12 +186,12 @@ export default function RegisterPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error || 'Registration failed');
+        setError(data.error || t.auth.register.errors.generic);
       } else {
         router.push('/login?registered=true');
       }
     } catch (error) {
-      setError('An error occurred. Please try again.');
+      setError(t.common.error);
     } finally {
       setLoading(false);
     }
@@ -200,12 +202,17 @@ export default function RegisterPage() {
       <AnimatedBackground />
 
       <div className="relative z-10 w-full max-w-md mx-4">
+        {/* Language Switcher */}
+        <div className="absolute -top-12 right-0">
+          <LanguageSwitcher />
+        </div>
+
         {/* Logo with glow effect */}
         <div className="text-center mb-6">
           <h1 className="text-4xl font-bold tracking-tight animate-shimmer bg-gradient-to-r from-teal-400 via-cyan-300 to-teal-400 bg-[length:200%_100%] bg-clip-text text-transparent">
-            ZALOGCHE
+            {t.auth.register.title}
           </h1>
-          <p className="text-zinc-400 mt-2 text-sm tracking-wide">Create your account</p>
+          <p className="text-zinc-400 mt-2 text-sm tracking-wide">{t.auth.register.subtitle}</p>
         </div>
 
         {/* Glass morphism card */}
@@ -226,7 +233,7 @@ export default function RegisterPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-zinc-300 mb-2">
-                    First Name
+                    {t.auth.register.firstName}
                   </label>
                   <input
                     type="text"
@@ -234,13 +241,13 @@ export default function RegisterPage() {
                     value={formData.firstName}
                     onChange={handleChange}
                     className="w-full bg-zinc-800/50 border border-zinc-700/50 rounded-xl px-4 py-3.5 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500/50 transition-all duration-300 backdrop-blur-sm"
-                    placeholder="John"
+                    placeholder={t.auth.register.firstNamePlaceholder}
                     required
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-zinc-300 mb-2">
-                    Last Name
+                    {t.auth.register.lastName}
                   </label>
                   <input
                     type="text"
@@ -248,7 +255,7 @@ export default function RegisterPage() {
                     value={formData.lastName}
                     onChange={handleChange}
                     className="w-full bg-zinc-800/50 border border-zinc-700/50 rounded-xl px-4 py-3.5 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500/50 transition-all duration-300 backdrop-blur-sm"
-                    placeholder="Doe"
+                    placeholder={t.auth.register.lastNamePlaceholder}
                     required
                   />
                 </div>
@@ -257,7 +264,7 @@ export default function RegisterPage() {
               {/* Email */}
               <div>
                 <label className="block text-sm font-medium text-zinc-300 mb-2">
-                  Email
+                  {t.auth.register.email}
                 </label>
                 <input
                   type="email"
@@ -265,7 +272,7 @@ export default function RegisterPage() {
                   value={formData.email}
                   onChange={handleChange}
                   className="w-full bg-zinc-800/50 border border-zinc-700/50 rounded-xl px-4 py-3.5 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500/50 transition-all duration-300 backdrop-blur-sm"
-                  placeholder="you@example.com"
+                  placeholder={t.auth.register.emailPlaceholder}
                   required
                 />
               </div>
@@ -273,7 +280,7 @@ export default function RegisterPage() {
               {/* Phone Number */}
               <div>
                 <label className="block text-sm font-medium text-zinc-300 mb-2">
-                  Phone Number
+                  {t.auth.register.phone}
                 </label>
                 <input
                   type="tel"
@@ -281,7 +288,7 @@ export default function RegisterPage() {
                   value={formData.phone}
                   onChange={handleChange}
                   className="w-full bg-zinc-800/50 border border-zinc-700/50 rounded-xl px-4 py-3.5 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500/50 transition-all duration-300 backdrop-blur-sm"
-                  placeholder="+1 (555) 000-0000"
+                  placeholder={t.auth.register.phonePlaceholder}
                   required
                 />
               </div>
@@ -289,7 +296,7 @@ export default function RegisterPage() {
               {/* Username */}
               <div>
                 <label className="block text-sm font-medium text-zinc-300 mb-2">
-                  Username
+                  {t.auth.register.username}
                 </label>
                 <input
                   type="text"
@@ -297,7 +304,7 @@ export default function RegisterPage() {
                   value={formData.username}
                   onChange={handleChange}
                   className="w-full bg-zinc-800/50 border border-zinc-700/50 rounded-xl px-4 py-3.5 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500/50 transition-all duration-300 backdrop-blur-sm"
-                  placeholder="your_username"
+                  placeholder={t.auth.register.usernamePlaceholder}
                   minLength={3}
                   maxLength={20}
                   required
@@ -307,7 +314,7 @@ export default function RegisterPage() {
               {/* Password */}
               <div>
                 <label className="block text-sm font-medium text-zinc-300 mb-2">
-                  Password
+                  {t.auth.register.password}
                 </label>
                 <input
                   type="password"
@@ -315,7 +322,7 @@ export default function RegisterPage() {
                   value={formData.password}
                   onChange={handleChange}
                   className="w-full bg-zinc-800/50 border border-zinc-700/50 rounded-xl px-4 py-3.5 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500/50 transition-all duration-300 backdrop-blur-sm"
-                  placeholder="••••••••"
+                  placeholder={t.auth.register.passwordPlaceholder}
                   minLength={8}
                   required
                 />
@@ -331,18 +338,18 @@ export default function RegisterPage() {
                 }}
               >
                 <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover/btn:translate-x-full transition-transform duration-700" />
-                <span className="relative">{loading ? 'Creating account...' : 'Create Account'}</span>
+                <span className="relative">{loading ? t.auth.register.submitting : t.auth.register.submit}</span>
               </button>
             </form>
 
             {/* Sign in link */}
             <p className="mt-8 text-center text-sm text-zinc-500">
-              Already have an account?{' '}
+              {t.auth.register.hasAccount}{' '}
               <Link
                 href="/login"
                 className="text-teal-400 hover:text-teal-300 font-medium transition-colors"
               >
-                Sign in
+                {t.auth.register.signIn}
               </Link>
             </p>
           </div>
@@ -350,7 +357,7 @@ export default function RegisterPage() {
 
         {/* Disclaimer */}
         <p className="mt-8 text-center text-xs text-zinc-600">
-          By creating an account, you confirm you are 18+ and agree to our Terms of Service.
+          {t.auth.register.disclaimer}
         </p>
       </div>
     </div>

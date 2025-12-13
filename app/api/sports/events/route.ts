@@ -99,9 +99,10 @@ export async function GET(req: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Sports API error:', error);
+    // Only log error message, not full stack trace (prevents API key leaks)
+    console.error('Sports API error:', error instanceof Error ? error.message : 'Unknown error');
     return NextResponse.json(
-      { error: 'Failed to fetch events', details: String(error) },
+      { error: 'Failed to fetch events' }, // Remove details to prevent info disclosure
       { status: 500 }
     );
   }

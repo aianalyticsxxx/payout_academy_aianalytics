@@ -11,8 +11,8 @@ export async function GET(request: NextRequest) {
 
     const resultFilter = searchParams.get('result') || 'all';
     const sport = searchParams.get('sport') || 'all';
-    const days = parseInt(searchParams.get('days') || '7', 10);
-    const limit = parseInt(searchParams.get('limit') || '50', 10);
+    const days = Math.min(Math.max(1, parseInt(searchParams.get('days') || '7', 10)), 90); // Max 90 days
+    const limit = Math.min(Math.max(1, parseInt(searchParams.get('limit') || '50', 10)), 100); // Bounded: 1-100
 
     // Always fetch ALL predictions first (no result filter) to ensure consistent deduplication
     const allPredictions = await getAIPredictions({

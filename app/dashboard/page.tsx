@@ -10,6 +10,10 @@ import { useSession, signOut } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ProfileEditModal } from '@/components/ProfileEditModal';
+import { useLanguage, LanguageSwitcher } from '@/lib/i18n';
+import { ConfidenceGauge } from '@/components/ai/ConfidenceGauge';
+import { AIComparisonMatrix } from '@/components/ai/AIComparisonMatrix';
+import { StreamingAnalysis } from '@/components/ai/StreamingAnalysis';
 
 // ==========================================
 // TYPES
@@ -101,36 +105,6 @@ interface Parlay {
   settledAt?: string;
 }
 
-interface AIPrediction {
-  id: string;
-  eventId: string;
-  eventName: string;
-  sport?: string;
-  league?: string;
-  homeTeam?: string;
-  awayTeam?: string;
-  commenceTime?: string;
-  consensusVerdict?: string;
-  consensusScore?: number;
-  betVotes: number;
-  passVotes: number;
-  aiVotes: any[];
-  betSelection?: string;
-  betOdds?: number;
-  result: string;
-  actualScore?: string;
-  createdAt: string;
-  settledAt?: string;
-}
-
-interface PredictionStats {
-  total: number;
-  won: number;
-  lost: number;
-  pending: number;
-  winRate: string;
-  currentStreak: number;
-}
 
 interface ReferralData {
   referralCode: string;
@@ -265,6 +239,7 @@ const AI_AGENTS = [
 // ==========================================
 
 function DashboardContent() {
+  const { t } = useLanguage();
   const { data: session, status, update } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -306,20 +281,13 @@ function DashboardContent() {
   const [selectedEvent, setSelectedEvent] = useState<SportEvent | null>(null);
   const [swarmResult, setSwarmResult] = useState<SwarmResult | null>(null);
   const [analyzingSwarm, setAnalyzingSwarm] = useState(false);
+  const [streamingAnalyses, setStreamingAnalyses] = useState<AIAnalysis[]>([]);
+  const [streamingProgress, setStreamingProgress] = useState(0);
+  const [currentStreamingAgent, setCurrentStreamingAgent] = useState<string | null>(null);
   const [bets, setBets] = useState<Bet[]>([]);
   const [loadingBets, setLoadingBets] = useState(false);
   const [userStats, setUserStats] = useState<any>(null);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
-  const [aiSubTab, setAiSubTab] = useState<'swarm' | 'predictions' | 'performance'>('swarm');
-  const [aiLeaderboard, setAiLeaderboard] = useState<any[]>([]);
-  const [loadingAiLeaderboard, setLoadingAiLeaderboard] = useState(false);
-  const [aiCompetition, setAiCompetition] = useState<any>(null);
-  const [loadingCompetition, setLoadingCompetition] = useState(false);
-  const [predictions, setPredictions] = useState<AIPrediction[]>([]);
-  const [predictionStats, setPredictionStats] = useState<PredictionStats | null>(null);
-  const [predictionFilter, setPredictionFilter] = useState<'all' | 'pending' | 'won' | 'lost'>('all');
-  const [loadingPredictions, setLoadingPredictions] = useState(false);
-  const [selectedPrediction, setSelectedPrediction] = useState<AIPrediction | null>(null);
 
   // Referral state
   const [referralData, setReferralData] = useState<ReferralData | null>(null);
@@ -436,15 +404,6 @@ function DashboardContent() {
     }
   }, [session]);
 
-  // Fetch predictions when tab changes or filter changes
-  useEffect(() => {
-    if (aiSubTab === 'predictions') {
-      fetchPredictions();
-    }
-    if (aiSubTab === 'performance') {
-      fetchAiCompetition();
-    }
-  }, [aiSubTab, predictionFilter]);
 
   // Fetch achievements when achievements tab is selected
   useEffect(() => {
@@ -760,65 +719,112 @@ function DashboardContent() {
     }
   };
 
-  const fetchPredictions = async () => {
-    setLoadingPredictions(true);
-    try {
-      const res = await fetch(`/api/ai/predictions?result=${predictionFilter}&days=7`);
-      const data = await res.json();
-      setPredictions(data.predictions || []);
-      setPredictionStats(data.stats || null);
-    } catch (error) {
-      console.error('Failed to fetch predictions:', error);
-    } finally {
-      setLoadingPredictions(false);
-    }
-  };
 
-  const fetchAiLeaderboard = async () => {
-    setLoadingAiLeaderboard(true);
-    try {
-      const res = await fetch('/api/leaderboard?type=ai');
-      const data = await res.json();
-      setAiLeaderboard(data.leaderboard || []);
-    } catch (error) {
-      console.error('Failed to fetch AI leaderboard:', error);
-    } finally {
-      setLoadingAiLeaderboard(false);
-    }
-  };
+  const AI_AGENT_ORDER = ['claude', 'chatgpt', 'gemini', 'grok', 'llama', 'copilot', 'perplexity'];
 
-  const fetchAiCompetition = async () => {
-    setLoadingCompetition(true);
-    try {
-      const res = await fetch('/api/ai/competition');
-      const data = await res.json();
-      setAiCompetition(data);
-    } catch (error) {
-      console.error('Failed to fetch AI competition:', error);
-    } finally {
-      setLoadingCompetition(false);
-    }
-  };
-
-  const runSwarmAnalysis = async (event: SportEvent) => {
+  const runSwarmAnalysis = async (event: SportEvent, useStreaming = true) => {
     setSelectedEvent(event);
     setAnalyzingSwarm(true);
     setSwarmResult(null);
+    setStreamingAnalyses([]);
+    setStreamingProgress(0);
+    setCurrentStreamingAgent(useStreaming ? AI_AGENT_ORDER[0] : null);
     setActiveTab('ai');
-    setAiSubTab('swarm');
 
     try {
-      const res = await fetch('/api/ai/swarm', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ event }),
-      });
-      const data = await res.json();
-      setSwarmResult(data);
+      if (useStreaming) {
+        // Use streaming endpoint for real-time updates
+        const eventParam = encodeURIComponent(JSON.stringify(event));
+        const response = await fetch(`/api/ai/swarm?event=${eventParam}`);
+
+        if (!response.ok) {
+          throw new Error('Failed to start streaming analysis');
+        }
+
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+
+        if (!reader) {
+          throw new Error('No response body');
+        }
+
+        let buffer = '';
+        const analyses: AIAnalysis[] = [];
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6);
+
+              if (data === '[DONE]') {
+                break;
+              }
+
+              try {
+                const parsed = JSON.parse(data);
+
+                if (parsed.type === 'analysis') {
+                  const analysis = parsed.data as AIAnalysis;
+                  analyses.push(analysis);
+                  setStreamingAnalyses([...analyses]);
+
+                  const agentIndex = AI_AGENT_ORDER.indexOf(analysis.agentId);
+                  const nextAgentIndex = agentIndex + 1;
+                  setCurrentStreamingAgent(
+                    nextAgentIndex < AI_AGENT_ORDER.length ? AI_AGENT_ORDER[nextAgentIndex] : null
+                  );
+                  setStreamingProgress(((agentIndex + 1) / AI_AGENT_ORDER.length) * 100);
+                } else if (parsed.type === 'consensus') {
+                  setSwarmResult({
+                    eventId: event.id,
+                    eventName: `${event.awayTeam} @ ${event.homeTeam}`,
+                    analyses,
+                    consensus: parsed.data,
+                    timestamp: new Date().toISOString(),
+                  });
+                  setStreamingProgress(100);
+                  setCurrentStreamingAgent(null);
+                }
+              } catch (e) {
+                console.error('Failed to parse SSE data:', e);
+              }
+            }
+          }
+        }
+      } else {
+        // Fall back to regular POST endpoint
+        const res = await fetch('/api/ai/swarm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ event }),
+        });
+        const data = await res.json();
+        setSwarmResult(data);
+      }
     } catch (error) {
       console.error('Swarm analysis failed:', error);
+      // Fall back to non-streaming if streaming fails
+      try {
+        const res = await fetch('/api/ai/swarm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ event }),
+        });
+        const data = await res.json();
+        setSwarmResult(data);
+      } catch (fallbackError) {
+        console.error('Fallback analysis also failed:', fallbackError);
+      }
     } finally {
       setAnalyzingSwarm(false);
+      setCurrentStreamingAgent(null);
     }
   };
 
@@ -859,7 +865,6 @@ function DashboardContent() {
       setSelectedEvent(event);
       setSwarmResult(cachedResult);
       setActiveTab('ai');
-      setAiSubTab('swarm');
     }
   };
 
@@ -1183,25 +1188,26 @@ function DashboardContent() {
             <h1 className="text-2xl md:text-3xl font-bold text-teal-400 tracking-tight">ZALOGCHE</h1>
           </div>
           <div className="flex items-center gap-3">
+            <LanguageSwitcher />
             <a
               href="/profile"
               className="group flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-teal-900/40 to-teal-800/20 hover:from-teal-800/50 hover:to-teal-700/30 rounded-xl border border-teal-600/30 hover:border-teal-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-teal-500/10"
-              title="View Profile"
+              title={t.nav.profile}
             >
               <svg className="w-5 h-5 text-teal-400 group-hover:text-teal-300 transition-colors" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M12 12c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm0 2c-3.33 0-10 1.67-10 5v2c0 .55.45 1 1 1h18c.55 0 1-.45 1-1v-2c0-3.33-6.67-5-10-5z"/>
               </svg>
-              <span className="text-sm font-medium text-teal-400 group-hover:text-teal-300 hidden sm:inline">Profile</span>
+              <span className="text-sm font-medium text-teal-400 group-hover:text-teal-300 hidden sm:inline">{t.nav.profile}</span>
             </a>
             <button
               onClick={() => signOut()}
               className="group flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-rose-900/30 to-rose-800/10 hover:from-rose-800/40 hover:to-rose-700/20 rounded-xl border border-rose-600/20 hover:border-rose-500/40 transition-all duration-300 hover:shadow-lg hover:shadow-rose-500/10"
-              title="Sign Out"
+              title={t.nav.logout}
             >
               <svg className="w-5 h-5 text-rose-400 group-hover:text-rose-300 transition-colors" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9"/>
               </svg>
-              <span className="text-sm font-medium text-rose-400 group-hover:text-rose-300 hidden sm:inline">Sign Out</span>
+              <span className="text-sm font-medium text-rose-400 group-hover:text-rose-300 hidden sm:inline">{t.nav.logout}</span>
             </button>
           </div>
         </div>
@@ -1211,14 +1217,14 @@ function DashboardContent() {
       <nav className="bg-surface border-b border-zinc-800/50">
         <div className="max-w-7xl mx-auto flex overflow-x-auto">
           {[
-            { id: 'bets', label: 'Dashboard', icon: '📊' },
-            { id: 'events', label: 'Events', icon: '🎯' },
-            { id: 'challenges', label: 'Challenges', icon: '🎮' },
-            { id: 'ai', label: 'AI Hub', icon: '🤖' },
-            { id: 'rewards', label: 'Rewards', icon: '🎁' },
-            { id: 'achievements', label: 'Achievements', icon: '⭐' },
-            { id: 'referral', label: 'Referral', icon: '👥' },
-            { id: 'faq', label: 'FAQ', icon: '❓' },
+            { id: 'bets', label: t.dashboard.tabs.dashboard, icon: '📊' },
+            { id: 'events', label: t.dashboard.tabs.events, icon: '🎯' },
+            { id: 'challenges', label: t.dashboard.tabs.challenges, icon: '🎮' },
+            { id: 'ai', label: t.dashboard.tabs.aiHub, icon: '🤖' },
+            { id: 'rewards', label: t.dashboard.tabs.rewards, icon: '🎁' },
+            { id: 'achievements', label: t.dashboard.tabs.achievements, icon: '⭐' },
+            { id: 'referral', label: t.dashboard.tabs.referral, icon: '👥' },
+            { id: 'faq', label: t.dashboard.tabs.faq, icon: '❓' },
           ].map(tab => (
             <button
               key={tab.id}
@@ -1282,16 +1288,16 @@ function DashboardContent() {
 
             {/* Events Grid */}
             {loadingEvents ? (
-              <div className="text-center py-12 text-zinc-400">Loading events...</div>
+              <div className="text-center py-12 text-zinc-400">{t.dashboard.events.loadingEvents}</div>
             ) : events.length === 0 ? (
-              <div className="text-center py-12 text-zinc-400">No upcoming events found</div>
+              <div className="text-center py-12 text-zinc-400">{t.dashboard.events.noEvents}</div>
             ) : (
               <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
                 {events.map(event => {
                   const eventDate = new Date(event.commenceTime);
                   const isToday = new Date().toDateString() === eventDate.toDateString();
                   const isTomorrow = new Date(Date.now() + 86400000).toDateString() === eventDate.toDateString();
-                  const timeLabel = isToday ? 'Today' : isTomorrow ? 'Tomorrow' : eventDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+                  const timeLabel = isToday ? t.dashboard.events.today : isTomorrow ? t.dashboard.events.tomorrow : eventDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 
                   return (
                     <div
@@ -1324,7 +1330,7 @@ function DashboardContent() {
                             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
                             </svg>
-                            <span>All Markets</span>
+                            <span>{t.dashboard.events.allMarkets}</span>
                             <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                             </svg>
@@ -1357,7 +1363,7 @@ function DashboardContent() {
                         {event.bestOdds && (
                           <div className="mb-5">
                             <div className="flex items-center justify-between mb-2">
-                              <span className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Best Odds</span>
+                              <span className="text-xs font-medium text-zinc-500 uppercase tracking-wider">{t.dashboard.events.bestOdds}</span>
                               {event.bestOdds.home?.bookmaker && (
                                 <span className="text-xs text-zinc-600">via {event.bestOdds.home.bookmaker}</span>
                               )}
@@ -1391,7 +1397,7 @@ function DashboardContent() {
                                   }`}
                                   title={session ? 'Bet on Draw' : 'Sign in to place bets'}
                                 >
-                                  <div className="text-[10px] text-zinc-500 font-medium mb-1">DRAW</div>
+                                  <div className="text-[10px] text-zinc-500 font-medium mb-1">{t.dashboard.events.draw}</div>
                                   <div className="text-lg font-bold text-teal-400">
                                     {event.bestOdds.draw?.price?.toFixed(2)}
                                   </div>
@@ -1433,7 +1439,7 @@ function DashboardContent() {
                               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
                               </svg>
-                              More Markets
+                              {t.dashboard.events.moreMarkets}
                             </span>
                             <svg
                               className={`w-4 h-4 text-zinc-500 transition-transform ${expandedEventMarkets[event.id] ? 'rotate-180' : ''}`}
@@ -1454,7 +1460,7 @@ function DashboardContent() {
                                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                                   </svg>
-                                  Loading markets...
+                                  {t.dashboard.events.loadingMarkets}
                                 </div>
                               ) : eventMarketsCache[event.id]?.markets ? (
                                 <div className="space-y-3 max-h-80 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
@@ -1494,7 +1500,7 @@ function DashboardContent() {
                                 </div>
                               ) : (
                                 <div className="text-center py-4 text-zinc-500 text-sm">
-                                  No additional markets available
+                                  {t.dashboard.events.noAdditionalMarkets}
                                 </div>
                               )}
                             </div>
@@ -1542,7 +1548,7 @@ function DashboardContent() {
                                   <div className="flex items-center justify-between mb-2">
                                     <div className="flex items-center gap-2">
                                       <span className="text-sm">🤖</span>
-                                      <span className="text-xs text-zinc-400 font-medium">AI CONSENSUS</span>
+                                      <span className="text-xs text-zinc-400 font-medium">{t.dashboard.events.aiConsensus}</span>
                                     </div>
                                     <svg className="w-4 h-4 text-zinc-500 group-hover/verdict:text-white group-hover/verdict:translate-x-0.5 transition-all" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -1564,7 +1570,7 @@ function DashboardContent() {
                                     )}
                                   </div>
                                   <div className="text-xs text-zinc-500 mt-1">
-                                    {cachedAnalysis.consensus.betVotes}/{cachedAnalysis.consensus.betVotes + cachedAnalysis.consensus.passVotes} AIs recommend betting
+                                    {cachedAnalysis.consensus.betVotes}/{cachedAnalysis.consensus.betVotes + cachedAnalysis.consensus.passVotes} {t.dashboard.events.aisRecommend}
                                   </div>
                                 </button>
 
@@ -1574,7 +1580,7 @@ function DashboardContent() {
                                     onClick={() => openBetModalForEvent(event)}
                                     className="w-full py-3 px-4 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-semibold rounded-xl transition-all shadow-lg shadow-emerald-900/30 flex items-center justify-center gap-2"
                                   >
-                                    <span>Place Bet</span>
+                                    <span>{t.dashboard.events.placeBet}</span>
                                     {avgOdds && <span className="text-emerald-200 text-sm">@{avgOdds.toFixed(2)}</span>}
                                   </button>
                                 )}
@@ -1596,12 +1602,12 @@ function DashboardContent() {
                                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                                   </svg>
-                                  <span>Analyzing...</span>
+                                  <span>{t.dashboard.events.analyzing}</span>
                                 </span>
                               ) : (
                                 <span className="flex items-center gap-2">
                                   <span className="text-lg">🤖</span>
-                                  <span>Get AI Analysis</span>
+                                  <span>{t.dashboard.events.getAiAnalysis}</span>
                                   <svg className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                                   </svg>
@@ -1633,7 +1639,7 @@ function DashboardContent() {
                   </div>
                   <div>
                     <p className="font-semibold text-emerald-400">{challengeSuccessMessage}</p>
-                    <p className="text-sm text-zinc-400">Your challenge is now active. Good luck!</p>
+                    <p className="text-sm text-zinc-400">{t.dashboard.challengesTab.challengeActive}</p>
                   </div>
                 </div>
                 <button
@@ -1739,8 +1745,8 @@ function DashboardContent() {
                       <div className="flex items-center gap-3 mb-4">
                         <span className="text-4xl">🎮</span>
                         <div>
-                          <h1 className="text-3xl md:text-4xl font-black text-white">STREAK CHALLENGES</h1>
-                          <p className="text-[#7cc4c4] mt-2 text-lg">Complete 4 levels of winning streaks. Bigger account = Bigger rewards at each level!</p>
+                          <h1 className="text-3xl md:text-4xl font-black text-white">{t.dashboard.challengesTab.streakChallenges}</h1>
+                          <p className="text-[#7cc4c4] mt-2 text-lg">{t.dashboard.challengesTab.streakDescription}</p>
                         </div>
                       </div>
 
@@ -1761,11 +1767,11 @@ function DashboardContent() {
                           }`}>
                             <div className="flex items-center justify-center gap-2 mb-1">
                               <span className="text-xl">🎯</span>
-                              <span className="text-lg font-bold text-white">Beginner</span>
+                              <span className="text-lg font-bold text-white">{t.dashboard.challengesTab.beginner}</span>
                             </div>
-                            <div className="text-xs text-zinc-400 mb-1">Perfect for getting started</div>
+                            <div className="text-xs text-zinc-400 mb-1">{t.dashboard.challengesTab.perfectForStarting}</div>
                             <div className="text-sm font-bold text-teal-400">
-                              Min odds: 1.5
+                              {t.dashboard.challengesTab.minOdds}: 1.5
                             </div>
                           </div>
                         </button>
@@ -1784,11 +1790,11 @@ function DashboardContent() {
                           }`}>
                             <div className="flex items-center justify-center gap-2 mb-1">
                               <span className="text-xl">⚡</span>
-                              <span className="text-lg font-bold text-white">Pro</span>
+                              <span className="text-lg font-bold text-white">{t.dashboard.challengesTab.pro}</span>
                             </div>
-                            <div className="text-xs text-zinc-400 mb-1">High risk, high intensity</div>
+                            <div className="text-xs text-zinc-400 mb-1">{t.dashboard.challengesTab.highRiskIntensity}</div>
                             <div className="text-sm font-bold text-yellow-400">
-                              Min odds: 2.0
+                              {t.dashboard.challengesTab.minOdds}: 2.0
                             </div>
                           </div>
                         </button>
@@ -1798,8 +1804,8 @@ function DashboardContent() {
                       <div className="grid grid-cols-4 gap-2 mt-6 mb-4">
                         {(challengesViewDifficulty === 'beginner' ? beginnerLevels : proLevels).map((lvl) => (
                           <div key={lvl.level} className="text-center p-3 bg-zinc-900/50 rounded-xl border border-zinc-800/50">
-                            <div className={`text-xs font-bold bg-gradient-to-r ${lvl.color} bg-clip-text text-transparent`}>LEVEL {lvl.level}</div>
-                            <div className="text-white font-bold text-sm">{lvl.streakRequired} Wins</div>
+                            <div className={`text-xs font-bold bg-gradient-to-r ${lvl.color} bg-clip-text text-transparent`}>{t.dashboard.challengesTab.level} {lvl.level}</div>
+                            <div className="text-white font-bold text-sm">{lvl.streakRequired} {t.dashboard.challengesTab.wins}</div>
                             <div className="text-zinc-500 text-xs">{lvl.name}</div>
                           </div>
                         ))}
@@ -1808,15 +1814,15 @@ function DashboardContent() {
                       <div className="flex flex-wrap gap-4">
                         <div className="flex items-center gap-2 bg-teal-500/10 px-4 py-2 rounded-lg border border-teal-500/30">
                           <span className="text-teal-400">✓</span>
-                          <span className="text-zinc-300 text-sm">Keep Rewards Each Level</span>
+                          <span className="text-zinc-300 text-sm">{t.dashboard.challengesTab.keepRewardsLevel}</span>
                         </div>
                         <div className="flex items-center gap-2 bg-teal-500/10 px-4 py-2 rounded-lg border border-teal-500/30">
                           <span className="text-teal-400">✓</span>
-                          <span className="text-zinc-300 text-sm">AI-Powered Picks</span>
+                          <span className="text-zinc-300 text-sm">{t.dashboard.challengesTab.aiPoweredPicks}</span>
                         </div>
                         <div className="flex items-center gap-2 bg-teal-500/10 px-4 py-2 rounded-lg border border-teal-500/30">
                           <span className="text-teal-400">✓</span>
-                          <span className="text-zinc-300 text-sm">45 Day Access</span>
+                          <span className="text-zinc-300 text-sm">45 {t.dashboard.challengesTab.dayAccess}</span>
                         </div>
                       </div>
                     </div>
@@ -1834,20 +1840,20 @@ function DashboardContent() {
                         {/* Popular Badge */}
                         {(idx === 2 || idx === 3) && (
                           <div className="absolute -top-0 left-1/2 -translate-x-1/2 px-4 py-1 bg-gradient-to-r from-amber-500 to-orange-500 rounded-b-lg text-xs font-bold text-black uppercase tracking-wide">
-                            {idx === 2 ? 'MOST POPULAR' : 'BEST VALUE'}
+                            {idx === 2 ? t.dashboard.challengesTab.mostPopular : t.dashboard.challengesTab.bestValue}
                           </div>
                         )}
 
                         {/* Card Header */}
                         <div className="text-center mb-4 mt-4">
                           <div className="text-4xl font-black text-white mb-1">€{tier.size.toLocaleString()}</div>
-                          <div className="text-sm font-bold text-teal-400 tracking-widest uppercase">CHALLENGE</div>
+                          <div className="text-sm font-bold text-teal-400 tracking-widest uppercase">{t.dashboard.challengesTab.challenge}</div>
                         </div>
 
                         {/* Level Rewards Grid */}
                         <div className="bg-zinc-900/50 rounded-xl p-4 mb-4">
                           <div className="text-xs text-zinc-400 text-center mb-3 uppercase tracking-wider">
-                            Rewards Per Level ({challengesViewDifficulty === 'pro' ? 'Pro' : 'Beginner'})
+                            {t.dashboard.challengesTab.rewardsPerLevel} ({challengesViewDifficulty === 'pro' ? t.dashboard.challengesTab.pro : t.dashboard.challengesTab.beginner})
                           </div>
                           <div className="grid grid-cols-2 gap-2">
                             {(challengesViewDifficulty === 'pro' ? proLevels : beginnerLevels).map((lvl, i) => (
@@ -1863,14 +1869,14 @@ function DashboardContent() {
 
                         {/* Total Potential */}
                         <div className="flex items-center justify-between px-3 py-2 bg-teal-500/10 rounded-lg border border-teal-500/30 mb-4">
-                          <span className="text-zinc-400 text-sm">Max Payout (All 4)</span>
+                          <span className="text-zinc-400 text-sm">{t.dashboard.challengesTab.maxPayout}</span>
                           <span className="text-teal-400 font-bold">€{tier.rewards.reduce((a, b) => a + b, 0).toLocaleString()}</span>
                         </div>
 
                         {/* Meta Info */}
                         <div className="flex items-center justify-between text-xs text-zinc-500 mb-4">
-                          <span>⏱️ 45 days</span>
-                          <span>🔄 Reset: €{tier.resetFee}</span>
+                          <span>⏱️ 45 {t.dashboard.challengesTab.days}</span>
+                          <span>🔄 {t.dashboard.challengesTab.reset}: €{tier.resetFee}</span>
                         </div>
 
                         {/* Buy Button */}
@@ -1881,7 +1887,7 @@ function DashboardContent() {
                           }}
                           className="w-full py-4 rounded-xl font-bold text-lg transition-all bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-teal-400 text-white shadow-lg shadow-teal-500/25 group-hover:shadow-teal-500/40"
                         >
-                          💳 START - €{tier.cost}
+                          💳 {t.dashboard.challengesTab.start} - €{tier.cost}
                         </button>
                       </div>
                     ))}
@@ -1895,9 +1901,9 @@ function DashboardContent() {
                         <div className="flex items-center justify-between mb-4">
                           <div className="flex items-center gap-3">
                             <span className="text-2xl">🏆</span>
-                            <h2 className="text-xl font-bold text-white">My Active Challenges</h2>
+                            <h2 className="text-xl font-bold text-white">{t.dashboard.challengesTab.myActiveChallenges}</h2>
                             <span className="bg-teal-500/20 text-teal-400 text-xs font-bold px-2 py-1 rounded-full">
-                              {challengeCount}/{maxChallenges} Active
+                              {challengeCount}/{maxChallenges} {t.dashboard.challengesTab.active}
                             </span>
                           </div>
                         </div>
@@ -1932,7 +1938,7 @@ function DashboardContent() {
                                   }`}>
                                     {isPro ? '⚡ PRO' : '🎯 BEGINNER'} • {challenge.minOdds || (isPro ? 2.0 : 1.5)}x
                                   </span>
-                                  <span className="text-zinc-400 text-xs">{challenge.daysRemaining}d left</span>
+                                  <span className="text-zinc-400 text-xs">{challenge.daysRemaining}{t.dashboard.challengesTab.daysLeft}</span>
                                 </div>
 
                                 <div className="flex items-center gap-2 mb-3">
@@ -1945,9 +1951,9 @@ function DashboardContent() {
                                 {/* Streak Progress */}
                                 <div className="mb-3">
                                   <div className="flex items-center justify-between text-xs mb-1">
-                                    <span className="text-zinc-400">Current Streak</span>
+                                    <span className="text-zinc-400">{t.dashboard.challengesTab.currentStreak}</span>
                                     <span className={`font-bold ${isPro ? 'text-amber-400' : 'text-teal-400'}`}>
-                                      {challenge.currentStreak}/{nextLevel?.streakRequired || challengeLevels[challengeLevels.length - 1].streakRequired} wins
+                                      {challenge.currentStreak}/{nextLevel?.streakRequired || challengeLevels[challengeLevels.length - 1].streakRequired} {t.dashboard.challengesTab.winsLabel}
                                     </span>
                                   </div>
                                   <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
@@ -1987,12 +1993,12 @@ function DashboardContent() {
                                   onClick={() => setActiveTab('events')}
                                   className="w-full py-2 rounded-lg font-semibold text-sm transition-all bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white shadow-lg shadow-amber-900/30"
                                 >
-                                  Place a Bet
+                                  {t.dashboard.challengesTab.placeABet}
                                 </button>
 
                                 {/* Rewards Earned */}
                                 <div className="flex items-center justify-between pt-3 border-t border-zinc-800">
-                                  <span className="text-zinc-400 text-xs">Earned</span>
+                                  <span className="text-zinc-400 text-xs">{t.dashboard.challengesTab.earned}</span>
                                   <span className="text-emerald-400 font-bold">€{(challenge.totalRewardsEarned || 0).toLocaleString()}</span>
                                 </div>
                               </div>
@@ -2006,32 +2012,32 @@ function DashboardContent() {
                   {/* Challenge Rules - Updated */}
                   <div className="bg-zinc-900/30 border border-zinc-800/50 rounded-2xl p-6">
                     <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                      <span>📋</span> Challenge Rules
+                      <span>📋</span> {t.dashboard.challengesTab.rulesTitle}
                     </h3>
                     <ul className="space-y-2 text-zinc-400 text-sm">
                       <li className="flex items-start gap-2">
                         <span className="text-teal-400 mt-0.5">•</span>
-                        <span>Complete levels by achieving consecutive win streaks (3 → 5 → 7 → 10 wins)</span>
+                        <span>{t.dashboard.challengesTab.rule1}</span>
                       </li>
                       <li className="flex items-start gap-2">
                         <span className="text-teal-400 mt-0.5">•</span>
-                        <span>Each level reward is paid out when you complete it - rewards are cumulative!</span>
+                        <span>{t.dashboard.challengesTab.rule2}</span>
                       </li>
                       <li className="flex items-start gap-2">
                         <span className="text-teal-400 mt-0.5">•</span>
-                        <span>A loss resets your current streak to zero, but you keep all previously earned rewards</span>
+                        <span>{t.dashboard.challengesTab.rule3}</span>
                       </li>
                       <li className="flex items-start gap-2">
                         <span className="text-teal-400 mt-0.5">•</span>
-                        <span>You have 45 days to complete as many levels as possible</span>
+                        <span>{t.dashboard.challengesTab.rule4}</span>
                       </li>
                       <li className="flex items-start gap-2">
                         <span className="text-teal-400 mt-0.5">•</span>
-                        <span>Payouts processed within 3-5 business days after completing each level</span>
+                        <span>{t.dashboard.challengesTab.rule5}</span>
                       </li>
                       <li className="flex items-start gap-2">
                         <span className="text-teal-400 mt-0.5">•</span>
-                        <span>Reset option available at 50% of original cost when your 45 days expire</span>
+                        <span>{t.dashboard.challengesTab.rule6}</span>
                       </li>
                     </ul>
                   </div>
@@ -2046,58 +2052,54 @@ function DashboardContent() {
           <div className="space-y-6">
             {/* Header */}
             <div className="bg-surface border border-zinc-800/50 rounded-2xl p-6">
-              <h2 className="text-2xl font-bold text-teal-400">AI Command Center</h2>
-              <p className="text-zinc-400 mt-1">7-Model Swarm Analysis • Performance Tracking • AI Leaderboard</p>
-            </div>
-
-            {/* Sub Navigation */}
-            <div className="flex gap-2">
-              {[
-                { id: 'swarm', label: 'Swarm Analysis' },
-                { id: 'predictions', label: 'Predictions' },
-                { id: 'performance', label: 'AI Performance' },
-              ].map(tab => (
-                <button
-                  key={tab.id}
-                  onClick={() => setAiSubTab(tab.id as any)}
-                  className={`px-4 py-2 rounded-xl font-medium transition-all ${
-                    aiSubTab === tab.id
-                      ? 'text-dark'
-                      : 'bg-surface text-zinc-400 hover:bg-surface-light border border-zinc-800'
-                  }`}
-                  style={aiSubTab === tab.id ? { background: 'linear-gradient(180deg, #2DD4BF 0%, #14B8A6 100%)' } : {}}
-                >
-                  {tab.label}
-                </button>
-              ))}
+              <h2 className="text-2xl font-bold text-teal-400">{t.dashboard.aiTab.commandCenter}</h2>
+              <p className="text-zinc-400 mt-1">{t.dashboard.aiTab.consulting7Models}</p>
             </div>
 
             {/* Swarm Analysis */}
-            {aiSubTab === 'swarm' && (
-              <div>
+            <div>
                 {analyzingSwarm ? (
-                  <div className="relative p-[1px] rounded-2xl bg-gradient-to-b from-teal-500/50 to-teal-600/20">
-                    <div className="bg-surface rounded-2xl py-16 px-8 text-center">
-                      <div className="relative inline-block mb-6">
-                        <div className="absolute inset-0 bg-teal-500/20 rounded-full blur-xl animate-pulse" />
-                        <div className="relative text-5xl animate-bounce">🤖</div>
+                  <div className="space-y-6">
+                    {/* Streaming Analysis Component */}
+                    <StreamingAnalysis
+                      currentAgent={currentStreamingAgent}
+                      progress={streamingProgress}
+                      completedAgents={streamingAnalyses.map(a => a.agentId)}
+                      isStreaming={analyzingSwarm}
+                    />
+
+                    {/* Live Results Preview */}
+                    {streamingAnalyses.length > 0 && (
+                      <div className="bg-surface border border-zinc-800/50 rounded-2xl p-4">
+                        <div className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3">
+                          Live Results
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                          {streamingAnalyses.map(analysis => {
+                            const agent = AI_AGENTS.find(a => a.id === analysis.agentId);
+                            const isPositive = ['STRONG BET', 'SLIGHT EDGE'].includes(analysis.verdict);
+                            return (
+                              <div
+                                key={analysis.agentId}
+                                className={`p-3 rounded-xl border transition-all animate-fadeIn ${
+                                  isPositive
+                                    ? 'bg-emerald-900/20 border-emerald-700/30'
+                                    : 'bg-rose-900/20 border-rose-700/30'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="text-lg">{agent?.emoji}</span>
+                                  <span className={`text-xs font-medium ${agent?.color}`}>{agent?.name}</span>
+                                </div>
+                                <div className={`text-xs font-semibold ${isPositive ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                  {analysis.verdict}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
-                      <div className="text-xl font-semibold text-white mb-2">AI Swarm Analyzing</div>
-                      <div className="text-zinc-400 max-w-md mx-auto">
-                        Consulting 7 AI models for comprehensive analysis
-                      </div>
-                      <div className="flex justify-center gap-3 mt-6">
-                        {['🧠', '💬', '✨', '⚡', '🦙', '👨‍💻', '🔍'].map((emoji, i) => (
-                          <div
-                            key={i}
-                            className="w-10 h-10 rounded-full bg-surface-light border border-zinc-800 flex items-center justify-center text-lg"
-                            style={{ animationDelay: `${i * 0.1}s` }}
-                          >
-                            {emoji}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                    )}
                   </div>
                 ) : swarmResult ? (
                   <div className="space-y-8">
@@ -2105,17 +2107,17 @@ function DashboardContent() {
                     <div className="relative p-[1px] rounded-2xl bg-gradient-to-r from-teal-500/50 via-teal-400/30 to-teal-500/50">
                       <div className="bg-surface rounded-2xl p-6 text-center">
                         <div className="flex items-center justify-center gap-2 mb-2">
-                          <span className="text-xs font-medium text-zinc-500 uppercase tracking-widest">Match Analysis</span>
+                          <span className="text-xs font-medium text-zinc-500 uppercase tracking-widest">{t.dashboard.aiTab.matchAnalysis}</span>
                           {swarmResult.cached && (
                             <span className="text-[10px] font-medium text-teal-400 bg-teal-900/30 px-2 py-0.5 rounded-full border border-teal-700/30">
-                              Shared Analysis
+                              {t.dashboard.aiTab.sharedAnalysis}
                             </span>
                           )}
                         </div>
                         <div className="text-2xl font-bold text-white">{swarmResult.eventName}</div>
                         {swarmResult.timestamp && (
                           <div className="text-xs text-zinc-600 mt-2">
-                            Analyzed {new Date(swarmResult.timestamp).toLocaleString()}
+                            {t.dashboard.aiTab.analyzed} {new Date(swarmResult.timestamp).toLocaleString()}
                           </div>
                         )}
                       </div>
@@ -2127,16 +2129,29 @@ function DashboardContent() {
                       <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 via-transparent to-transparent pointer-events-none" />
 
                       <div className="relative">
-                        {/* Header with Verdict - Clean Modern */}
+                        {/* Header with Verdict and Confidence Gauge */}
                         <div className={`p-6 border-b border-emerald-900/20 ${getVerdictColor(swarmResult.consensus.verdict)}`}>
                           <div className="flex items-center justify-between">
-                            <div>
-                              <div className="text-[10px] font-semibold text-emerald-500/80 uppercase tracking-[0.2em] mb-1">AI Consensus</div>
-                              <div className="text-3xl font-bold tracking-tight">{swarmResult.consensus.verdict}</div>
+                            <div className="flex items-center gap-6">
+                              {/* Confidence Gauge */}
+                              <ConfidenceGauge
+                                betVotes={swarmResult.consensus.betVotes}
+                                passVotes={swarmResult.consensus.passVotes}
+                                confidence={swarmResult.consensus.confidence as 'HIGH' | 'MEDIUM' | 'LOW'}
+                                verdict={swarmResult.consensus.verdict}
+                                size="md"
+                              />
+                              <div>
+                                <div className="text-[10px] font-semibold text-emerald-500/80 uppercase tracking-[0.2em] mb-1">{t.dashboard.aiTab.aiConsensus}</div>
+                                <div className="text-3xl font-bold tracking-tight">{swarmResult.consensus.verdict}</div>
+                                <div className="text-sm text-zinc-500 mt-1">
+                                  {swarmResult.consensus.betVotes}/{swarmResult.consensus.betVotes + swarmResult.consensus.passVotes} {t.dashboard.aiTab.aisAgree}
+                                </div>
+                              </div>
                             </div>
                             <div className="text-right">
                               <div className="text-4xl font-bold font-mono">{swarmResult.consensus.score}</div>
-                              <div className="text-[10px] font-semibold text-zinc-500 uppercase tracking-[0.2em] mt-1">Score</div>
+                              <div className="text-[10px] font-semibold text-zinc-500 uppercase tracking-[0.2em] mt-1">{t.dashboard.aiTab.score}</div>
                             </div>
                           </div>
                         </div>
@@ -2148,23 +2163,14 @@ function DashboardContent() {
                           const avgEdge = edges.length > 0 ? edges.reduce((a, b) => a + b, 0) / edges.length : null;
 
                           return (
-                            <div className="grid grid-cols-4 gap-px bg-emerald-900/10">
+                            <div className="grid grid-cols-3 gap-px bg-emerald-900/10">
                               <div className="bg-zinc-950/50 p-4 text-center">
                                 <div className="text-2xl font-bold text-emerald-400">{swarmResult.consensus.betVotes}</div>
-                                <div className="text-[10px] font-semibold text-zinc-600 uppercase tracking-[0.15em] mt-1">Bet</div>
+                                <div className="text-[10px] font-semibold text-zinc-600 uppercase tracking-[0.15em] mt-1">{t.dashboard.aiTab.bet}</div>
                               </div>
                               <div className="bg-zinc-950/50 p-4 text-center">
                                 <div className="text-2xl font-bold text-rose-400">{swarmResult.consensus.passVotes}</div>
-                                <div className="text-[10px] font-semibold text-zinc-600 uppercase tracking-[0.15em] mt-1">Pass</div>
-                              </div>
-                              <div className="bg-zinc-950/50 p-4 text-center">
-                                <div className={`text-2xl font-bold ${
-                                  swarmResult.consensus.confidence === 'HIGH' ? 'text-emerald-400' :
-                                  swarmResult.consensus.confidence === 'MEDIUM' ? 'text-amber-400' : 'text-rose-400'
-                                }`}>
-                                  {swarmResult.consensus.confidence}
-                                </div>
-                                <div className="text-[10px] font-semibold text-zinc-600 uppercase tracking-[0.15em] mt-1">Confidence</div>
+                                <div className="text-[10px] font-semibold text-zinc-600 uppercase tracking-[0.15em] mt-1">{t.dashboard.aiTab.pass}</div>
                               </div>
                               <div className="bg-zinc-950/50 p-4 text-center">
                                 {avgEdge !== null ? (
@@ -2176,12 +2182,12 @@ function DashboardContent() {
                                     }`}>
                                       {avgEdge > 0 ? '+' : ''}{avgEdge.toFixed(1)}%
                                     </div>
-                                    <div className="text-[10px] font-semibold text-zinc-600 uppercase tracking-[0.15em] mt-1">Avg Edge</div>
+                                    <div className="text-[10px] font-semibold text-zinc-600 uppercase tracking-[0.15em] mt-1">{t.dashboard.aiTab.avgEdge}</div>
                                   </>
                                 ) : (
                                   <>
                                     <div className="text-2xl font-bold text-zinc-700">—</div>
-                                    <div className="text-[10px] font-semibold text-zinc-600 uppercase tracking-[0.15em] mt-1">Avg Edge</div>
+                                    <div className="text-[10px] font-semibold text-zinc-600 uppercase tracking-[0.15em] mt-1">{t.dashboard.aiTab.avgEdge}</div>
                                   </>
                                 )}
                               </div>
@@ -2217,7 +2223,7 @@ function DashboardContent() {
 
                           return (
                             <div className="p-5 border-t border-emerald-900/20 bg-emerald-950/30">
-                              <div className="text-[10px] font-semibold text-emerald-500/80 uppercase tracking-[0.2em] mb-3">Recommended Bet</div>
+                              <div className="text-[10px] font-semibold text-emerald-500/80 uppercase tracking-[0.2em] mb-3">{t.dashboard.aiTab.recommendedBet}</div>
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
                                   {topBetType && (
@@ -2239,7 +2245,7 @@ function DashboardContent() {
                                   )}
                                   {topSelection && (
                                     <div className="text-[10px] font-semibold text-zinc-600 uppercase tracking-wide mt-1">
-                                      {topSelection[1].count}/{swarmResult.analyses.length} AIs agree
+                                      {topSelection[1].count}/{swarmResult.analyses.length} {t.dashboard.aiTab.aisAgree}
                                     </div>
                                   )}
                                 </div>
@@ -2250,7 +2256,7 @@ function DashboardContent() {
 
                         {/* Vote Distribution Bar - Modern */}
                         <div className="p-5 border-t border-emerald-900/20">
-                          <div className="text-[10px] font-semibold text-zinc-600 uppercase tracking-[0.2em] mb-3">Vote Distribution</div>
+                          <div className="text-[10px] font-semibold text-zinc-600 uppercase tracking-[0.2em] mb-3">{t.dashboard.aiTab.voteDistribution}</div>
                           <div className="h-2 bg-zinc-900/80 rounded-full overflow-hidden flex">
                             <div
                               className="bg-gradient-to-r from-emerald-600 to-emerald-400 transition-all"
@@ -2267,10 +2273,10 @@ function DashboardContent() {
                           </div>
                           <div className="flex justify-between mt-2 text-xs font-semibold">
                             <span className="text-emerald-400">
-                              {Math.round((swarmResult.consensus.betVotes / (swarmResult.consensus.betVotes + swarmResult.consensus.passVotes)) * 100)}% Bet
+                              {Math.round((swarmResult.consensus.betVotes / (swarmResult.consensus.betVotes + swarmResult.consensus.passVotes)) * 100)}% {t.dashboard.aiTab.bet}
                             </span>
                             <span className="text-rose-400">
-                              {Math.round((swarmResult.consensus.passVotes / (swarmResult.consensus.betVotes + swarmResult.consensus.passVotes)) * 100)}% Pass
+                              {Math.round((swarmResult.consensus.passVotes / (swarmResult.consensus.betVotes + swarmResult.consensus.passVotes)) * 100)}% {t.dashboard.aiTab.pass}
                             </span>
                           </div>
                         </div>
@@ -2282,9 +2288,9 @@ function DashboardContent() {
                               onClick={() => setBetModalOpen(true)}
                               className="w-full py-3.5 px-4 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-semibold rounded-xl transition-all duration-200 flex items-center justify-center gap-3 shadow-lg shadow-emerald-900/30"
                             >
-                              <span className="text-lg">Place This Bet</span>
+                              <span className="text-lg">{t.dashboard.aiTab.placeThisBet}</span>
                               <span className="bg-emerald-700/50 px-2 py-0.5 rounded-md text-emerald-200 text-sm">
-                                Track &amp; Win
+                                {t.dashboard.aiTab.trackAndWin}
                               </span>
                             </button>
                           </div>
@@ -2292,47 +2298,26 @@ function DashboardContent() {
                       </div>
                     </div>
 
+                    {/* AI Model Comparison Matrix */}
+                    <AIComparisonMatrix
+                      analyses={swarmResult.analyses}
+                      translations={{
+                        model: t.dashboard.aiTab.modelColumn || 'Model',
+                        verdict: t.dashboard.aiTab.verdictColumn || 'Verdict',
+                        edge: t.dashboard.aiTab.edgeColumn || 'Edge',
+                        pick: t.dashboard.aiTab.pickColumn || 'Pick',
+                        odds: t.dashboard.aiTab.oddsColumn || 'Odds',
+                        noData: t.dashboard.aiTab.noDataAvailable || 'No data',
+                      }}
+                    />
+
                     {/* AI Opinions Header */}
                     <div className="flex items-center gap-3">
                       <div className="h-px flex-1 bg-gradient-to-r from-transparent via-zinc-800 to-transparent" />
                       <span className="text-xs font-medium text-zinc-500 uppercase tracking-widest">
-                        Individual AI Analysis ({swarmResult.analyses.filter(a => !a.error && a.verdict !== 'UNKNOWN').length}/7 responded)
+                        {t.dashboard.aiTab.individualAiAnalysis} ({swarmResult.analyses.filter(a => !a.error && a.verdict !== 'UNKNOWN').length}/7 {t.dashboard.aiTab.responded})
                       </span>
                       <div className="h-px flex-1 bg-gradient-to-r from-transparent via-zinc-800 to-transparent" />
-                    </div>
-
-                    {/* AI Status Summary - Show all 7 AIs */}
-                    <div className="flex flex-wrap gap-2 justify-center p-3 bg-dark/30 rounded-xl border border-zinc-800/30">
-                      {AI_AGENTS.map(agent => {
-                        const analysis = swarmResult.analyses.find(a => a.agentId === agent.id);
-                        const hasError = analysis?.error;
-                        const hasResponse = analysis && !hasError && analysis.verdict !== 'UNKNOWN';
-                        const isPositive = hasResponse && ['STRONG BET', 'SLIGHT EDGE'].includes(analysis.verdict);
-                        const isNegative = hasResponse && ['RISKY', 'AVOID'].includes(analysis.verdict);
-
-                        return (
-                          <div
-                            key={agent.id}
-                            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium ${
-                              hasResponse ? (isPositive ? 'bg-green-900/40 text-green-400 border border-green-700/30' :
-                                            isNegative ? 'bg-red-900/40 text-red-400 border border-red-700/30' :
-                                            'bg-zinc-800 text-zinc-400 border border-zinc-700/30')
-                              : 'bg-zinc-900/50 text-zinc-600 border border-zinc-800/30'
-                            }`}
-                            title={hasError ? `Error: ${analysis.error}` : hasResponse ? analysis.verdict : 'No response'}
-                          >
-                            <span>{agent.emoji}</span>
-                            <span>{agent.name}</span>
-                            {hasResponse && (
-                              <span className="ml-1">
-                                {isPositive ? '✓' : isNegative ? '✗' : '?'}
-                              </span>
-                            )}
-                            {hasError && <span className="text-yellow-500">⚠</span>}
-                            {!analysis && <span className="text-zinc-600">—</span>}
-                          </div>
-                        );
-                      })}
                     </div>
 
                     {/* AI Opinions Grid - Premium Cards */}
@@ -2367,13 +2352,13 @@ function DashboardContent() {
                                 <div className="grid grid-cols-3 gap-2 mb-4">
                                   {analysis.probability && (
                                     <div className="bg-dark/50 rounded-lg p-2 text-center border border-zinc-800/30">
-                                      <div className="text-[10px] text-zinc-500 uppercase tracking-wide">True Prob</div>
+                                      <div className="text-[10px] text-zinc-500 uppercase tracking-wide">{t.dashboard.aiTab.trueProb}</div>
                                       <div className="text-sm font-bold text-white">{analysis.probability}%</div>
                                     </div>
                                   )}
                                   {analysis.impliedProbability && (
                                     <div className="bg-dark/50 rounded-lg p-2 text-center border border-zinc-800/30">
-                                      <div className="text-[10px] text-zinc-500 uppercase tracking-wide">Implied</div>
+                                      <div className="text-[10px] text-zinc-500 uppercase tracking-wide">{t.dashboard.aiTab.implied}</div>
                                       <div className="text-sm font-bold text-zinc-400">{analysis.impliedProbability}%</div>
                                     </div>
                                   )}
@@ -2384,7 +2369,7 @@ function DashboardContent() {
                                       analysis.edge > 0 ? 'bg-orange-900/30 border-orange-700/30' :
                                       'bg-red-900/30 border-red-700/30'
                                     }`}>
-                                      <div className="text-[10px] text-zinc-500 uppercase tracking-wide">Edge</div>
+                                      <div className="text-[10px] text-zinc-500 uppercase tracking-wide">{t.dashboard.aiTab.edge}</div>
                                       <div className={`text-sm font-bold ${
                                         analysis.edge >= 5 ? 'text-green-400' :
                                         analysis.edge >= 3 ? 'text-yellow-400' :
@@ -2430,7 +2415,7 @@ function DashboardContent() {
                                   <svg className="w-3 h-3 transition-transform group-open/details:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                   </svg>
-                                  Full Analysis
+                                  {t.dashboard.aiTab.fullAnalysis}
                                 </summary>
                                 <p className="text-sm text-zinc-500 leading-relaxed mt-2 pl-4 border-l border-zinc-800">{analysis.opinion}</p>
                               </details>
@@ -2441,8 +2426,8 @@ function DashboardContent() {
                         : (
                           <div className="col-span-full text-center py-8">
                             <div className="text-4xl mb-3">⚠️</div>
-                            <div className="text-zinc-400 font-medium">No AI responses available</div>
-                            <div className="text-zinc-600 text-sm mt-1">All models failed to respond or returned errors</div>
+                            <div className="text-zinc-400 font-medium">{t.dashboard.aiTab.noAiResponses}</div>
+                            <div className="text-zinc-600 text-sm mt-1">{t.dashboard.aiTab.allModelsFailed}</div>
                           </div>
                         )
                       }
@@ -2455,521 +2440,21 @@ function DashboardContent() {
                         <div className="absolute inset-0 bg-teal-500/10 rounded-full blur-2xl" />
                         <div className="relative text-6xl">🎯</div>
                       </div>
-                      <div className="text-2xl font-bold text-white mb-3">Select an Event</div>
+                      <div className="text-2xl font-bold text-white mb-3">{t.dashboard.aiTab.selectAnEvent}</div>
                       <div className="text-zinc-400 max-w-md mx-auto mb-6">
-                        Browse upcoming matches and click "Get AI Analysis" to see the AI verdict and place bets
+                        {t.dashboard.aiTab.selectEventDesc}
                       </div>
                       <button
                         onClick={() => setActiveTab('events')}
                         className="text-dark px-8 py-3 rounded-xl font-semibold transition-all shadow-lg shadow-teal-900/30 hover:shadow-teal-500/30"
                         style={{ background: 'linear-gradient(180deg, #2DD4BF 0%, #14B8A6 100%)' }}
                       >
-                        Browse Events →
+                        {t.dashboard.aiTab.browseEvents} →
                       </button>
                     </div>
                   </div>
                 )}
-              </div>
-            )}
-
-            {/* Predictions */}
-            {aiSubTab === 'predictions' && (
-              <div className="space-y-6">
-                {/* Filter Bar */}
-                <div className="flex flex-wrap gap-2 items-center justify-between">
-                  <div className="flex gap-2">
-                    {(['all', 'pending', 'won', 'lost'] as const).map(filter => (
-                      <button
-                        key={filter}
-                        onClick={() => setPredictionFilter(filter)}
-                        className={`px-4 py-2 rounded-xl font-medium capitalize transition-all ${
-                          predictionFilter === filter
-                            ? filter === 'won' ? 'bg-green-600 text-white' :
-                              filter === 'lost' ? 'bg-red-600 text-white' :
-                              filter === 'pending' ? 'bg-teal-600 text-white' :
-                              'text-dark'
-                            : 'bg-surface text-zinc-400 hover:bg-surface-light border border-zinc-800'
-                        }`}
-                        style={predictionFilter === filter && filter === 'all' ? { background: 'linear-gradient(180deg, #2DD4BF 0%, #14B8A6 100%)' } : {}}
-                      >
-                        {filter}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="text-sm text-zinc-500">Last 7 days</div>
-                </div>
-
-                {/* Stats Summary */}
-                {predictionStats && (
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                    <div className="bg-surface border border-zinc-800/50 rounded-xl p-4 text-center">
-                      <div className="text-2xl font-bold">{predictionStats.total}</div>
-                      <div className="text-xs text-zinc-500">Total</div>
-                    </div>
-                    <div className="bg-surface border border-zinc-800/50 rounded-xl p-4 text-center">
-                      <div className="text-2xl font-bold text-green-400">{predictionStats.won}</div>
-                      <div className="text-xs text-zinc-500">Won</div>
-                    </div>
-                    <div className="bg-surface border border-zinc-800/50 rounded-xl p-4 text-center">
-                      <div className="text-2xl font-bold text-red-400">{predictionStats.lost}</div>
-                      <div className="text-xs text-zinc-500">Lost</div>
-                    </div>
-                    <div className="bg-surface border border-zinc-800/50 rounded-xl p-4 text-center">
-                      <div className="text-2xl font-bold text-teal-400">{predictionStats.pending}</div>
-                      <div className="text-xs text-zinc-500">Pending</div>
-                    </div>
-                    <div className="bg-surface border border-zinc-800/50 rounded-xl p-4 text-center">
-                      <div className={`text-2xl font-bold ${parseFloat(predictionStats.winRate) >= 50 ? 'text-teal-400' : 'text-red-400'}`}>
-                        {predictionStats.winRate}%
-                      </div>
-                      <div className="text-xs text-zinc-500">
-                        Win Rate {predictionStats.currentStreak !== 0 && (
-                          <span className="ml-1">
-                            {predictionStats.currentStreak > 0 ? `🔥${predictionStats.currentStreak}` : `❄️${Math.abs(predictionStats.currentStreak)}`}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Predictions List */}
-                {loadingPredictions ? (
-                  <div className="text-center py-12 text-zinc-400">Loading predictions...</div>
-                ) : predictions.length === 0 ? (
-                  <div className="text-center py-12">
-                    <div className="text-6xl mb-4">🔮</div>
-                    <div className="text-xl font-semibold mb-2">No Predictions Yet</div>
-                    <div className="text-zinc-400">Run swarm analysis on events to generate predictions</div>
-                    <button
-                      onClick={() => { setActiveTab('events'); }}
-                      className="mt-4 text-dark px-6 py-2 rounded-xl font-medium transition-all"
-                      style={{ background: 'linear-gradient(180deg, #2DD4BF 0%, #14B8A6 100%)' }}
-                    >
-                      Browse Events →
-                    </button>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {predictions.map(prediction => (
-                      <div
-                        key={prediction.id}
-                        className="bg-surface border border-zinc-800/50 rounded-xl overflow-hidden cursor-pointer hover:border-teal-700/50 transition-all"
-                        onClick={() => setSelectedPrediction(prediction)}
-                      >
-                        {/* Header */}
-                        <div className="p-4 flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                                prediction.result === 'won' ? 'bg-green-600 text-white' :
-                                prediction.result === 'lost' ? 'bg-red-600 text-white' :
-                                'bg-teal-600 text-white'
-                              }`}>
-                                {prediction.result === 'won' ? '✓ WON' :
-                                 prediction.result === 'lost' ? '✗ LOST' : '◯ PENDING'}
-                              </span>
-                              <span className="text-xs text-zinc-500">
-                                {new Date(prediction.createdAt).toLocaleDateString()}
-                              </span>
-                            </div>
-                            <div className="font-semibold text-lg">{prediction.eventName}</div>
-                            <div className="text-sm text-zinc-400">
-                              {prediction.sport} {prediction.league && `• ${prediction.league}`}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Consensus */}
-                        <div className={`px-4 py-3 ${getVerdictColor(prediction.consensusVerdict || '')}`}>
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <span className="text-sm opacity-75">AI Consensus: </span>
-                              <span className="font-bold">{prediction.consensusVerdict}</span>
-                              <span className="ml-2 text-sm">({prediction.betVotes}/{prediction.betVotes + prediction.passVotes} AIs)</span>
-                            </div>
-                            {prediction.betSelection && (
-                              <div className="text-right">
-                                <span className="font-medium">{prediction.betSelection}</span>
-                                {prediction.betOdds && (
-                                  <span className="ml-2 text-gold font-mono">@{prediction.betOdds.toFixed(2)}</span>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* AI Votes Summary */}
-                        <div className="px-4 py-3 border-t border-zinc-800/50">
-                          <div className="flex flex-wrap gap-2">
-                            {(prediction.aiVotes || []).map((vote: any) => {
-                              const agent = AI_AGENTS.find(a => a.id === vote.agentId);
-                              const isBet = ['STRONG BET', 'SLIGHT EDGE'].includes(vote.verdict);
-                              const wasCorrect = prediction.result === 'pending' ? null :
-                                (prediction.result === 'won' && isBet) || (prediction.result === 'lost' && !isBet);
-
-                              return (
-                                <span
-                                  key={vote.agentId}
-                                  className={`px-2 py-1 rounded text-xs flex items-center gap-1 ${agent?.bg} border border-zinc-800/50`}
-                                >
-                                  <span>{agent?.emoji}</span>
-                                  <span className={agent?.color}>{agent?.name}</span>
-                                  {prediction.result !== 'pending' && (
-                                    <span className={wasCorrect ? 'text-green-400' : 'text-red-400'}>
-                                      {wasCorrect ? '✓' : '✗'}
-                                    </span>
-                                  )}
-                                </span>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Prediction Detail Modal */}
-            {selectedPrediction && (
-              <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50" onClick={() => setSelectedPrediction(null)}>
-                <div className="bg-surface border border-zinc-800/50 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-                  {/* Modal Header */}
-                  <div className="p-6 border-b border-zinc-800/50">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                            selectedPrediction.result === 'won' ? 'bg-green-600 text-white' :
-                            selectedPrediction.result === 'lost' ? 'bg-red-600 text-white' :
-                            'bg-teal-600 text-white'
-                          }`}>
-                            {selectedPrediction.result.toUpperCase()}
-                          </span>
-                          {selectedPrediction.actualScore && (
-                            <span className="text-sm text-zinc-400">Final: {selectedPrediction.actualScore}</span>
-                          )}
-                        </div>
-                        <h3 className="text-xl font-bold">{selectedPrediction.eventName}</h3>
-                        <p className="text-sm text-zinc-400">
-                          {selectedPrediction.sport} {selectedPrediction.league && `• ${selectedPrediction.league}`}
-                        </p>
-                        <p className="text-xs text-zinc-500 mt-1">
-                          Predicted: {new Date(selectedPrediction.createdAt).toLocaleString()}
-                          {selectedPrediction.settledAt && ` • Settled: ${new Date(selectedPrediction.settledAt).toLocaleString()}`}
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => setSelectedPrediction(null)}
-                        className="text-zinc-400 hover:text-white text-2xl transition-colors"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Consensus */}
-                  <div className={`p-4 ${getVerdictColor(selectedPrediction.consensusVerdict || '')}`}>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="text-sm opacity-75">AI Consensus</div>
-                        <div className="text-2xl font-bold">{selectedPrediction.consensusVerdict}</div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-3xl font-bold">{selectedPrediction.consensusScore?.toFixed(1)}</div>
-                        <div className="text-sm opacity-75">Score</div>
-                      </div>
-                    </div>
-                    {selectedPrediction.betSelection && (
-                      <div className="mt-3 p-2 bg-black/20 rounded-lg">
-                        <span className="text-sm">Recommended: </span>
-                        <span className="font-medium">{selectedPrediction.betSelection}</span>
-                        {selectedPrediction.betOdds && (
-                          <span className="ml-2 text-gold font-mono">@{selectedPrediction.betOdds.toFixed(2)}</span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Individual AI Votes */}
-                  <div className="p-4">
-                    <h4 className="text-sm font-semibold text-zinc-400 mb-3">INDIVIDUAL AI VOTES</h4>
-                    <div className="space-y-3">
-                      {(selectedPrediction.aiVotes || []).map((vote: any) => {
-                        const agent = AI_AGENTS.find(a => a.id === vote.agentId);
-                        const isBet = ['STRONG BET', 'SLIGHT EDGE'].includes(vote.verdict);
-                        const wasCorrect = selectedPrediction.result === 'pending' ? null :
-                          (selectedPrediction.result === 'won' && isBet) || (selectedPrediction.result === 'lost' && !isBet);
-
-                        return (
-                          <div key={vote.agentId} className={`p-3 rounded-xl border ${agent?.bg} border-zinc-800/50`}>
-                            <div className="flex items-center justify-between mb-2">
-                              <div className="flex items-center gap-2">
-                                <span className="text-xl">{agent?.emoji}</span>
-                                <span className={`font-semibold ${agent?.color}`}>{agent?.name}</span>
-                                {selectedPrediction.result !== 'pending' && (
-                                  <span className={`text-sm ${wasCorrect ? 'text-green-400' : 'text-red-400'}`}>
-                                    {wasCorrect ? '✓ Correct' : '✗ Wrong'}
-                                  </span>
-                                )}
-                              </div>
-                              <span className={`px-2 py-1 rounded text-sm ${getVerdictColor(vote.verdict)}`}>
-                                {vote.verdict}
-                              </span>
-                            </div>
-                            {vote.betType && (
-                              <div className="text-sm mb-1">
-                                <span className="bg-teal-900/50 text-teal-300 px-1.5 py-0.5 rounded text-xs mr-2">
-                                  {vote.betType}
-                                </span>
-                                {vote.betSelection && <span>{vote.betSelection}</span>}
-                                {vote.betOdds && <span className="text-gold ml-1">@{vote.betOdds.toFixed(2)}</span>}
-                              </div>
-                            )}
-                            {vote.betExplanation && (
-                              <p className="text-xs text-zinc-400 italic">{vote.betExplanation}</p>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* AI Performance - Competition */}
-            {aiSubTab === 'performance' && (
-              <div className="space-y-6">
-                {loadingCompetition ? (
-                  <div className="text-center py-12 text-zinc-400">Loading competition data...</div>
-                ) : aiCompetition ? (
-                  <>
-                    {/* Competition Header */}
-                    <div className="relative overflow-hidden rounded-2xl">
-                      <div className="absolute inset-0 bg-gradient-to-r from-teal-900/50 via-teal-800/30 to-teal-900/50" />
-                      <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0zNiAxOGMtOS45NDEgMC0xOCA4LjA1OS0xOCAxOHM4LjA1OSAxOCAxOCAxOCAxOC04LjA1OSAxOC0xOC04LjA1OS0xOC0xOC0xOHptMCAzMmMtNy43MzIgMC0xNC02LjI2OC0xNC0xNHM2LjI2OC0xNCAxNC0xNCAxNCA2LjI2OCAxNCAxNC02LjI2OCAxNC0xNCAxNHoiIGZpbGw9IiMxNGI4YTYiIGZpbGwtb3BhY2l0eT0iLjA1Ii8+PC9nPjwvc3ZnPg==')] opacity-30" />
-                      <div className="relative p-6 md:p-8">
-                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                          <div>
-                            <div className="flex items-center gap-3 mb-2">
-                              <span className="text-4xl">🏆</span>
-                              <div>
-                                <h2 className="text-2xl md:text-3xl font-bold text-white">AI Sharp Showdown</h2>
-                                <p className="text-teal-400 font-medium">Season 1 • 1-Week Competition</p>
-                              </div>
-                            </div>
-                            <p className="text-zinc-400 text-sm mt-2">
-                              Dec 4 - Dec 11, 2025 • Which AI model is the sharpest bettor?
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-4">
-                            <div className="text-center px-4 py-2 bg-dark/50 rounded-xl border border-teal-700/30">
-                              <div className="text-2xl font-bold text-teal-400">Day {Math.min(7, Math.max(0, 7 - (aiCompetition.competition?.daysRemaining || 0)))}</div>
-                              <div className="text-xs text-zinc-500">of 7</div>
-                            </div>
-                            <div className="text-center px-4 py-2 bg-dark/50 rounded-xl border border-teal-700/30">
-                              <div className="text-2xl font-bold text-gold">{aiCompetition.competition?.daysRemaining || 0}</div>
-                              <div className="text-xs text-zinc-500">days left</div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Competition Stats */}
-                    <div className="grid gap-4 md:grid-cols-4">
-                      <div className="bg-surface border border-zinc-800/50 rounded-xl p-5">
-                        <div className="text-xs text-zinc-500 uppercase tracking-wider mb-1">Total Predictions</div>
-                        <div className="text-3xl font-bold text-white">{aiCompetition.summary?.settledPredictions || 0}</div>
-                        <div className="text-sm text-zinc-400 mt-1">
-                          {aiCompetition.summary?.pendingPredictions || 0} pending
-                        </div>
-                      </div>
-                      <div className="bg-surface border border-zinc-800/50 rounded-xl p-5">
-                        <div className="text-xs text-zinc-500 uppercase tracking-wider mb-1">Overall Win Rate</div>
-                        <div className={`text-3xl font-bold ${(aiCompetition.summary?.overallWinRate || 0) >= 55 ? 'text-teal-400' : (aiCompetition.summary?.overallWinRate || 0) >= 50 ? 'text-gold' : 'text-red-400'}`}>
-                          {aiCompetition.summary?.overallWinRate?.toFixed(1) || '0.0'}%
-                        </div>
-                        <div className="text-sm text-zinc-400 mt-1">Combined AI accuracy</div>
-                      </div>
-                      <div className="bg-surface border border-zinc-800/50 rounded-xl p-5">
-                        <div className="text-xs text-zinc-500 uppercase tracking-wider mb-1">Current Leader</div>
-                        {aiCompetition.leaderboard?.[0] ? (
-                          <>
-                            <div className="text-xl font-bold text-white flex items-center gap-2">
-                              <span>{aiCompetition.leaderboard[0].emoji}</span>
-                              <span>{aiCompetition.leaderboard[0].agentName}</span>
-                            </div>
-                            <div className="text-sm text-teal-400 mt-1">{aiCompetition.leaderboard[0].winRate?.toFixed(1)}% win rate</div>
-                          </>
-                        ) : (
-                          <div className="text-xl font-bold text-zinc-500">TBD</div>
-                        )}
-                      </div>
-                      <div className="bg-surface border border-zinc-800/50 rounded-xl p-5">
-                        <div className="text-xs text-zinc-500 uppercase tracking-wider mb-1">Hottest Streak</div>
-                        {(() => {
-                          const hottest = aiCompetition.leaderboard?.reduce((best: any, a: any) =>
-                            (a.currentStreak > (best?.currentStreak || 0)) ? a : best, null);
-                          return hottest ? (
-                            <>
-                              <div className="text-xl font-bold text-white flex items-center gap-2">
-                                <span>{hottest.emoji}</span>
-                                <span className="text-teal-400">🔥 {hottest.currentStreak}</span>
-                              </div>
-                              <div className="text-sm text-zinc-400 mt-1">{hottest.agentName}</div>
-                            </>
-                          ) : (
-                            <div className="text-xl font-bold text-zinc-500">—</div>
-                          );
-                        })()}
-                      </div>
-                    </div>
-
-                    {/* Leaderboard */}
-                    <div className="bg-surface border border-zinc-800/50 rounded-2xl overflow-hidden">
-                      <div className="px-5 py-4 border-b border-zinc-800/50 bg-gradient-to-r from-gold/10 to-teal-900/10">
-                        <h3 className="font-semibold text-gold flex items-center gap-2">
-                          <span>🏅</span> Competition Leaderboard
-                        </h3>
-                        <p className="text-sm text-zinc-500">Ranked by win rate • Based on settled predictions only</p>
-                      </div>
-                      <div className="overflow-x-auto">
-                        <table className="w-full">
-                          <thead className="bg-zinc-900/50">
-                            <tr>
-                              <th className="px-5 py-3 text-left text-xs text-zinc-500 uppercase tracking-wider">#</th>
-                              <th className="px-5 py-3 text-left text-xs text-zinc-500 uppercase tracking-wider">Model</th>
-                              <th className="px-5 py-3 text-center text-xs text-zinc-500 uppercase tracking-wider">Record</th>
-                              <th className="px-5 py-3 text-center text-xs text-zinc-500 uppercase tracking-wider">Win %</th>
-                              <th className="px-5 py-3 text-center text-xs text-zinc-500 uppercase tracking-wider">Streak</th>
-                              <th className="px-5 py-3 text-right text-xs text-zinc-500 uppercase tracking-wider">Best</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-zinc-800/30">
-                            {(aiCompetition.leaderboard || []).map((agent: any, i: number) => {
-                              const agentStyle = AI_AGENTS.find(a => a.id === agent.agentId);
-                              return (
-                                <tr key={agent.agentId} className={`hover:bg-teal-900/10 transition-colors ${i === 0 ? 'bg-gold/5' : ''}`}>
-                                  <td className="px-5 py-4">
-                                    <span className={`text-lg font-bold ${i === 0 ? 'text-gold' : i === 1 ? 'text-zinc-300' : i === 2 ? 'text-amber-700' : 'text-zinc-500'}`}>
-                                      {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}
-                                    </span>
-                                  </td>
-                                  <td className="px-5 py-4">
-                                    <div className="flex items-center gap-3">
-                                      <span className="text-2xl">{agent.emoji}</span>
-                                      <span className={`font-medium ${agentStyle?.color || 'text-white'}`}>{agent.agentName}</span>
-                                    </div>
-                                  </td>
-                                  <td className="px-5 py-4 text-center">
-                                    <span className="text-green-400 font-medium">{agent.wins}</span>
-                                    <span className="text-zinc-500">-</span>
-                                    <span className="text-red-400 font-medium">{agent.losses}</span>
-                                    {agent.pushes > 0 && (
-                                      <span className="text-zinc-500">-{agent.pushes}</span>
-                                    )}
-                                  </td>
-                                  <td className="px-5 py-4 text-center">
-                                    <span className={`font-bold ${agent.winRate >= 55 ? 'text-teal-400' : agent.winRate >= 50 ? 'text-gold' : 'text-red-400'}`}>
-                                      {agent.winRate?.toFixed(1)}%
-                                    </span>
-                                  </td>
-                                  <td className="px-5 py-4 text-center">
-                                    <span className={`font-medium ${agent.currentStreak > 0 ? 'text-teal-400' : agent.currentStreak < 0 ? 'text-red-400' : 'text-zinc-500'}`}>
-                                      {agent.currentStreak > 0 ? `🔥${agent.currentStreak}` : agent.currentStreak < 0 ? `❄️${Math.abs(agent.currentStreak)}` : '—'}
-                                    </span>
-                                  </td>
-                                  <td className="px-5 py-4 text-right">
-                                    <span className="text-amber-400 font-medium">
-                                      🔥 {agent.bestStreak || 0}
-                                    </span>
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-
-                    {/* Weekly Breakdown (if data exists) */}
-                    {aiCompetition.leaderboard?.[0]?.weeklyPerformance?.length > 0 && (
-                      <div className="bg-surface border border-zinc-800/50 rounded-2xl overflow-hidden">
-                        <div className="px-5 py-4 border-b border-zinc-800/50">
-                          <h3 className="font-semibold text-white">Weekly Performance</h3>
-                          <p className="text-sm text-zinc-500">Win rates by competition week</p>
-                        </div>
-                        <div className="p-5">
-                          <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                              <thead>
-                                <tr>
-                                  <th className="text-left text-zinc-500 pb-3">Model</th>
-                                  {aiCompetition.leaderboard[0].weeklyPerformance.map((w: any, i: number) => (
-                                    <th key={i} className={`text-center text-zinc-500 pb-3 ${i + 1 === aiCompetition.competition?.currentWeek ? 'text-teal-400' : ''}`}>
-                                      W{i + 1}
-                                    </th>
-                                  ))}
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {aiCompetition.leaderboard.slice(0, 5).map((agent: any) => (
-                                  <tr key={agent.agentId} className="border-t border-zinc-800/30">
-                                    <td className="py-2">
-                                      <span className="flex items-center gap-2">
-                                        <span>{agent.emoji}</span>
-                                        <span className="text-zinc-300">{agent.agentName}</span>
-                                      </span>
-                                    </td>
-                                    {agent.weeklyPerformance.map((week: any, i: number) => (
-                                      <td key={i} className="text-center py-2">
-                                        {week.wins + week.losses > 0 ? (
-                                          <span className={`${week.winRate >= 55 ? 'text-teal-400' : week.winRate >= 50 ? 'text-zinc-300' : 'text-red-400'}`}>
-                                            {week.winRate.toFixed(0)}%
-                                          </span>
-                                        ) : (
-                                          <span className="text-zinc-600">—</span>
-                                        )}
-                                      </td>
-                                    ))}
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Competition Rules */}
-                    <div className="bg-surface border border-zinc-800/50 rounded-xl p-5">
-                      <h4 className="text-sm font-semibold text-zinc-300 mb-3 flex items-center gap-2">
-                        <span>📋</span> Competition Rules
-                      </h4>
-                      <ul className="text-sm text-zinc-500 leading-relaxed space-y-2">
-                        <li>• Each AI model votes on every analyzed match with BET or PASS recommendation</li>
-                        <li>• A &quot;win&quot; is counted when the AI&apos;s recommendation correctly predicts the outcome</li>
-                        <li>• BET recommendations that hit = Win | BET recommendations that miss = Loss</li>
-                        <li>• PASS on losing bets = Win (saved money) | PASS on winning bets = Loss (missed opportunity)</li>
-                        <li>• Rankings are based on win rate with settled predictions only</li>
-                        <li>• Competition runs 1 week from December 4th to December 11th, 2025</li>
-                      </ul>
-                    </div>
-                  </>
-                ) : (
-                  <div className="text-center py-12">
-                    <div className="text-6xl mb-4">🏆</div>
-                    <div className="text-xl font-semibold mb-2">AI Sharp Showdown</div>
-                    <div className="text-zinc-400">Competition: Dec 4 - Dec 11, 2025</div>
-                    <div className="text-sm text-zinc-500 mt-2">7 AI models compete to see who&apos;s the sharpest bettor</div>
-                  </div>
-                )}
-              </div>
-            )}
+            </div>
           </div>
         )}
 
@@ -3004,13 +2489,13 @@ function DashboardContent() {
                       <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(45,180,180,0.12),transparent_50%)]"></div>
                       <div className="relative text-center py-4">
                         <div className="text-4xl mb-3">🎯</div>
-                        <h3 className="text-lg font-bold text-white mb-2">No Active Challenges</h3>
-                        <p className="text-sm text-[#7cc4c4] mb-4">Purchase a challenge to start tracking your winning streak!</p>
+                        <h3 className="text-lg font-bold text-white mb-2">{t.dashboard.betsTab.noActiveChallenges}</h3>
+                        <p className="text-sm text-[#7cc4c4] mb-4">{t.dashboard.betsTab.purchaseChallenge}</p>
                         <button
                           onClick={() => setActiveTab('challenges')}
                           className="px-6 py-2 bg-teal-500 hover:bg-teal-400 text-black font-semibold rounded-xl transition-all"
                         >
-                          Browse Challenges
+                          {t.dashboard.betsTab.browseChallenges}
                         </button>
                       </div>
                     </div>
@@ -3028,23 +2513,23 @@ function DashboardContent() {
                       <div className="flex items-center justify-between mb-4">
                         <div>
                           <h3 className="text-lg font-bold text-white mb-1">
-                            {activeChallenges.length === 1 ? 'Your Challenge Account' : 'Your Challenge Accounts'}
+                            {activeChallenges.length === 1 ? t.dashboard.betsTab.yourChallengeAccount : t.dashboard.betsTab.yourChallengeAccounts}
                           </h3>
                           <p className="text-sm text-[#7cc4c4]">
                             {activeChallenges.length === 1
-                              ? `${selectedChallenge?.tierLabel || getTierLabel(selectedChallenge?.tier)} Challenge Active`
-                              : `${activeChallenges.length} active challenges`}
+                              ? `${selectedChallenge?.tierLabel || getTierLabel(selectedChallenge?.tier)} ${t.dashboard.betsTab.challengeActive}`
+                              : `${activeChallenges.length} ${t.dashboard.betsTab.activeChallenges}`}
                           </p>
                         </div>
                         <div className="text-right">
                           <div className="flex items-center gap-4">
                             <div>
-                              <div className="text-[10px] text-zinc-500 uppercase">Total Potential</div>
+                              <div className="text-[10px] text-zinc-500 uppercase">{t.dashboard.betsTab.totalPotential}</div>
                               <div className="text-lg font-bold text-teal-400">€{rewards.reduce((a: number, b: number) => a + b, 0)?.toLocaleString()}</div>
                             </div>
                             <div className="w-px h-8 bg-zinc-700"></div>
                             <div>
-                              <div className="text-[10px] text-zinc-500 uppercase">Reset Fee</div>
+                              <div className="text-[10px] text-zinc-500 uppercase">{t.dashboard.betsTab.resetFee}</div>
                               <div className="text-lg font-bold text-zinc-400">€{selectedChallenge?.resetFee || 0}</div>
                             </div>
                           </div>
@@ -3098,7 +2583,7 @@ function DashboardContent() {
                               ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
                               : 'bg-teal-500/20 text-teal-400 border border-teal-500/40'
                           }`}>
-                            {selectedChallenge?.difficulty === 'pro' ? '⚡ Pro Mode' : '🎯 Beginner Mode'} • Min {selectedChallenge?.minOdds || 1.5}x Odds
+                            {selectedChallenge?.difficulty === 'pro' ? `⚡ ${t.dashboard.betsTab.proMode}` : `🎯 ${t.dashboard.betsTab.beginnerMode}`} • {t.dashboard.betsTab.minOdds} {selectedChallenge?.minOdds || 1.5}x {t.dashboard.betsTab.odds}
                           </span>
                         </div>
 
@@ -3143,21 +2628,21 @@ function DashboardContent() {
                           {/* Stats Grid */}
                           <div className="flex-1 grid grid-cols-2 gap-2">
                             <div className="bg-zinc-900/50 rounded-lg p-2.5 text-center">
-                              <div className="text-[10px] text-zinc-500 uppercase tracking-wide mb-0.5">Level</div>
+                              <div className="text-[10px] text-zinc-500 uppercase tracking-wide mb-0.5">{t.dashboard.betsTab.level}</div>
                               <div className="text-lg font-bold text-white">{selectedChallenge?.currentLevel || 1}<span className="text-zinc-500 text-sm">/4</span></div>
                             </div>
                             <div className="bg-zinc-900/50 rounded-lg p-2.5 text-center">
-                              <div className="text-[10px] text-zinc-500 uppercase tracking-wide mb-0.5">Days Left</div>
+                              <div className="text-[10px] text-zinc-500 uppercase tracking-wide mb-0.5">{t.dashboard.betsTab.daysLeft}</div>
                               <div className={`text-lg font-bold ${(selectedChallenge?.daysRemaining ?? 45) <= 7 ? 'text-red-400' : (selectedChallenge?.daysRemaining ?? 45) <= 14 ? 'text-amber-400' : 'text-emerald-400'}`}>
                                 {selectedChallenge?.daysRemaining ?? 45}
                               </div>
                             </div>
                             <div className="bg-zinc-900/50 rounded-lg p-2.5 text-center">
-                              <div className="text-[10px] text-zinc-500 uppercase tracking-wide mb-0.5">Earned</div>
+                              <div className="text-[10px] text-zinc-500 uppercase tracking-wide mb-0.5">{t.dashboard.betsTab.earnedLabel}</div>
                               <div className="text-lg font-bold text-emerald-400">€{(selectedChallenge?.totalRewardsEarned || 0).toLocaleString()}</div>
                             </div>
                             <div className="bg-zinc-900/50 rounded-lg p-2.5 text-center">
-                              <div className="text-[10px] text-zinc-500 uppercase tracking-wide mb-0.5">Next Target</div>
+                              <div className="text-[10px] text-zinc-500 uppercase tracking-wide mb-0.5">{t.dashboard.betsTab.nextTarget}</div>
                               <div className="text-lg font-bold text-white">
                                 {(() => {
                                   const streak = selectedChallenge?.currentStreak || 0;
@@ -3176,18 +2661,18 @@ function DashboardContent() {
                         <div className="flex items-center justify-between mt-3 pt-3 border-t border-zinc-800/50">
                           <div className="flex items-center gap-4 text-xs text-zinc-500">
                             <span>
-                              📅 Started: {selectedChallenge?.purchasedAt
+                              📅 {t.dashboard.betsTab.started}: {selectedChallenge?.purchasedAt
                                 ? new Date(selectedChallenge.purchasedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
                                 : 'N/A'}
                             </span>
                             <span>
-                              ⏰ Expires: {selectedChallenge?.expiresAt
+                              ⏰ {t.dashboard.betsTab.expires}: {selectedChallenge?.expiresAt
                                 ? new Date(selectedChallenge.expiresAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
                                 : 'N/A'}
                             </span>
                           </div>
                           <div className="text-xs text-zinc-600 font-mono">
-                            Account {selectedChallenge?.id?.slice(-6).toLowerCase() || '------'}
+                            {t.dashboard.betsTab.account} {selectedChallenge?.id?.slice(-6).toLowerCase() || '------'}
                           </div>
                         </div>
                       </div>
@@ -3206,9 +2691,9 @@ function DashboardContent() {
                         return (
                           <div className="pt-4 border-t border-[#2a5555]/40">
                             <div className="flex items-center justify-between mb-3">
-                              <span className="text-xs text-zinc-500 uppercase tracking-wide">Level Progression</span>
+                              <span className="text-xs text-zinc-500 uppercase tracking-wide">{t.dashboard.betsTab.levelProgression}</span>
                               <span className="text-xs text-zinc-400">
-                                {[selectedChallenge?.level1Completed, selectedChallenge?.level2Completed, selectedChallenge?.level3Completed, selectedChallenge?.level4Completed].filter(Boolean).length}/4 completed
+                                {[selectedChallenge?.level1Completed, selectedChallenge?.level2Completed, selectedChallenge?.level3Completed, selectedChallenge?.level4Completed].filter(Boolean).length}/4 {t.dashboard.betsTab.completed}
                               </span>
                             </div>
 
@@ -3272,7 +2757,7 @@ function DashboardContent() {
                             className="w-full py-3 px-4 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white font-semibold rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-amber-900/30 disabled:opacity-50"
                           >
                             <span>{claimingRewards ? '⏳' : '💰'}</span>
-                            <span>{claimingRewards ? 'Claiming...' : `Claim €${(selectedChallenge.totalPendingAmount || 0).toLocaleString()} Reward`}</span>
+                            <span>{claimingRewards ? t.dashboard.betsTab.claiming : `${t.dashboard.betsTab.claimReward} €${(selectedChallenge.totalPendingAmount || 0).toLocaleString()} ${t.dashboard.betsTab.reward}`}</span>
                           </button>
                         </div>
                       )}
@@ -3283,14 +2768,14 @@ function DashboardContent() {
                           onClick={() => setActiveTab('events')}
                           className="w-1/3 py-3 px-4 rounded-lg font-semibold text-sm transition-all flex items-center justify-center shadow-lg bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white shadow-amber-900/30"
                         >
-                          Place a Bet
+                          {t.dashboard.events.placeBet}
                         </button>
                       </div>
 
                       {/* Recent Results - Simple W/L */}
                       <div className="pt-4 border-t border-zinc-800/50 mt-4">
                         <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs text-zinc-500">Recent Results</span>
+                          <span className="text-xs text-zinc-500">{t.dashboard.betsTab.recentResults}</span>
                           <span className="text-xs text-zinc-500">
                             {bets.filter(b => b.result === 'won').length}W - {bets.filter(b => b.result === 'lost').length}L
                           </span>
@@ -3315,7 +2800,7 @@ function DashboardContent() {
                               </div>
                             ))}
                           {bets.filter(b => b.result !== 'pending').length === 0 && (
-                            <span className="text-xs text-zinc-600">No results yet</span>
+                            <span className="text-xs text-zinc-600">{t.dashboard.betsTab.noResultsYet}</span>
                           )}
                         </div>
                       </div>
@@ -3335,7 +2820,7 @@ function DashboardContent() {
                     : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50'
                 }`}
               >
-                Active Picks ({bets.filter(b => b.result === 'pending').length})
+                {t.dashboard.betsTab.activePicks} ({bets.filter(b => b.result === 'pending').length})
               </button>
               <button
                 onClick={() => setBetsSubTab('history')}
@@ -3345,7 +2830,7 @@ function DashboardContent() {
                     : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50'
                 }`}
               >
-                Pick History ({bets.filter(b => b.result !== 'pending').length})
+                {t.dashboard.betsTab.pickHistory} ({bets.filter(b => b.result !== 'pending').length})
               </button>
             </div>
 
@@ -3354,7 +2839,7 @@ function DashboardContent() {
               <div className={`space-y-4 ${activeChallenges.length === 0 ? 'opacity-40 blur-[2px] pointer-events-none select-none' : ''}`}>
                 {loadingBets ? (
                   <div className="bg-surface border border-zinc-800/50 rounded-2xl p-12 text-center">
-                    <div className="animate-pulse text-zinc-400">Loading your active picks...</div>
+                    <div className="animate-pulse text-zinc-400">{t.dashboard.betsTab.loadingActivePicks}</div>
                   </div>
                 ) : bets.filter(b => b.result === 'pending').length === 0 ? (
                   <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-12 text-center">
@@ -3363,13 +2848,13 @@ function DashboardContent() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                       </svg>
                     </div>
-                    <h3 className="text-lg font-semibold text-white mb-2">No Active Picks</h3>
-                    <p className="text-zinc-400 mb-4">Place a bet from the AI Swarm analysis to start tracking!</p>
+                    <h3 className="text-lg font-semibold text-white mb-2">{t.dashboard.betsTab.noActivePicks}</h3>
+                    <p className="text-zinc-400 mb-4">{t.dashboard.betsTab.placeABetToStart}</p>
                     <button
                       onClick={() => setActiveTab('events')}
                       className="px-4 py-2 bg-[#2d9090] hover:bg-[#3aa0a0] text-white rounded-lg text-sm font-medium transition-colors"
                     >
-                      Browse Events
+                      {t.dashboard.betsTab.browseEvents}
                     </button>
                   </div>
                 ) : (
@@ -3508,7 +2993,7 @@ function DashboardContent() {
                     <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center">
                       <span className="text-lg">💰</span>
                     </div>
-                    <span className="text-emerald-400 text-sm font-medium">Available Balance</span>
+                    <span className="text-emerald-400 text-sm font-medium">{t.dashboard.rewardsTab.availableBalance}</span>
                   </div>
                   <div className="text-4xl font-bold text-white mb-4">€{availableBalance.toLocaleString()}</div>
                   <button
@@ -3517,10 +3002,10 @@ function DashboardContent() {
                     className="w-full py-3 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-semibold rounded-xl transition-all shadow-lg shadow-emerald-500/25 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
                     <span>💸</span>
-                    <span>Withdraw Funds</span>
+                    <span>{t.dashboard.rewardsTab.withdrawFunds}</span>
                   </button>
                   {availableBalance < 10 && availableBalance > 0 && (
-                    <div className="text-xs text-emerald-400/70 text-center mt-2">Minimum withdrawal: €10</div>
+                    <div className="text-xs text-emerald-400/70 text-center mt-2">{t.dashboard.rewardsTab.minWithdrawal}</div>
                   )}
                 </div>
               </div>
@@ -3533,7 +3018,7 @@ function DashboardContent() {
                     <div className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center">
                       <span className="text-lg">⏳</span>
                     </div>
-                    <span className="text-amber-400 text-sm font-medium">Pending Rewards</span>
+                    <span className="text-amber-400 text-sm font-medium">{t.dashboard.rewardsTab.pendingRewards}</span>
                   </div>
                   <div className="text-4xl font-bold text-white mb-4">
                     €{activeChallenges.reduce((sum, c) => sum + (c.totalPendingAmount || 0), 0).toLocaleString()}
@@ -3545,15 +3030,15 @@ function DashboardContent() {
                       className="w-full py-3 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white font-semibold rounded-xl transition-all shadow-lg shadow-amber-500/25 disabled:opacity-50 flex items-center justify-center gap-2"
                     >
                       <span>{claimingRewards ? '⏳' : '✨'}</span>
-                      <span>{claimingRewards ? 'Claiming...' : 'Claim All Rewards'}</span>
+                      <span>{claimingRewards ? t.dashboard.rewardsTab.claiming : t.dashboard.rewardsTab.claimAllRewards}</span>
                     </button>
                   ) : (
                     <div className="w-full py-3 bg-zinc-800/50 text-zinc-500 font-medium rounded-xl text-center">
-                      No pending rewards
+                      {t.dashboard.rewardsTab.noPendingRewards}
                     </div>
                   )}
                   <div className="text-xs text-amber-400/70 text-center mt-2">
-                    {activeChallenges.reduce((sum, c) => sum + (c.pendingRewards?.length || 0), 0)} level(s) ready to claim
+                    {activeChallenges.reduce((sum, c) => sum + (c.pendingRewards?.length || 0), 0)} {t.dashboard.rewardsTab.levelsReadyToClaim}
                   </div>
                 </div>
               </div>
@@ -3563,25 +3048,25 @@ function DashboardContent() {
             <div className="grid grid-cols-4 gap-3">
               <div className="bg-[#111]/80 border border-zinc-800/50 rounded-xl p-4 text-center">
                 <div className="text-2xl font-bold text-white">{activeChallenges.length}</div>
-                <div className="text-xs text-zinc-500 mt-1">Active Challenges</div>
+                <div className="text-xs text-zinc-500 mt-1">{t.dashboard.rewardsTab.activeChallenges}</div>
               </div>
               <div className="bg-[#111]/80 border border-zinc-800/50 rounded-xl p-4 text-center">
                 <div className="text-2xl font-bold text-teal-400">
                   {activeChallenges.reduce((sum, c) => sum + [c.level1Completed, c.level2Completed, c.level3Completed, c.level4Completed].filter(Boolean).length, 0)}
                 </div>
-                <div className="text-xs text-zinc-500 mt-1">Levels Complete</div>
+                <div className="text-xs text-zinc-500 mt-1">{t.dashboard.rewardsTab.levelsComplete}</div>
               </div>
               <div className="bg-[#111]/80 border border-zinc-800/50 rounded-xl p-4 text-center">
                 <div className="text-2xl font-bold text-emerald-400">
                   €{activeChallenges.reduce((sum, c) => sum + (c.totalRewardsEarned || 0), 0).toLocaleString()}
                 </div>
-                <div className="text-xs text-zinc-500 mt-1">Total Earned</div>
+                <div className="text-xs text-zinc-500 mt-1">{t.dashboard.rewardsTab.totalEarned}</div>
               </div>
               <div className="bg-[#111]/80 border border-zinc-800/50 rounded-xl p-4 text-center">
                 <div className="text-2xl font-bold text-cyan-400">
                   {activeChallenges.filter(c => c.level4Completed).length}
                 </div>
-                <div className="text-xs text-zinc-500 mt-1">Max Payouts</div>
+                <div className="text-xs text-zinc-500 mt-1">{t.dashboard.rewardsTab.maxPayouts}</div>
               </div>
             </div>
 
@@ -3589,7 +3074,7 @@ function DashboardContent() {
             <div className="bg-[#111]/80 border border-zinc-800/50 rounded-2xl overflow-hidden">
                 <div className="p-4 border-b border-zinc-800/50 flex items-center justify-between">
                   <h3 className="text-base font-semibold text-white flex items-center gap-2">
-                    <span>📜</span> Withdrawal History
+                    <span>📜</span> {t.dashboard.rewardsTab.withdrawalHistory}
                   </h3>
                   {loadingPayouts && (
                     <div className="w-4 h-4 border-2 border-teal-500/30 border-t-teal-500 rounded-full animate-spin"></div>
@@ -3598,7 +3083,7 @@ function DashboardContent() {
                 {payoutHistory.length === 0 ? (
                   <div className="p-6 text-center text-zinc-500">
                     <div className="text-2xl mb-2">📋</div>
-                    <div className="text-sm">No withdrawals yet</div>
+                    <div className="text-sm">{t.dashboard.rewardsTab.noWithdrawals}</div>
                   </div>
                 ) : (
                   <div className="divide-y divide-zinc-800/50 max-h-[200px] overflow-y-auto">
@@ -3654,37 +3139,37 @@ function DashboardContent() {
 
           // Level rewards
           const levelRewards = [
-            { level: 1, reward: '$5 Bonus', icon: '🎁', unlocked: currentLevel >= 1 },
-            { level: 2, reward: '$10 Bonus', icon: '💵', unlocked: currentLevel >= 2 },
-            { level: 3, reward: 'Free Challenge Reset', icon: '🔄', unlocked: currentLevel >= 3 },
-            { level: 4, reward: '$25 Bonus', icon: '💰', unlocked: currentLevel >= 4 },
-            { level: 5, reward: 'VIP Status', icon: '👑', unlocked: currentLevel >= 5 },
-            { level: 6, reward: '$50 Bonus + Badge', icon: '🏆', unlocked: currentLevel >= 6 },
+            { level: 1, reward: t.dashboard.achievementsTab.bonus5, icon: '🎁', unlocked: currentLevel >= 1 },
+            { level: 2, reward: t.dashboard.achievementsTab.bonus10, icon: '💵', unlocked: currentLevel >= 2 },
+            { level: 3, reward: t.dashboard.achievementsTab.freeReset, icon: '🔄', unlocked: currentLevel >= 3 },
+            { level: 4, reward: t.dashboard.achievementsTab.bonus25, icon: '💰', unlocked: currentLevel >= 4 },
+            { level: 5, reward: t.dashboard.achievementsTab.vipStatus, icon: '👑', unlocked: currentLevel >= 5 },
+            { level: 6, reward: t.dashboard.achievementsTab.bonus50Badge, icon: '🏆', unlocked: currentLevel >= 6 },
           ];
 
           // All achievements with XP values
           const allAchievements = [
-            { icon: '🎯', name: 'First Blood', desc: 'Place your first bet', xp: 50 },
-            { icon: '🔟', name: 'Getting Started', desc: 'Place 10 bets', xp: 75 },
-            { icon: '💯', name: 'Century Club', desc: 'Place 100 bets', xp: 150 },
-            { icon: '🔥', name: 'Hot Streak', desc: 'Win 5 bets in a row', xp: 100 },
-            { icon: '💥', name: 'On Fire', desc: 'Win 10 bets in a row', xp: 200 },
-            { icon: '🎰', name: 'High Roller', desc: 'Win a $100+ bet', xp: 125 },
-            { icon: '💰', name: 'Money Maker', desc: '15 win streak', xp: 150 },
-            { icon: '🤑', name: 'Big Winner', desc: '20 win streak', xp: 250 },
-            { icon: '🃏', name: 'Parlay Starter', desc: 'Win a 2-leg parlay', xp: 75 },
-            { icon: '🎲', name: 'Parlay Pro', desc: 'Win a 3-leg parlay', xp: 125 },
-            { icon: '🏆', name: 'Parlay Master', desc: 'Win a 4-leg parlay', xp: 200 },
-            { icon: '🥉', name: 'Bronze Badge', desc: 'Reach Bronze tier', xp: 50 },
-            { icon: '🥈', name: 'Silver Star', desc: 'Reach Silver tier', xp: 100 },
-            { icon: '🥇', name: 'Gold Glory', desc: 'Reach Gold tier', xp: 150 },
-            { icon: '👑', name: 'Platinum Crown', desc: 'Reach Platinum tier', xp: 200 },
-            { icon: '💎', name: 'Diamond Elite', desc: 'Reach Diamond tier', xp: 300 },
-            { icon: '⭐', name: 'Sharp Bettor', desc: '55%+ win rate (50+ bets)', xp: 125 },
-            { icon: '🌟', name: 'Elite Bettor', desc: '60%+ win rate (100+ bets)', xp: 200 },
-            { icon: '📈', name: 'Streak King', desc: '25 win streak', xp: 175 },
-            { icon: '🎮', name: 'Challenge Starter', desc: 'Complete first challenge level', xp: 100 },
-            { icon: '🏅', name: 'Challenge Champion', desc: 'Complete a full challenge', xp: 250 },
+            { icon: '🎯', name: t.dashboard.achievementsTab.firstBlood, desc: t.dashboard.achievementsTab.firstBloodDesc, xp: 50 },
+            { icon: '🔟', name: t.dashboard.achievementsTab.gettingStarted, desc: t.dashboard.achievementsTab.gettingStartedDesc, xp: 75 },
+            { icon: '💯', name: t.dashboard.achievementsTab.centuryClub, desc: t.dashboard.achievementsTab.centuryClubDesc, xp: 150 },
+            { icon: '🔥', name: t.dashboard.achievementsTab.hotStreak, desc: t.dashboard.achievementsTab.hotStreakDesc, xp: 100 },
+            { icon: '💥', name: t.dashboard.achievementsTab.onFire, desc: t.dashboard.achievementsTab.onFireDesc, xp: 200 },
+            { icon: '🎰', name: t.dashboard.achievementsTab.highRoller, desc: t.dashboard.achievementsTab.highRollerDesc, xp: 125 },
+            { icon: '💰', name: t.dashboard.achievementsTab.moneyMaker, desc: t.dashboard.achievementsTab.moneyMakerDesc, xp: 150 },
+            { icon: '🤑', name: t.dashboard.achievementsTab.bigWinner, desc: t.dashboard.achievementsTab.bigWinnerDesc, xp: 250 },
+            { icon: '🃏', name: t.dashboard.achievementsTab.parlayStarter, desc: t.dashboard.achievementsTab.parlayStarterDesc, xp: 75 },
+            { icon: '🎲', name: t.dashboard.achievementsTab.parlayPro, desc: t.dashboard.achievementsTab.parlayProDesc, xp: 125 },
+            { icon: '🏆', name: t.dashboard.achievementsTab.parlayMaster, desc: t.dashboard.achievementsTab.parlayMasterDesc, xp: 200 },
+            { icon: '🥉', name: t.dashboard.achievementsTab.bronzeBadge, desc: t.dashboard.achievementsTab.bronzeBadgeDesc, xp: 50 },
+            { icon: '🥈', name: t.dashboard.achievementsTab.silverStar, desc: t.dashboard.achievementsTab.silverStarDesc, xp: 100 },
+            { icon: '🥇', name: t.dashboard.achievementsTab.goldGlory, desc: t.dashboard.achievementsTab.goldGloryDesc, xp: 150 },
+            { icon: '👑', name: t.dashboard.achievementsTab.platinumCrown, desc: t.dashboard.achievementsTab.platinumCrownDesc, xp: 200 },
+            { icon: '💎', name: t.dashboard.achievementsTab.diamondElite, desc: t.dashboard.achievementsTab.diamondEliteDesc, xp: 300 },
+            { icon: '⭐', name: t.dashboard.achievementsTab.sharpBettor, desc: t.dashboard.achievementsTab.sharpBettorDesc, xp: 125 },
+            { icon: '🌟', name: t.dashboard.achievementsTab.eliteBettor, desc: t.dashboard.achievementsTab.eliteBettorDesc, xp: 200 },
+            { icon: '📈', name: t.dashboard.achievementsTab.streakKing, desc: t.dashboard.achievementsTab.streakKingDesc, xp: 175 },
+            { icon: '🎮', name: t.dashboard.achievementsTab.challengeStarter, desc: t.dashboard.achievementsTab.challengeStarterDesc, xp: 100 },
+            { icon: '🏅', name: t.dashboard.achievementsTab.challengeChampion, desc: t.dashboard.achievementsTab.challengeChampionDesc, xp: 250 },
           ];
 
           return (
@@ -3697,22 +3182,22 @@ function DashboardContent() {
                     <span className="text-3xl font-bold text-black">{currentLevel}</span>
                   </div>
                   <div>
-                    <h2 className="text-2xl font-bold text-white">Level {currentLevel}</h2>
-                    <p className="text-amber-300/70">Achievement Hunter</p>
+                    <h2 className="text-2xl font-bold text-white">{t.dashboard.achievementsTab.level} {currentLevel}</h2>
+                    <p className="text-amber-300/70">{t.dashboard.achievementsTab.achievementHunter}</p>
                   </div>
                 </div>
                 <div className="text-right">
                   <div className="text-2xl font-bold text-amber-400">{totalXP} XP</div>
-                  <div className="text-sm text-zinc-400">{achievements.length} Achievements</div>
+                  <div className="text-sm text-zinc-400">{achievements.length} {t.dashboard.achievementsTab.achievements}</div>
                 </div>
               </div>
 
               {/* XP Progress Bar */}
               <div className="mt-4">
                 <div className="flex justify-between text-sm mb-2">
-                  <span className="text-zinc-400">Level {currentLevel}</span>
+                  <span className="text-zinc-400">{t.dashboard.achievementsTab.level} {currentLevel}</span>
                   <span className="text-amber-400">{totalXP} / {nextLevelXP} XP</span>
-                  <span className="text-zinc-400">Level {currentLevel + 1}</span>
+                  <span className="text-zinc-400">{t.dashboard.achievementsTab.level} {currentLevel + 1}</span>
                 </div>
                 <div className="h-4 bg-zinc-800 rounded-full overflow-hidden">
                   <div
@@ -3723,7 +3208,7 @@ function DashboardContent() {
                   </div>
                 </div>
                 <p className="text-xs text-zinc-500 mt-2 text-center">
-                  {nextLevelXP - totalXP > 0 ? `${nextLevelXP - totalXP} XP to next level` : 'Max level reached!'}
+                  {nextLevelXP - totalXP > 0 ? `${nextLevelXP - totalXP} ${t.dashboard.achievementsTab.xpToNextLevel}` : t.dashboard.achievementsTab.maxLevelReached}
                 </p>
               </div>
             </div>
@@ -3731,7 +3216,7 @@ function DashboardContent() {
             {/* Level Rewards with Progress Bar */}
             <div className="bg-surface border border-zinc-800/50 rounded-2xl p-6">
               <h3 className="font-semibold mb-6 flex items-center gap-2">
-                <span className="text-xl">🎁</span> Level Rewards
+                <span className="text-xl">🎁</span> {t.dashboard.achievementsTab.levelRewards}
               </h3>
 
               {/* Level Progress Track */}
@@ -3784,7 +3269,7 @@ function DashboardContent() {
                         <div className={`mt-2 text-sm font-bold ${
                           isPastLevel ? 'text-teal-400' : isCurrentLevel ? 'text-amber-400' : 'text-zinc-500'
                         }`}>
-                          Lvl {reward.level}
+                          {t.dashboard.achievementsTab.lvl} {reward.level}
                         </div>
 
                         {/* XP required */}
@@ -3806,17 +3291,17 @@ function DashboardContent() {
                         {/* Status badge */}
                         {isPastLevel && (
                           <div className="mt-2 px-2 py-0.5 bg-teal-500/20 text-teal-400 text-xs rounded-full">
-                            Claimed
+                            {t.dashboard.achievementsTab.claimed}
                           </div>
                         )}
                         {isCurrentLevel && (
                           <div className="mt-2 px-2 py-0.5 bg-amber-500/20 text-amber-400 text-xs rounded-full animate-pulse">
-                            Current
+                            {t.dashboard.achievementsTab.current}
                           </div>
                         )}
                         {isFutureLevel && (
                           <div className="mt-2 px-2 py-0.5 bg-zinc-700/50 text-zinc-500 text-xs rounded-full">
-                            Locked
+                            {t.dashboard.achievementsTab.locked}
                           </div>
                         )}
                       </div>
@@ -3828,8 +3313,8 @@ function DashboardContent() {
               {/* Mobile-friendly progress */}
               <div className="mt-6 md:hidden">
                 <div className="flex justify-between text-xs text-zinc-500 mb-1">
-                  <span>Level {currentLevel}</span>
-                  <span>Level {Math.min(currentLevel + 1, 6)}</span>
+                  <span>{t.dashboard.achievementsTab.level} {currentLevel}</span>
+                  <span>{t.dashboard.achievementsTab.level} {Math.min(currentLevel + 1, 6)}</span>
                 </div>
                 <div className="h-3 bg-zinc-800 rounded-full overflow-hidden">
                   <div
@@ -3843,8 +3328,8 @@ function DashboardContent() {
             {/* Achievements Grid */}
             <div className="bg-surface border border-zinc-800/50 rounded-2xl p-6">
               <div className="flex items-center justify-between mb-6">
-                <h3 className="font-semibold text-lg">All Achievements</h3>
-                <span className="text-sm text-zinc-400">{achievements.length} / {allAchievements.length} unlocked</span>
+                <h3 className="font-semibold text-lg">{t.dashboard.achievementsTab.allAchievements}</h3>
+                <span className="text-sm text-zinc-400">{achievements.length} / {allAchievements.length} {t.dashboard.achievementsTab.unlocked}</span>
               </div>
 
               {loadingAchievements ? (
@@ -3895,27 +3380,27 @@ function DashboardContent() {
 
             {/* Stats Summary */}
             <div className="bg-surface border border-zinc-800/50 rounded-2xl p-6">
-              <h3 className="font-semibold mb-4">Progress Summary</h3>
+              <h3 className="font-semibold mb-4">{t.dashboard.achievementsTab.progressSummary}</h3>
               <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                 <div className="bg-zinc-800/50 rounded-xl p-4 text-center">
                   <div className="text-2xl font-bold text-amber-400">{currentLevel}</div>
-                  <div className="text-xs text-zinc-500 mt-1">Current Level</div>
+                  <div className="text-xs text-zinc-500 mt-1">{t.dashboard.achievementsTab.currentLevel}</div>
                 </div>
                 <div className="bg-zinc-800/50 rounded-xl p-4 text-center">
                   <div className="text-2xl font-bold text-teal-400">{totalXP}</div>
-                  <div className="text-xs text-zinc-500 mt-1">Total XP</div>
+                  <div className="text-xs text-zinc-500 mt-1">{t.dashboard.achievementsTab.totalXP}</div>
                 </div>
                 <div className="bg-zinc-800/50 rounded-xl p-4 text-center">
                   <div className="text-2xl font-bold text-purple-400">{achievements.length}</div>
-                  <div className="text-xs text-zinc-500 mt-1">Achievements</div>
+                  <div className="text-xs text-zinc-500 mt-1">{t.dashboard.achievementsTab.achievements}</div>
                 </div>
                 <div className="bg-zinc-800/50 rounded-xl p-4 text-center">
                   <div className="text-2xl font-bold text-emerald-400">{levelRewards.filter(r => r.unlocked).length}</div>
-                  <div className="text-xs text-zinc-500 mt-1">Rewards Claimed</div>
+                  <div className="text-xs text-zinc-500 mt-1">{t.dashboard.achievementsTab.rewardsClaimed}</div>
                 </div>
                 <div className="bg-zinc-800/50 rounded-xl p-4 text-center">
                   <div className="text-2xl font-bold text-zinc-400">{Math.round((achievements.length / allAchievements.length) * 100)}%</div>
-                  <div className="text-xs text-zinc-500 mt-1">Completion</div>
+                  <div className="text-xs text-zinc-500 mt-1">{t.dashboard.achievementsTab.completion}</div>
                 </div>
               </div>
             </div>
@@ -3928,13 +3413,13 @@ function DashboardContent() {
           <div className="space-y-6">
             {loadingReferral ? (
               <div className="flex items-center justify-center py-12">
-                <div className="animate-pulse text-zinc-500">Loading referral data...</div>
+                <div className="animate-pulse text-zinc-500">{t.dashboard.referralTab.loadingReferralData}</div>
               </div>
             ) : referralData ? (
               <>
                 {/* Referral Link Card */}
                 <div className="bg-gradient-to-br from-teal-900/30 to-teal-800/10 border border-teal-500/30 rounded-2xl p-6">
-                  <h2 className="text-xl font-bold text-white mb-4">Your Referral Link</h2>
+                  <h2 className="text-xl font-bold text-white mb-4">{t.dashboard.referralTab.yourReferralLink}</h2>
                   <div className="flex gap-3 mb-4">
                     <input
                       type="text"
@@ -3950,11 +3435,11 @@ function DashboardContent() {
                           : 'bg-teal-600 hover:bg-teal-700 text-white'
                       }`}
                     >
-                      {referralCopied ? 'Copied!' : 'Copy'}
+                      {referralCopied ? t.dashboard.referralTab.copied : t.dashboard.referralTab.copy}
                     </button>
                   </div>
                   <div className="flex items-center gap-4 text-sm">
-                    <span className="text-zinc-400">Your code:</span>
+                    <span className="text-zinc-400">{t.dashboard.referralTab.yourCode}</span>
                     <span className="bg-zinc-800 px-3 py-1 rounded-lg font-mono text-teal-400 font-bold">
                       {referralData.referralCode}
                     </span>
@@ -3962,7 +3447,7 @@ function DashboardContent() {
                       onClick={() => copyReferralToClipboard(referralData.referralCode)}
                       className="text-zinc-400 hover:text-white"
                     >
-                      Copy code
+                      {t.dashboard.referralTab.copyCode}
                     </button>
                   </div>
                 </div>
@@ -3972,19 +3457,19 @@ function DashboardContent() {
                   <div className="bg-gradient-to-br from-green-900/20 to-green-800/10 border border-green-500/30 rounded-xl p-5">
                     <div className="flex items-center gap-3 mb-2">
                       <span className="text-2xl">💰</span>
-                      <h3 className="font-bold text-white">You Get 15% Cashback</h3>
+                      <h3 className="font-bold text-white">{t.dashboard.referralTab.youGet15Cashback}</h3>
                     </div>
                     <p className="text-sm text-zinc-400">
-                      Earn 15% of every friend&apos;s first challenge purchase added to your rewards balance
+                      {t.dashboard.referralTab.youGetDescription}
                     </p>
                   </div>
                   <div className="bg-gradient-to-br from-purple-900/20 to-purple-800/10 border border-purple-500/30 rounded-xl p-5">
                     <div className="flex items-center gap-3 mb-2">
                       <span className="text-2xl">🎁</span>
-                      <h3 className="font-bold text-white">They Get 15% Off</h3>
+                      <h3 className="font-bold text-white">{t.dashboard.referralTab.theyGet15Off}</h3>
                     </div>
                     <p className="text-sm text-zinc-400">
-                      Your friends get 15% discount on their first challenge purchase when they sign up with your link
+                      {t.dashboard.referralTab.theyGetDescription}
                     </p>
                   </div>
                 </div>
@@ -3993,65 +3478,65 @@ function DashboardContent() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="bg-surface border border-zinc-800 rounded-xl p-4">
                     <div className="text-3xl font-bold text-white">{referralData.stats.totalReferrals}</div>
-                    <div className="text-sm text-zinc-400">Total Referrals</div>
+                    <div className="text-sm text-zinc-400">{t.dashboard.referralTab.totalReferrals}</div>
                   </div>
                   <div className="bg-surface border border-zinc-800 rounded-xl p-4">
                     <div className="text-3xl font-bold text-teal-400">{referralData.stats.qualifiedReferrals}</div>
-                    <div className="text-sm text-zinc-400">Qualified</div>
+                    <div className="text-sm text-zinc-400">{t.dashboard.referralTab.qualified}</div>
                   </div>
                   <div className="bg-surface border border-zinc-800 rounded-xl p-4">
                     <div className="text-3xl font-bold text-green-400">€{referralData.stats.totalEarned.toFixed(2)}</div>
-                    <div className="text-sm text-zinc-400">Total Earned</div>
+                    <div className="text-sm text-zinc-400">{t.dashboard.referralTab.totalEarned}</div>
                   </div>
                   <div className="bg-surface border border-zinc-800 rounded-xl p-4">
                     <div className="text-3xl font-bold text-yellow-400">€{referralData.stats.pendingRewards.toFixed(2)}</div>
-                    <div className="text-sm text-zinc-400">Pending Rewards</div>
+                    <div className="text-sm text-zinc-400">{t.dashboard.referralTab.pendingRewards}</div>
                   </div>
                 </div>
 
                 {/* How It Works */}
                 <div className="bg-surface border border-zinc-800 rounded-2xl p-6">
-                  <h2 className="text-xl font-bold text-white mb-4">How It Works</h2>
+                  <h2 className="text-xl font-bold text-white mb-4">{t.dashboard.referralTab.howItWorks}</h2>
                   <div className="grid md:grid-cols-4 gap-6">
                     <div className="text-center">
                       <div className="w-12 h-12 bg-teal-900/30 rounded-full flex items-center justify-center mx-auto mb-3">
                         <span className="text-xl font-bold text-teal-400">1</span>
                       </div>
-                      <h3 className="font-semibold text-white mb-1">Share Your Link</h3>
-                      <p className="text-sm text-zinc-400">Send your unique referral link to friends</p>
+                      <h3 className="font-semibold text-white mb-1">{t.dashboard.referralTab.shareYourLink}</h3>
+                      <p className="text-sm text-zinc-400">{t.dashboard.referralTab.shareDescription}</p>
                     </div>
                     <div className="text-center">
                       <div className="w-12 h-12 bg-teal-900/30 rounded-full flex items-center justify-center mx-auto mb-3">
                         <span className="text-xl font-bold text-teal-400">2</span>
                       </div>
-                      <h3 className="font-semibold text-white mb-1">They Sign Up</h3>
-                      <p className="text-sm text-zinc-400">Friends create account with your link</p>
+                      <h3 className="font-semibold text-white mb-1">{t.dashboard.referralTab.theySignUp}</h3>
+                      <p className="text-sm text-zinc-400">{t.dashboard.referralTab.signUpDescription}</p>
                     </div>
                     <div className="text-center">
                       <div className="w-12 h-12 bg-purple-900/30 rounded-full flex items-center justify-center mx-auto mb-3">
                         <span className="text-xl font-bold text-purple-400">3</span>
                       </div>
-                      <h3 className="font-semibold text-white mb-1">They Save 15%</h3>
-                      <p className="text-sm text-zinc-400">They get 15% off their first challenge</p>
+                      <h3 className="font-semibold text-white mb-1">{t.dashboard.referralTab.theySave15}</h3>
+                      <p className="text-sm text-zinc-400">{t.dashboard.referralTab.saveDescription}</p>
                     </div>
                     <div className="text-center">
                       <div className="w-12 h-12 bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-3">
                         <span className="text-xl font-bold text-green-400">4</span>
                       </div>
-                      <h3 className="font-semibold text-white mb-1">You Earn 15%</h3>
-                      <p className="text-sm text-zinc-400">You get 15% of their purchase as reward</p>
+                      <h3 className="font-semibold text-white mb-1">{t.dashboard.referralTab.youEarn15}</h3>
+                      <p className="text-sm text-zinc-400">{t.dashboard.referralTab.earnDescription}</p>
                     </div>
                   </div>
                 </div>
 
                 {/* Referrals List */}
                 <div className="bg-surface border border-zinc-800 rounded-2xl p-6">
-                  <h2 className="text-xl font-bold text-white mb-4">Your Referrals</h2>
+                  <h2 className="text-xl font-bold text-white mb-4">{t.dashboard.referralTab.yourReferrals}</h2>
                   {referralData.referrals.length === 0 ? (
                     <div className="text-center py-12">
                       <div className="text-4xl mb-4">👥</div>
-                      <p className="text-zinc-400">No referrals yet</p>
-                      <p className="text-sm text-zinc-500 mt-1">Share your link to start earning rewards</p>
+                      <p className="text-zinc-400">{t.dashboard.referralTab.noReferrals}</p>
+                      <p className="text-sm text-zinc-500 mt-1">{t.dashboard.referralTab.shareToStart}</p>
                     </div>
                   ) : (
                     <div className="space-y-3">
@@ -4138,17 +3623,17 @@ function DashboardContent() {
         {activeTab === 'faq' && (
           <div className="space-y-6">
             <div className="bg-[#1a1a1a] border border-zinc-800/50 rounded-2xl p-6">
-              <h2 className="text-2xl font-bold text-white mb-6">Frequently Asked Questions</h2>
+              <h2 className="text-2xl font-bold text-white mb-6">{t.dashboard.faqTab.title}</h2>
               <div className="space-y-3">
                 {[
-                  { q: "How do the 4 levels work?", a: "Requirements depend on difficulty: Beginner (3, 6, 10, 15 wins with min odds 1.5) or Pro (2, 4, 6, 9 wins with min odds 2.0). You earn rewards at each level!" },
-                  { q: "What happens if I lose a bet?", a: "You fail your challenge, but keep earned rewards from completed levels." },
-                  { q: "Do I need to complete all 4 levels?", a: "No! You can cash out your earned rewards at any time. However, completing all 4 levels unlocks the maximum payout for your account size." },
-                  { q: "How long do I have to complete all levels?", a: "You have 45 days from your purchase date to complete as many levels as you can. Any rewards earned during this time are yours to keep." },
-                  { q: "Can I reset my challenge?", a: "Yes! If you run out of time, you can reset at 50% of the original cost. This gives you a fresh 45 days to continue earning rewards." },
-                  { q: "What are the minimum odds requirements?", a: "Beginner mode requires minimum odds of 1.5x per bet. Pro mode requires minimum odds of 2.0x per bet. This ensures fair and competitive betting." },
-                  { q: "How do rewards work?", a: "You earn rewards as you complete levels. All rewards are added to your balance immediately and can be withdrawn at any time." },
-                  { q: "Can I have multiple active challenges?", a: "Yes! You can have up to 5 active challenges at the same time. Each challenge tracks progress independently." },
+                  { q: t.dashboard.faqTab.faq1q, a: t.dashboard.faqTab.faq1a },
+                  { q: t.dashboard.faqTab.faq2q, a: t.dashboard.faqTab.faq2a },
+                  { q: t.dashboard.faqTab.faq3q, a: t.dashboard.faqTab.faq3a },
+                  { q: t.dashboard.faqTab.faq4q, a: t.dashboard.faqTab.faq4a },
+                  { q: t.dashboard.faqTab.faq5q, a: t.dashboard.faqTab.faq5a },
+                  { q: t.dashboard.faqTab.faq6q, a: t.dashboard.faqTab.faq6a },
+                  { q: t.dashboard.faqTab.faq7q, a: t.dashboard.faqTab.faq7a },
+                  { q: t.dashboard.faqTab.faq8q, a: t.dashboard.faqTab.faq8a },
                 ].map((faq, idx) => (
                   <div key={idx} className="border border-zinc-800/50 rounded-xl overflow-hidden">
                     <button
@@ -4172,13 +3657,13 @@ function DashboardContent() {
 
             {/* Contact Support */}
             <div className="bg-surface border border-zinc-800 rounded-2xl p-6">
-              <h2 className="text-xl font-bold text-white mb-4">Still have questions?</h2>
-              <p className="text-zinc-400 mb-4">Our support team is here to help you with any questions or concerns.</p>
+              <h2 className="text-xl font-bold text-white mb-4">{t.dashboard.faqTab.stillHaveQuestions}</h2>
+              <p className="text-zinc-400 mb-4">{t.dashboard.faqTab.supportDescription}</p>
               <a
                 href="mailto:support@zalogche.com"
                 className="inline-flex items-center gap-2 px-6 py-3 bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-medium transition-colors"
               >
-                <span>📧</span> Contact Support
+                <span>📧</span> {t.dashboard.faqTab.contactSupport}
               </a>
             </div>
           </div>
@@ -4189,7 +3674,7 @@ function DashboardContent() {
       {/* Footer */}
       <footer className="mt-12 py-8 border-t border-zinc-800/50 text-center">
         <p className="text-teal-400 font-semibold tracking-tight">ZALOGCHE</p>
-        <p className="text-zinc-500 text-xs mt-1">For Entertainment Only • Gamble Responsibly</p>
+        <p className="text-zinc-500 text-xs mt-1">{t.dashboard.footer.forEntertainment} • {t.dashboard.footer.gambleResponsibly}</p>
       </footer>
 
       {/* Bet Placement Modal */}
@@ -4198,7 +3683,7 @@ function DashboardContent() {
           <div className="bg-gradient-to-b from-teal-950 to-zinc-950 border border-teal-800/50 rounded-2xl p-6 w-full max-w-md shadow-2xl shadow-teal-900/20">
             {/* Modal Header */}
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-bold text-white">Place Your Bet</h3>
+              <h3 className="text-xl font-bold text-white">{t.dashboard.modals.placeYourBet}</h3>
               <button
                 onClick={() => {
                   setBetModalOpen(false);

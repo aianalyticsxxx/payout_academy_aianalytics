@@ -8,6 +8,7 @@ import { authOptions } from '@/lib/auth/config';
 import { prisma } from '@/lib/db/prisma';
 import { authenticator } from 'otplib';
 import QRCode from 'qrcode';
+import { randomBytes } from 'crypto';
 
 // Generate a new 2FA secret and QR code
 export async function POST(req: NextRequest) {
@@ -50,9 +51,9 @@ export async function POST(req: NextRequest) {
     // Generate QR code as data URL
     const qrCodeDataUrl = await QRCode.toDataURL(otpauthUrl);
 
-    // Generate backup codes
+    // Generate backup codes using cryptographically secure random bytes
     const backupCodes = Array.from({ length: 8 }, () =>
-      Math.random().toString(36).substring(2, 10).toUpperCase()
+      randomBytes(4).toString('hex').toUpperCase()
     );
 
     // Store secret temporarily (not enabled yet)

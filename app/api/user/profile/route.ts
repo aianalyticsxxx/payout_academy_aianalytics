@@ -8,13 +8,47 @@ import { authOptions } from '@/lib/auth/config';
 import { prisma } from '@/lib/db/prisma';
 import { z } from 'zod';
 
+// List of allowed emoji avatars (prevents XSS/SSRF via avatar field)
+const ALLOWED_AVATARS = [
+  '🎲', '🎯', '🏀', '⚽', '🏈', '⚾', '🎾', '🏐', '🏉', '🎱',
+  '🥊', '🏆', '🎰', '💰', '💵', '🔥', '⭐', '💎', '👑', '🦁',
+  '🐯', '🦅', '🐺', '🦊', '🐻', '🦈', '🐎', '🎪', '🎭', '🎨',
+];
+
 const UpdateProfileSchema = z.object({
-  username: z.string().min(3).max(20).optional(),
-  avatar: z.string().optional(),
-  phoneNumber: z.string().optional(),
-  dateOfBirth: z.string().optional(), // ISO date string
-  country: z.string().optional(),
-  timezone: z.string().optional(),
+  username: z.string()
+    .min(3, 'Username must be at least 3 characters')
+    .max(20, 'Username must be at most 20 characters')
+    .regex(/^[a-zA-Z0-9_]+$/, 'Username can only contain letters, numbers, and underscores')
+    .optional(),
+  avatar: z.string()
+    .refine((val) => ALLOWED_AVATARS.includes(val), {
+      message: 'Invalid avatar selection',
+    })
+    .optional(),
+  phoneNumber: z.string()
+    .regex(/^[+]?[\d\s-()]{7,20}$/, 'Invalid phone number format')
+    .optional()
+    .nullable(),
+  dateOfBirth: z.string()
+    .refine((val) => {
+      const date = new Date(val);
+      const now = new Date();
+      const minAge = new Date(now.getFullYear() - 18, now.getMonth(), now.getDate());
+      return !isNaN(date.getTime()) && date < minAge;
+    }, { message: 'Must be at least 18 years old' })
+    .optional()
+    .nullable(),
+  country: z.string()
+    .min(2)
+    .max(100)
+    .regex(/^[a-zA-Z\s-]+$/, 'Invalid country name')
+    .optional()
+    .nullable(),
+  timezone: z.string()
+    .regex(/^[a-zA-Z_\/]+$/, 'Invalid timezone format')
+    .optional()
+    .nullable(),
 });
 
 // ==========================================

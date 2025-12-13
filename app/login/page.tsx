@@ -8,6 +8,7 @@ import { useState, Suspense } from 'react';
 import { signIn } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { useLanguage, LanguageSwitcher } from '@/lib/i18n';
 
 // ==========================================
 // ANIMATED ORB COMPONENT
@@ -144,6 +145,7 @@ function AnimatedBackground() {
 // LOGIN FORM COMPONENT
 // ==========================================
 function LoginForm() {
+  const { t } = useLanguage();
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get('callbackUrl') || '/dashboard';
@@ -168,13 +170,13 @@ function LoginForm() {
       });
 
       if (result?.error) {
-        setErrorMessage('Invalid email or password');
+        setErrorMessage(t.auth.login.error);
       } else if (result?.ok) {
         router.push(callbackUrl);
         router.refresh();
       }
     } catch (error) {
-      setErrorMessage('An error occurred. Please try again.');
+      setErrorMessage(t.common.error);
     } finally {
       setLoading(false);
     }
@@ -182,12 +184,17 @@ function LoginForm() {
 
   return (
     <div className="relative z-10 w-full max-w-md mx-4">
+      {/* Language Switcher */}
+      <div className="absolute -top-12 right-0">
+        <LanguageSwitcher />
+      </div>
+
       {/* Logo with glow effect */}
       <div className="text-center mb-6">
         <h1 className="text-4xl font-bold tracking-tight animate-shimmer bg-gradient-to-r from-teal-400 via-cyan-300 to-teal-400 bg-[length:200%_100%] bg-clip-text text-transparent">
-          ZALOGCHE
+          {t.auth.login.title}
         </h1>
-        <p className="text-zinc-400 mt-2 text-sm tracking-wide">Enter the arena</p>
+        <p className="text-zinc-400 mt-2 text-sm tracking-wide">{t.auth.login.subtitle}</p>
       </div>
 
       {/* Glass morphism card */}
@@ -206,28 +213,28 @@ function LoginForm() {
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
               <label className="block text-sm font-medium text-zinc-300 mb-2">
-                Email
+                {t.auth.login.email}
               </label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full bg-zinc-800/50 border border-zinc-700/50 rounded-xl px-4 py-3.5 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500/50 transition-all duration-300 backdrop-blur-sm"
-                placeholder="you@example.com"
+                placeholder={t.auth.login.emailPlaceholder}
                 required
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-zinc-300 mb-2">
-                Password
+                {t.auth.login.password}
               </label>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full bg-zinc-800/50 border border-zinc-700/50 rounded-xl px-4 py-3.5 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500/50 transition-all duration-300 backdrop-blur-sm"
-                placeholder="••••••••"
+                placeholder={t.auth.login.passwordPlaceholder}
                 required
               />
             </div>
@@ -242,14 +249,14 @@ function LoginForm() {
             >
               {/* Button shine effect */}
               <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover/btn:translate-x-full transition-transform duration-700" />
-              <span className="relative">{loading ? 'Signing in...' : 'Sign In'}</span>
+              <span className="relative">{loading ? t.auth.login.submitting : t.auth.login.submit}</span>
             </button>
           </form>
 
           <p className="mt-8 text-center text-sm text-zinc-500">
-            Don&apos;t have an account?{' '}
+            {t.auth.login.noAccount}{' '}
             <Link href="/register" className="text-teal-400 hover:text-teal-300 font-medium transition-colors">
-              Sign up
+              {t.auth.login.signUp}
             </Link>
           </p>
         </div>
@@ -257,7 +264,7 @@ function LoginForm() {
 
       {/* Disclaimer */}
       <p className="mt-8 text-center text-xs text-zinc-600">
-        By signing in, you agree that this platform is for entertainment purposes only.
+        {t.auth.login.disclaimer}
       </p>
     </div>
   );
@@ -271,7 +278,7 @@ function LoginFormFallback() {
     <div className="relative z-10 w-full max-w-md mx-4">
       <div className="text-center mb-10">
         <h1 className="text-4xl font-bold text-teal-400 tracking-tight">ZALOGCHE</h1>
-        <p className="text-zinc-400 mt-4">Loading...</p>
+        <p className="text-zinc-400 mt-4">...</p>
       </div>
       <div className="backdrop-blur-xl bg-zinc-900/70 border border-white/10 rounded-3xl p-8 animate-pulse">
         <div className="h-12 bg-zinc-800/50 rounded-xl mb-4" />

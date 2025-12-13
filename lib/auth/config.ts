@@ -8,6 +8,12 @@ import GoogleProvider from 'next-auth/providers/google';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import { prisma } from '@/lib/db/prisma';
 import bcrypt from 'bcryptjs';
+import {
+  isAccountLocked,
+  recordFailedLogin,
+  resetFailedLogins,
+  formatLockoutMessage,
+} from '@/lib/security/account-lockout';
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma) as any,
@@ -31,12 +37,27 @@ export const authOptions: NextAuthOptions = {
           throw new Error('Email and password required');
         }
 
+        const email = credentials.email.toLowerCase();
+
+        // Check if account is locked
+        const lockStatus = await isAccountLocked(email);
+        if (lockStatus.locked) {
+          throw new Error(formatLockoutMessage(lockStatus.remainingMs || 0));
+        }
+
         const user = await prisma.user.findUnique({
-          where: { email: credentials.email },
+          where: { email },
         });
 
         if (!user || !user.hashedPassword) {
+          // Record failed attempt (even for non-existent users to prevent enumeration timing)
+          await recordFailedLogin(email);
           throw new Error('Invalid credentials');
+        }
+
+        // Check if user is banned
+        if (user.isBanned) {
+          throw new Error('Account suspended. Contact support.');
         }
 
         const isValid = await bcrypt.compare(
@@ -45,8 +66,24 @@ export const authOptions: NextAuthOptions = {
         );
 
         if (!isValid) {
-          throw new Error('Invalid credentials');
+          // Record failed login attempt
+          const result = await recordFailedLogin(email);
+          if (result.locked) {
+            throw new Error(formatLockoutMessage(15 * 60 * 1000)); // 15 minutes
+          }
+          throw new Error(`Invalid credentials. ${result.remainingAttempts} attempts remaining.`);
         }
+
+        // Reset failed login counter on successful login
+        await resetFailedLogins(email);
+
+        // Update last login info
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            lastLoginAt: new Date(),
+          },
+        });
 
         return {
           id: user.id,

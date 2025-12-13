@@ -13,6 +13,7 @@ import {
   PRO_LEVEL_REQUIREMENTS,
   DIFFICULTY_CONFIG,
 } from '@/lib/challenges/constants';
+import { useLanguage, LanguageSwitcher } from '@/lib/i18n';
 
 // ==========================================
 // ANIMATED COUNTER COMPONENT
@@ -115,6 +116,7 @@ function FloatingIcons() {
 // MAIN LANDING PAGE
 // ==========================================
 export default function LandingPage() {
+  const { t } = useLanguage();
   const [difficulty, setDifficulty] = useState<'beginner' | 'pro'>('beginner');
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   const [selectedTier, setSelectedTier] = useState<typeof BEGINNER_CHALLENGE_TIERS[number] | typeof PRO_CHALLENGE_TIERS[number] | null>(null);
@@ -195,32 +197,33 @@ export default function LandingPage() {
             {/* Navigation Links */}
             <nav className="hidden md:flex items-center gap-8">
               <a href="#how-it-works" className="text-sm font-medium text-zinc-400 hover:text-white transition-colors">
-                How it Works
+                {t.nav.howItWorks}
               </a>
               <a href="#reviews" className="text-sm font-medium text-zinc-400 hover:text-white transition-colors">
-                Reviews
+                {t.nav.reviews}
               </a>
               <a href="#challenges" className="text-sm font-medium text-zinc-400 hover:text-white transition-colors">
-                Challenges
+                {t.nav.challenges}
               </a>
               <a href="#benefits" className="text-sm font-medium text-zinc-400 hover:text-white transition-colors">
-                Benefits
+                {t.nav.benefits}
               </a>
             </nav>
 
             {/* CTA Buttons */}
             <div className="flex items-center gap-3">
+              <LanguageSwitcher className="hidden sm:flex" />
               <a
                 href="/login"
                 className="hidden sm:inline-flex px-4 py-2 text-sm font-medium text-zinc-300 hover:text-white transition-colors"
               >
-                Log In
+                {t.nav.login}
               </a>
               <a
                 href="#challenges"
                 className="px-4 py-2 rounded-lg text-sm font-semibold bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-teal-400 transition-all duration-300 shadow-lg shadow-teal-500/20 hover:shadow-teal-500/30"
               >
-                Get Started
+                {t.nav.register}
               </a>
             </div>
           </div>
@@ -262,21 +265,21 @@ export default function LandingPage() {
           {/* Badge */}
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-teal-500/10 border border-teal-500/30 mb-8 animate-fade-in">
             <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse" />
-            <span className="text-sm text-teal-400 font-medium">Join 2,500+ Active Players</span>
+            <span className="text-sm text-teal-400 font-medium">{t.landing.hero.badge}</span>
           </div>
 
           {/* Main Headline */}
           <h1 className="text-5xl md:text-7xl font-black mb-6 leading-tight animate-slide-up">
-            Turn Win Streaks
+            {t.landing.hero.title1}
             <br />
             <span className="bg-gradient-to-r from-teal-400 via-teal-300 to-emerald-400 bg-clip-text text-transparent">
-              Into Real Rewards
+              {t.landing.hero.title2}
             </span>
           </h1>
 
           {/* Subheadline */}
           <p className="text-xl md:text-2xl text-zinc-400 mb-4 max-w-2xl mx-auto animate-slide-up animation-delay-200">
-            Build consecutive wins. Complete 4 levels. Earn up to
+            {t.landing.hero.subtitle}
           </p>
 
           {/* Animated Payout Counter */}
@@ -293,7 +296,7 @@ export default function LandingPage() {
               <div className="absolute inset-0 bg-gradient-to-r from-teal-600 to-teal-500 group-hover:from-teal-500 group-hover:to-teal-400 transition-all duration-300" />
               <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300" style={{ boxShadow: '0 0 40px rgba(20, 184, 166, 0.5)' }} />
               <span className="relative flex items-center gap-2">
-                Start Your Challenge
+                {t.landing.hero.cta}
                 <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                 </svg>
@@ -304,7 +307,7 @@ export default function LandingPage() {
               href="#how-it-works"
               className="px-8 py-4 rounded-xl font-bold text-lg border border-zinc-700 hover:border-teal-500/50 hover:bg-teal-500/5 transition-all duration-300"
             >
-              See How It Works
+              {t.landing.hero.ctaSecondary}
             </a>
           </div>
 
@@ -324,10 +327,10 @@ export default function LandingPage() {
         <div className="max-w-6xl mx-auto px-4">
           <div className="flex flex-wrap justify-center gap-8 md:gap-16">
             {[
-              { value: '2M+', label: 'Paid Out', prefix: '€' },
-              { value: '10K+', label: 'Challenges Completed' },
-              { value: '7', label: 'AI Models' },
-              { value: '45', label: 'Day Access' },
+              { value: '2M+', label: t.landing.socialProof.paidOut, prefix: '€' },
+              { value: '10K+', label: t.landing.socialProof.challengesCompleted },
+              { value: '7', label: t.landing.socialProof.aiModels },
+              { value: '45', label: t.landing.socialProof.dayAccess },
             ].map((stat, i) => (
               <div key={i} className="text-center">
                 <div className="text-2xl md:text-3xl font-bold text-white">
@@ -348,10 +351,10 @@ export default function LandingPage() {
           {/* Section Header */}
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-5xl font-black mb-4">
-              How It <span className="text-teal-400">Works</span>
+              {t.landing.howItWorks.title} <span className="text-teal-400">{t.landing.howItWorks.titleHighlight}</span>
             </h2>
             <p className="text-zinc-400 text-lg max-w-2xl mx-auto">
-              Three simple steps to start earning rewards from your sports knowledge
+              {t.landing.howItWorks.subtitle}
             </p>
           </div>
 
@@ -375,7 +378,7 @@ export default function LandingPage() {
                   {/* Corner Decorations */}
                   <div className="absolute top-4 left-4 flex items-center gap-2 text-zinc-500 text-sm">
                     <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                    <span>Watch Demo</span>
+                    <span>{t.landing.howItWorks.watchDemo}</span>
                   </div>
                   <div className="absolute bottom-4 right-4 text-zinc-500 text-sm">
                     2:30
@@ -408,7 +411,7 @@ export default function LandingPage() {
 
               {/* Video Caption */}
               <p className="text-center text-zinc-500 text-sm mt-4">
-                See how easy it is to start earning rewards with Zalogche
+                {t.landing.howItWorks.videoCaption}
               </p>
             </div>
           </div>
@@ -422,20 +425,20 @@ export default function LandingPage() {
               {
                 step: '01',
                 icon: '🎮',
-                title: 'Choose Your Challenge',
-                description: 'Pick your account size (€1K - €100K) and difficulty mode (Beginner or Pro)',
+                title: t.landing.howItWorks.step1.title,
+                description: t.landing.howItWorks.step1.description,
               },
               {
                 step: '02',
                 icon: '🔥',
-                title: 'Build Your Streak',
-                description: 'Win consecutive bets at minimum odds. Each streak milestone unlocks a reward level',
+                title: t.landing.howItWorks.step2.title,
+                description: t.landing.howItWorks.step2.description,
               },
               {
                 step: '03',
                 icon: '💰',
-                title: 'Collect Rewards',
-                description: 'Get paid instantly at each level. Keep your rewards even if your streak breaks later',
+                title: t.landing.howItWorks.step3.title,
+                description: t.landing.howItWorks.step3.description,
               },
             ].map((item, i) => (
               <div
@@ -472,10 +475,10 @@ export default function LandingPage() {
           {/* Section Header */}
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-5xl font-black mb-4">
-              What Players Are <span className="text-teal-400">Saying</span>
+              {t.landing.reviews.title} <span className="text-teal-400">{t.landing.reviews.titleHighlight}</span>
             </h2>
             <p className="text-zinc-400 text-lg max-w-2xl mx-auto">
-              Join thousands of players already winning with Zalogche
+              {t.landing.reviews.subtitle}
             </p>
           </div>
 
@@ -560,7 +563,7 @@ export default function LandingPage() {
                   </div>
                   <div className="text-right">
                     <div className="text-emerald-400 font-bold">{testimonial.reward}</div>
-                    <div className="text-[10px] text-zinc-500">EARNED</div>
+                    <div className="text-[10px] text-zinc-500">{t.landing.reviews.earned}</div>
                   </div>
                 </div>
               </div>
@@ -570,10 +573,10 @@ export default function LandingPage() {
           {/* Trust Stats */}
           <div className="mt-16 grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
-              { value: '2,500+', label: 'Active Players' },
-              { value: '€850K+', label: 'Total Rewards Paid' },
-              { value: '92%', label: 'Payout Rate' },
-              { value: '4.8/5', label: 'Player Rating' },
+              { value: '2,500+', label: t.landing.reviews.activePlayers },
+              { value: '€850K+', label: t.landing.reviews.totalRewardsPaid },
+              { value: '92%', label: t.landing.reviews.payoutRate },
+              { value: '4.8/5', label: t.landing.reviews.playerRating },
             ].map((stat, i) => (
               <div key={i} className="text-center p-4">
                 <div className="text-2xl md:text-3xl font-black text-white mb-1">{stat.value}</div>
@@ -592,10 +595,10 @@ export default function LandingPage() {
           {/* Section Header */}
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-5xl font-black mb-4">
-              Choose Your <span className="text-teal-400">Challenge</span>
+              {t.landing.challenges.title} <span className="text-teal-400">{t.landing.challenges.titleHighlight}</span>
             </h2>
             <p className="text-zinc-400 text-lg max-w-2xl mx-auto mb-8">
-              6 account sizes, 2 difficulty modes. Pick what suits your style.
+              {t.landing.challenges.subtitle}
             </p>
 
             {/* Difficulty Toggle */}
@@ -608,7 +611,7 @@ export default function LandingPage() {
                     : 'text-zinc-400 hover:text-white'
                 }`}
               >
-                🎯 Beginner
+                🎯 {t.landing.challenges.beginner}
               </button>
               <button
                 onClick={() => setDifficulty('pro')}
@@ -618,7 +621,7 @@ export default function LandingPage() {
                     : 'text-zinc-400 hover:text-white'
                 }`}
               >
-                ⚡ Pro
+                ⚡ {t.landing.challenges.pro}
               </button>
             </div>
 
@@ -645,20 +648,20 @@ export default function LandingPage() {
                   {/* Popular Badge */}
                   {(isPopular || isBestValue) && (
                     <div className="absolute -top-0 left-1/2 -translate-x-1/2 px-4 py-1 bg-gradient-to-r from-amber-500 to-orange-500 rounded-b-lg text-xs font-bold text-black uppercase tracking-wide">
-                      {isPopular ? 'MOST POPULAR' : 'BEST VALUE'}
+                      {isPopular ? t.landing.challenges.mostPopular : t.landing.challenges.bestValue}
                     </div>
                   )}
 
                   {/* Card Header */}
                   <div className="text-center mb-4 mt-4">
                     <div className="text-4xl font-black text-white mb-1">€{tier.size.toLocaleString()}</div>
-                    <div className="text-sm font-bold text-teal-400 tracking-widest uppercase">CHALLENGE</div>
+                    <div className="text-sm font-bold text-teal-400 tracking-widest uppercase">{t.landing.challenges.challenge}</div>
                   </div>
 
                   {/* Level Rewards Grid */}
                   <div className="bg-zinc-900/50 rounded-xl p-4 mb-4">
                     <div className="text-xs text-zinc-400 text-center mb-3 uppercase tracking-wider">
-                      Rewards Per Level ({difficulty === 'pro' ? 'Pro' : 'Beginner'})
+                      {t.landing.challenges.rewardsPerLevel} ({difficulty === 'pro' ? t.landing.challenges.pro : t.landing.challenges.beginner})
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       {levels.map((lvl, i) => (
@@ -674,14 +677,14 @@ export default function LandingPage() {
 
                   {/* Total Potential */}
                   <div className="flex items-center justify-between px-3 py-2 bg-teal-500/10 rounded-lg border border-teal-500/30 mb-4">
-                    <span className="text-zinc-400 text-sm">Max Payout (All 4)</span>
+                    <span className="text-zinc-400 text-sm">{t.landing.challenges.maxPayout}</span>
                     <span className="text-teal-400 font-bold">€{total.toLocaleString()}</span>
                   </div>
 
                   {/* Meta Info */}
                   <div className="flex items-center justify-between text-xs text-zinc-500 mb-4">
-                    <span>⏱️ 45 days</span>
-                    <span>🔄 Reset: €{tier.resetFee}</span>
+                    <span>⏱️ 45 {t.landing.challenges.days}</span>
+                    <span>🔄 {t.landing.challenges.reset}: €{tier.resetFee}</span>
                   </div>
 
                   {/* Buy Button */}
@@ -698,7 +701,7 @@ export default function LandingPage() {
                         : 'bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-teal-400 shadow-teal-500/25 group-hover:shadow-teal-500/40'
                     }`}
                   >
-                    💳 START - €{tier.cost}
+                    💳 {t.landing.challenges.start} - €{tier.cost}
                   </button>
                 </div>
               );
@@ -720,10 +723,10 @@ export default function LandingPage() {
           {/* Section Header */}
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-5xl font-black mb-4">
-              7 AI Models. <span className="text-teal-400">One Winning Edge.</span>
+              {t.landing.aiSwarm.title} <span className="text-teal-400">{t.landing.aiSwarm.titleHighlight}</span>
             </h2>
             <p className="text-zinc-400 text-lg max-w-2xl mx-auto">
-              Our swarm intelligence analyzes every match from 7 different perspectives to give you the best insights
+              {t.landing.aiSwarm.subtitle}
             </p>
           </div>
 
@@ -734,8 +737,8 @@ export default function LandingPage() {
               <div className="absolute inset-0 rounded-full bg-gradient-to-br from-teal-500/20 to-emerald-500/20 animate-pulse" />
               <div className="absolute inset-2 rounded-full bg-[#0A0A0A] flex items-center justify-center flex-col">
                 <span className="text-3xl mb-1">🧠</span>
-                <span className="text-xs font-bold text-teal-400">SWARM</span>
-                <span className="text-xs text-zinc-500">CONSENSUS</span>
+                <span className="text-xs font-bold text-teal-400">{t.landing.aiSwarm.swarm}</span>
+                <span className="text-xs text-zinc-500">{t.landing.aiSwarm.consensus}</span>
               </div>
             </div>
 
@@ -815,10 +818,10 @@ export default function LandingPage() {
           {/* Section Header */}
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-5xl font-black mb-4">
-              Why <span className="text-teal-400">Zalogche</span>?
+              {t.landing.benefits.title} <span className="text-teal-400">{t.landing.benefits.titleHighlight}</span>?
             </h2>
             <p className="text-zinc-400 text-lg max-w-2xl mx-auto">
-              We&apos;re not just another betting platform. Here&apos;s what makes us different.
+              {t.landing.benefits.subtitle}
             </p>
           </div>
 
@@ -827,33 +830,33 @@ export default function LandingPage() {
             {[
               {
                 icon: '🎯',
-                title: 'Keep What You Earn',
-                description: 'Completed level rewards are yours forever, even if your streak breaks later',
+                title: t.landing.benefits.keepEarnings.title,
+                description: t.landing.benefits.keepEarnings.description,
               },
               {
                 icon: '⚡',
-                title: '5 Challenges At Once',
-                description: 'Run multiple challenges simultaneously - one bet counts for all active challenges',
+                title: t.landing.benefits.multipleChallenges.title,
+                description: t.landing.benefits.multipleChallenges.description,
               },
               {
                 icon: '🤖',
-                title: 'AI-Powered Analysis',
-                description: '7 AI models analyze every match to help you make informed decisions',
+                title: t.landing.benefits.aiPowered.title,
+                description: t.landing.benefits.aiPowered.description,
               },
               {
                 icon: '💰',
-                title: 'Instant Payouts',
-                description: 'Withdraw your rewards anytime via Bank Transfer, PayPal, or Crypto',
+                title: t.landing.benefits.instantPayouts.title,
+                description: t.landing.benefits.instantPayouts.description,
               },
               {
                 icon: '🔄',
-                title: 'Reset & Continue',
-                description: 'Challenge expired? Reset at 50% of the original cost and keep building',
+                title: t.landing.benefits.resetContinue.title,
+                description: t.landing.benefits.resetContinue.description,
               },
               {
                 icon: '📊',
-                title: 'Transparent Rewards',
-                description: 'Know exactly what you\'ll earn at each level before you start',
+                title: t.landing.benefits.transparentRewards.title,
+                description: t.landing.benefits.transparentRewards.description,
               },
             ].map((benefit, i) => (
               <div
@@ -879,7 +882,7 @@ export default function LandingPage() {
           {/* Section Header */}
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-5xl font-black mb-4">
-              Zalogche vs <span className="text-zinc-500">Regular Betting</span>
+              {t.landing.comparison.title} <span className="text-zinc-500">{t.landing.comparison.titleHighlight}</span>
             </h2>
           </div>
 
@@ -887,21 +890,21 @@ export default function LandingPage() {
           <div className="overflow-hidden rounded-2xl border border-zinc-800/50">
             {/* Header */}
             <div className="grid grid-cols-3 bg-[#111111]">
-              <div className="p-4 text-zinc-400 font-medium">Feature</div>
+              <div className="p-4 text-zinc-400 font-medium">{t.landing.comparison.feature}</div>
               <div className="p-4 text-center font-bold text-teal-400 bg-teal-500/10 border-x border-teal-500/20">
-                Zalogche
+                {t.landing.comparison.zalogche}
               </div>
-              <div className="p-4 text-center font-medium text-zinc-500">Regular Betting</div>
+              <div className="p-4 text-center font-medium text-zinc-500">{t.landing.comparison.regularBetting}</div>
             </div>
 
             {/* Rows */}
             {[
-              { feature: 'Keep rewards after losing', zalogche: true, regular: false },
-              { feature: 'Fixed milestone payouts', zalogche: true, regular: false },
-              { feature: 'AI analysis included', zalogche: true, regular: false },
-              { feature: 'Multiple concurrent challenges', zalogche: true, regular: false },
-              { feature: 'Transparent earning structure', zalogche: true, regular: false },
-              { feature: '45-day challenge window', zalogche: true, regular: 'N/A' },
+              { feature: t.landing.comparison.keepRewards, zalogche: true, regular: false },
+              { feature: t.landing.comparison.fixedPayouts, zalogche: true, regular: false },
+              { feature: t.landing.comparison.aiAnalysis, zalogche: true, regular: false },
+              { feature: t.landing.comparison.multipleChallenges, zalogche: true, regular: false },
+              { feature: t.landing.comparison.transparentEarnings, zalogche: true, regular: false },
+              { feature: t.landing.comparison.challengeWindow, zalogche: true, regular: t.landing.comparison.na },
             ].map((row, i) => (
               <div key={i} className={`grid grid-cols-3 ${i % 2 === 0 ? 'bg-[#0D0D0D]' : 'bg-[#111111]'}`}>
                 <div className="p-4 text-zinc-300">{row.feature}</div>
@@ -939,20 +942,20 @@ export default function LandingPage() {
 
         <div className="relative max-w-4xl mx-auto px-4 text-center">
           <h2 className="text-4xl md:text-6xl font-black mb-6">
-            Ready to Start <span className="text-teal-400">Winning</span>?
+            {t.landing.cta.title} <span className="text-teal-400">{t.landing.cta.titleHighlight}</span>?
           </h2>
           <p className="text-xl text-zinc-400 mb-4">
-            Choose your challenge, build your streak, and earn real rewards.
+            {t.landing.cta.subtitle}
           </p>
           <p className="text-lg text-zinc-500 mb-8">
-            Starting from just <span className="text-amber-400 font-bold">$20</span>
+            {t.landing.cta.startingFrom} <span className="text-amber-400 font-bold">$20</span>
           </p>
 
           <a
             href="#challenges"
             className="inline-flex items-center gap-3 px-10 py-5 rounded-2xl font-bold text-xl bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-teal-400 transition-all duration-300 hover:scale-105 shadow-xl shadow-teal-500/25"
           >
-            Start Your Challenge Now
+            {t.landing.cta.button}
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
             </svg>
@@ -964,19 +967,19 @@ export default function LandingPage() {
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
               </svg>
-              Secure Payments
+              {t.landing.cta.securePayments}
             </span>
             <span className="flex items-center gap-2">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
               </svg>
-              Multiple Payout Options
+              {t.landing.cta.multiplePayoutOptions}
             </span>
             <span className="flex items-center gap-2">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
               </svg>
-              Trusted Platform
+              {t.landing.cta.trustedPlatform}
             </span>
           </div>
         </div>
@@ -1012,7 +1015,7 @@ export default function LandingPage() {
                   </button>
                 )}
                 <h2 className="text-xl font-bold">
-                  {purchaseStep === 'select' ? 'Choose Your Challenge' : 'Quick Checkout'}
+                  {purchaseStep === 'select' ? t.landing.modal.chooseChallenge : t.landing.modal.quickCheckout}
                 </h2>
               </div>
               <button
@@ -1039,7 +1042,7 @@ export default function LandingPage() {
                             : 'text-zinc-400 hover:text-white'
                         }`}
                       >
-                        🎯 Beginner
+                        🎯 {t.landing.challenges.beginner}
                       </button>
                       <button
                         onClick={() => setSelectedDifficulty('pro')}
@@ -1049,7 +1052,7 @@ export default function LandingPage() {
                             : 'text-zinc-400 hover:text-white'
                         }`}
                       >
-                        ⚡ Pro
+                        ⚡ {t.landing.challenges.pro}
                       </button>
                     </div>
                   </div>
@@ -1075,13 +1078,13 @@ export default function LandingPage() {
                         >
                           {isPopular && (
                             <div className="absolute -top-2 left-1/2 -translate-x-1/2 px-2 py-0.5 bg-amber-500 rounded text-[10px] font-bold text-black">
-                              POPULAR
+                              {t.landing.modal.popular}
                             </div>
                           )}
                           <div className="text-2xl font-black mb-1">€{tier.size.toLocaleString()}</div>
-                          <div className="text-xs text-zinc-500 mb-2">Challenge</div>
+                          <div className="text-xs text-zinc-500 mb-2">{t.landing.modal.challenge}</div>
                           <div className="text-sm text-emerald-400 font-semibold mb-1">
-                            Max: €{total.toLocaleString()}
+                            {t.landing.modal.max}: €{total.toLocaleString()}
                           </div>
                           <div className={`text-lg font-bold ${selectedDifficulty === 'pro' ? 'text-amber-400' : 'text-teal-400'}`}>
                             €{tier.cost}
@@ -1102,11 +1105,11 @@ export default function LandingPage() {
                           <div>
                             <div className="text-2xl font-black">€{selectedTier.size.toLocaleString()}</div>
                             <div className="text-sm text-zinc-500">
-                              {selectedDifficulty === 'pro' ? '⚡ Pro' : '🎯 Beginner'} Challenge
+                              {selectedDifficulty === 'pro' ? `⚡ ${t.landing.challenges.pro}` : `🎯 ${t.landing.challenges.beginner}`} {t.landing.modal.challenge}
                             </div>
                           </div>
                           <div className="text-right">
-                            <div className="text-sm text-zinc-500">Total</div>
+                            <div className="text-sm text-zinc-500">{t.landing.modal.total}</div>
                             <div className={`text-2xl font-bold ${selectedDifficulty === 'pro' ? 'text-amber-400' : 'text-teal-400'}`}>
                               €{selectedTier.cost}
                             </div>
@@ -1129,29 +1132,29 @@ export default function LandingPage() {
                       {/* Quick Buy Form */}
                       <div className="space-y-4">
                         <div>
-                          <label className="block text-sm font-medium text-zinc-400 mb-1">Email</label>
+                          <label className="block text-sm font-medium text-zinc-400 mb-1">{t.landing.modal.email}</label>
                           <input
                             type="email"
                             value={formData.email}
                             onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                            placeholder="your@email.com"
+                            placeholder={t.landing.modal.emailPlaceholder}
                             className="w-full px-4 py-3 rounded-xl bg-zinc-900 border border-zinc-800 focus:border-teal-500 focus:outline-none transition-colors"
                           />
                         </div>
 
                         <div>
-                          <label className="block text-sm font-medium text-zinc-400 mb-1">Full Name</label>
+                          <label className="block text-sm font-medium text-zinc-400 mb-1">{t.landing.modal.fullName}</label>
                           <input
                             type="text"
                             value={formData.name}
                             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                            placeholder="John Doe"
+                            placeholder={t.landing.modal.fullNamePlaceholder}
                             className="w-full px-4 py-3 rounded-xl bg-zinc-900 border border-zinc-800 focus:border-teal-500 focus:outline-none transition-colors"
                           />
                         </div>
 
                         <div>
-                          <label className="block text-sm font-medium text-zinc-400 mb-1">Card Number</label>
+                          <label className="block text-sm font-medium text-zinc-400 mb-1">{t.landing.modal.cardNumber}</label>
                           <input
                             type="text"
                             value={formData.cardNumber}
@@ -1164,7 +1167,7 @@ export default function LandingPage() {
 
                         <div className="grid grid-cols-2 gap-4">
                           <div>
-                            <label className="block text-sm font-medium text-zinc-400 mb-1">Expiry</label>
+                            <label className="block text-sm font-medium text-zinc-400 mb-1">{t.landing.modal.expiry}</label>
                             <input
                               type="text"
                               value={formData.expiry}
@@ -1179,7 +1182,7 @@ export default function LandingPage() {
                             />
                           </div>
                           <div>
-                            <label className="block text-sm font-medium text-zinc-400 mb-1">CVC</label>
+                            <label className="block text-sm font-medium text-zinc-400 mb-1">{t.landing.modal.cvc}</label>
                             <input
                               type="text"
                               value={formData.cvc}
@@ -1208,10 +1211,10 @@ export default function LandingPage() {
                               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                             </svg>
-                            Processing...
+                            {t.landing.modal.processing}
                           </span>
                         ) : (
-                          <span>💳 Pay €{selectedTier.cost} & Start Challenge</span>
+                          <span>💳 {t.landing.modal.pay} €{selectedTier.cost} {t.landing.modal.startChallenge}</span>
                         )}
                       </button>
 
@@ -1220,7 +1223,7 @@ export default function LandingPage() {
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                         </svg>
-                        Secure payment powered by Stripe
+                        {t.landing.modal.securePayment}
                       </div>
                     </div>
                   )}
@@ -1241,12 +1244,12 @@ export default function LandingPage() {
               <span className="text-teal-400">Zalogche</span>
             </div>
             <div className="text-sm text-zinc-500">
-              © 2024 Zalogche. All rights reserved.
+              {t.landing.footer.copyright}
             </div>
             <div className="flex items-center gap-6 text-sm text-zinc-500">
-              <a href="#" className="hover:text-teal-400 transition-colors">Terms</a>
-              <a href="#" className="hover:text-teal-400 transition-colors">Privacy</a>
-              <a href="#" className="hover:text-teal-400 transition-colors">Support</a>
+              <a href="#" className="hover:text-teal-400 transition-colors">{t.landing.footer.terms}</a>
+              <a href="#" className="hover:text-teal-400 transition-colors">{t.landing.footer.privacy}</a>
+              <a href="#" className="hover:text-teal-400 transition-colors">{t.landing.footer.support}</a>
             </div>
           </div>
         </div>

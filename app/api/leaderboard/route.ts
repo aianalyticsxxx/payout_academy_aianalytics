@@ -7,6 +7,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/config';
 import { prisma } from '@/lib/db/prisma';
 import { getCached, setCache } from '@/lib/redis';
+import { safePagination } from '@/lib/security/pagination';
 
 const CACHE_KEY = 'global-leaderboard';
 const CACHE_TTL = 300; // 5 minutes
@@ -18,7 +19,7 @@ const CACHE_TTL = 300; // 5 minutes
 export async function GET(req: NextRequest) {
   try {
     const searchParams = req.nextUrl.searchParams;
-    const limit = parseInt(searchParams.get('limit') || '100');
+    const { limit } = safePagination(searchParams); // Bounded pagination
     const type = searchParams.get('type') || 'global'; // global, ai
 
     if (type === 'ai') {

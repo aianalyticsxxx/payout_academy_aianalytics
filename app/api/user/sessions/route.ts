@@ -7,7 +7,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/config';
 import { prisma } from '@/lib/db/prisma';
 import { headers } from 'next/headers';
-import { randomUUID } from 'crypto';
+import { randomUUID, randomBytes } from 'crypto';
 
 // Parse user agent to get browser/OS info
 function parseUserAgent(ua: string | null) {
@@ -94,8 +94,8 @@ export async function POST(req: NextRequest) {
 
     const { browser, os, device } = parseUserAgent(userAgent);
 
-    // Generate unique session token
-    const sessionToken = `sess_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+    // Generate cryptographically secure session token
+    const sessionToken = `sess_${randomUUID()}_${randomBytes(8).toString('hex')}`;
 
     // Create session record
     const userSession = await prisma.userSession.create({

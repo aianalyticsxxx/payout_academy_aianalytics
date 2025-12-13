@@ -1,0 +1,66 @@
+# ==========================================
+# CODERABBIT CONFIGURATION
+# ==========================================
+# AI-powered code review on every PR
+# Docs: https://docs.coderabbit.ai/
+
+language: en-US
+
+reviews:
+  # Enable auto-review on all PRs
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - main
+      - develop
+
+  # Review settings
+  profile: assertive
+  request_changes_workflow: true
+  high_level_summary: true
+  poem: false
+  review_status: true
+  collapse_walkthrough: false
+
+  # Security-focused review
+  path_instructions:
+    - path: "**/*.ts"
+      instructions: |
+        Focus on:
+        - SQL injection vulnerabilities
+        - XSS attack vectors
+        - Authentication/authorization issues
+        - Secrets exposure
+        - Input validation
+        - Rate limiting
+    - path: "app/api/**"
+      instructions: |
+        API routes must have:
+        - Authentication checks
+        - Input validation with Zod
+        - Rate limiting
+        - Proper error handling without leaking internals
+    - path: "prisma/**"
+      instructions: |
+        Check for:
+        - RLS policy requirements
+        - Proper indexes
+        - Cascade delete implications
+    - path: "lib/auth/**"
+      instructions: |
+        Critical security code - review thoroughly for:
+        - Session hijacking
+        - CSRF protection
+        - Secure cookie settings
+
+# Chat settings
+chat:
+  auto_reply: true
+
+# Ignore patterns
+path_filters:
+  - "!node_modules/**"
+  - "!.next/**"
+  - "!coverage/**"
+  - "!dist/**"

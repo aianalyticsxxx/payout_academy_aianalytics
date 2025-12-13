@@ -8,11 +8,29 @@ import { prisma } from '@/lib/db/prisma';
 import { getEventScores, getSportKey } from '@/lib/sports/odds-api';
 import { processChallengeSettlement } from '@/lib/challenges/challenge-service';
 
-// Verify cron secret
+// Verify cron secret with timing-safe comparison
 function verifyCronSecret(req: NextRequest): boolean {
   const authHeader = req.headers.get('authorization');
-  if (!process.env.CRON_SECRET) return true; // Allow if no secret configured
-  return authHeader === `Bearer ${process.env.CRON_SECRET}`;
+
+  // DENY by default if no secret configured (security first)
+  if (!process.env.CRON_SECRET) {
+    console.error('[Cron] CRON_SECRET not configured - denying access');
+    return false;
+  }
+
+  // Use timing-safe comparison to prevent timing attacks
+  const expected = `Bearer ${process.env.CRON_SECRET}`;
+  if (!authHeader || authHeader.length !== expected.length) {
+    return false;
+  }
+
+  // Constant-time comparison
+  const { timingSafeEqual } = require('crypto');
+  try {
+    return timingSafeEqual(Buffer.from(authHeader), Buffer.from(expected));
+  } catch {
+    return false;
+  }
 }
 
 export async function GET(req: NextRequest) {

@@ -8,28 +8,29 @@ import { authOptions } from '@/lib/auth/config';
 import { prisma } from '@/lib/db/prisma';
 import { z } from 'zod';
 import { linkBetToChallenge, processChallengeSettlement, getActiveChallenges } from '@/lib/challenges/challenge-service';
+import { safePagination, paginationMeta } from '@/lib/security/pagination';
 
 // ==========================================
 // VALIDATION SCHEMAS
 // ==========================================
 
 const CreateBetSchema = z.object({
-  sport: z.string().min(1),
-  league: z.string().optional(),
-  matchup: z.string().min(1),
-  betType: z.string().min(1),
-  selection: z.string().min(1),
-  odds: z.string().min(1),
-  stake: z.number().positive(),
-  eventId: z.string().optional(),
-  notes: z.string().optional(),
-  challengeIds: z.array(z.string()).optional(), // Selected challenge IDs to link to
+  sport: z.string().min(1).max(100),
+  league: z.string().max(200).optional(),
+  matchup: z.string().min(1).max(500),
+  betType: z.string().min(1).max(100),
+  selection: z.string().min(1).max(500),
+  odds: z.string().min(1).max(20),
+  stake: z.number().positive().max(100000), // Max €100k stake
+  eventId: z.string().max(100).optional(),
+  notes: z.string().max(1000).optional(), // Limit notes to 1000 chars
+  challengeIds: z.array(z.string()).max(10).optional(), // Max 10 challenges per bet
 });
 
 const UpdateBetSchema = z.object({
   id: z.string(),
   result: z.enum(['pending', 'won', 'lost', 'push']).optional(),
-  notes: z.string().optional(),
+  notes: z.string().max(1000).optional(), // Limit notes to 1000 chars
 });
 
 // ==========================================
@@ -147,11 +148,12 @@ export async function GET(req: NextRequest) {
 
     const userId = (session.user as any).id;
     const searchParams = req.nextUrl.searchParams;
-    
+
     const result = searchParams.get('result');
     const sport = searchParams.get('sport');
-    const limit = parseInt(searchParams.get('limit') || '100');
-    const offset = parseInt(searchParams.get('offset') || '0');
+
+    // Use safe pagination with bounds checking
+    const { limit, offset } = safePagination(searchParams);
 
     const bets = await prisma.bet.findMany({
       where: {
@@ -174,9 +176,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       bets,
-      total,
-      limit,
-      offset,
+      ...paginationMeta(total, { limit, offset }),
     });
     
   } catch (error) {

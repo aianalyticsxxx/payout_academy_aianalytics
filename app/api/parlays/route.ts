@@ -7,6 +7,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/config';
 import { prisma } from '@/lib/db/prisma';
 import { z } from 'zod';
+import { safePagination, paginationMeta } from '@/lib/security/pagination';
 
 // ==========================================
 // VALIDATION SCHEMAS
@@ -121,8 +122,7 @@ export async function GET(req: NextRequest) {
     const searchParams = req.nextUrl.searchParams;
 
     const result = searchParams.get('result');
-    const limit = parseInt(searchParams.get('limit') || '50');
-    const offset = parseInt(searchParams.get('offset') || '0');
+    const { limit, offset } = safePagination(searchParams); // Bounded pagination
 
     const parlays = await prisma.parlay.findMany({
       where: {
@@ -242,7 +242,7 @@ export async function PATCH(req: NextRequest) {
       // Update individual leg
       const { parlayId, legId, result } = UpdateLegSchema.parse(body);
 
-      // Verify ownership
+      // Verify ownership AND that leg belongs to this parlay
       const parlay = await prisma.parlay.findFirst({
         where: { id: parlayId, userId },
         include: { legs: true },
@@ -252,7 +252,13 @@ export async function PATCH(req: NextRequest) {
         return NextResponse.json({ error: 'Parlay not found' }, { status: 404 });
       }
 
-      // Update the leg
+      // SECURITY: Verify the leg belongs to this parlay (prevents IDOR)
+      const legBelongsToParlay = parlay.legs.some((leg) => leg.id === legId);
+      if (!legBelongsToParlay) {
+        return NextResponse.json({ error: 'Leg not found in this parlay' }, { status: 404 });
+      }
+
+      // Update the leg (now verified to belong to user's parlay)
       await prisma.parlayLeg.update({
         where: { id: legId },
         data: { result },

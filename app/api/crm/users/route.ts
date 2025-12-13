@@ -5,14 +5,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth/helpers';
 import { getUserAnalytics } from '@/lib/crm/analytics';
+import { safePagePagination } from '@/lib/security/pagination';
 
 export async function GET(req: NextRequest) {
   try {
     await requireAdmin();
 
     const { searchParams } = new URL(req.url);
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '50');
+    const { limit, page } = safePagePagination(searchParams); // Bounded pagination
     const search = searchParams.get('search') || '';
     const tier = searchParams.get('tier') || '';
     const difficulty = searchParams.get('difficulty') || '';

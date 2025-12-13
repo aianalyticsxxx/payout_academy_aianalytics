@@ -7,6 +7,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/config';
 import { prisma } from '@/lib/db/prisma';
 import { z } from 'zod';
+import { safePagination, paginationMeta } from '@/lib/security/pagination';
 
 // ==========================================
 // VALIDATION SCHEMAS
@@ -72,11 +73,11 @@ export async function GET(req: NextRequest) {
     }
 
     const userId = (session.user as any).id;
-    console.log('[Payouts API] userId:', userId, 'email:', (session.user as any).email);
     const searchParams = req.nextUrl.searchParams;
     const status = searchParams.get('status');
-    const limit = parseInt(searchParams.get('limit') || '50');
-    const offset = parseInt(searchParams.get('offset') || '0');
+
+    // Use safe pagination with bounds checking
+    const { limit, offset } = safePagination(searchParams);
 
     const payouts = await prisma.payoutRequest.findMany({
       where: {
