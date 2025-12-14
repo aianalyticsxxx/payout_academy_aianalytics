@@ -168,15 +168,23 @@ function LoginForm() {
   const { t } = useLanguage();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = getSafeCallbackUrl(searchParams.get('callbackUrl'));
-  const error = searchParams.get('error');
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState(error || '');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [callbackUrl, setCallbackUrl] = useState('/dashboard');
+  const [isClient, setIsClient] = useState(false);
   const turnstileTokenRef = useRef<string | null>(null);
+
+  // Handle client-side initialization
+  useEffect(() => {
+    setIsClient(true);
+    const error = searchParams.get('error');
+    if (error) setErrorMessage(error);
+    setCallbackUrl(getSafeCallbackUrl(searchParams.get('callbackUrl')));
+  }, [searchParams]);
 
   // SECURITY: Only remember email, NEVER store passwords in localStorage
   // Storing passwords in localStorage is a critical security vulnerability
