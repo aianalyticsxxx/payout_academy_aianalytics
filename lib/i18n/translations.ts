@@ -1292,8 +1292,8 @@ export const translations = {
       },
       // Challenges Tab
       challengesTab: {
-        streakChallenges: 'ПРЕДИЗВИКАТЕЛСТВА ЗА СЕРИИ',
-        streakDescription: 'Завърши 4 нива от печеливши серии. По-голям акаунт = По-големи награди на всяко ниво!',
+        streakChallenges: 'ПРЕДИЗВИКАТЕЛСТВА ЗА ПОРЕДНИ СПЕЧЕЛЕНИ ЗАЛОЗИ',
+        streakDescription: 'Завърши 4 нива от печеливши последователни залози. По-голям акаунт = По-големи награди на всяко ниво!',
         beginner: 'Начинаещ',
         pro: 'Про',
         perfectForStarting: 'Перфектно за начало',
