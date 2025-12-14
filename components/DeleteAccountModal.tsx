@@ -9,6 +9,7 @@ import { signOut } from 'next-auth/react';
 import { Modal } from './ui/Modal';
 import { Input } from './ui/Input';
 import { Button } from './ui/Button';
+import { useLanguage } from '@/lib/i18n';
 
 interface DeleteAccountModalProps {
   isOpen: boolean;
@@ -19,6 +20,7 @@ export function DeleteAccountModal({
   isOpen,
   onClose,
 }: DeleteAccountModalProps) {
+  const { t } = useLanguage();
   const [password, setPassword] = useState('');
   const [confirmation, setConfirmation] = useState('');
   const [loading, setLoading] = useState(false);
@@ -39,7 +41,7 @@ export function DeleteAccountModal({
 
   const handleContinue = () => {
     if (!password) {
-      setError('Please enter your password');
+      setError(t.modals.deleteAccount.errors.passwordRequired);
       return;
     }
     setError('');
@@ -48,7 +50,7 @@ export function DeleteAccountModal({
 
   const handleDelete = async () => {
     if (confirmation !== 'DELETE MY ACCOUNT') {
-      setError('Please type "DELETE MY ACCOUNT" exactly as shown');
+      setError(t.modals.deleteAccount.errors.confirmRequired);
       return;
     }
 
@@ -83,32 +85,32 @@ export function DeleteAccountModal({
     <Modal
       isOpen={isOpen}
       onClose={handleClose}
-      title={step === 1 ? 'Delete Account' : 'Confirm Deletion'}
+      title={step === 1 ? t.modals.deleteAccount.title : t.modals.deleteAccount.confirmTitle}
       size="md"
       footer={
         step === 1 ? (
           <>
             <Button variant="secondary" onClick={handleClose}>
-              Cancel
+              {t.modals.deleteAccount.cancel}
             </Button>
             <Button
               onClick={handleContinue}
               className="bg-red-600 hover:bg-red-700"
             >
-              Continue
+              {t.modals.deleteAccount.continue}
             </Button>
           </>
         ) : (
           <>
             <Button variant="secondary" onClick={() => setStep(1)} disabled={loading}>
-              Back
+              {t.modals.deleteAccount.back}
             </Button>
             <Button
               onClick={handleDelete}
               disabled={loading || confirmation !== 'DELETE MY ACCOUNT'}
               className="bg-red-600 hover:bg-red-700 disabled:bg-red-900"
             >
-              {loading ? 'Deleting...' : 'Delete My Account'}
+              {loading ? t.modals.deleteAccount.deleting : t.modals.deleteAccount.deleteButton}
             </Button>
           </>
         )
@@ -120,16 +122,16 @@ export function DeleteAccountModal({
             <div className="flex gap-3">
               <div className="text-2xl">⚠️</div>
               <div>
-                <h3 className="font-semibold text-red-400 mb-1">Warning: This action is irreversible</h3>
+                <h3 className="font-semibold text-red-400 mb-1">{t.modals.deleteAccount.warning}</h3>
                 <p className="text-sm text-zinc-400">
-                  Deleting your account will permanently remove all your data including:
+                  {t.modals.deleteAccount.description}
                 </p>
                 <ul className="text-sm text-zinc-400 mt-2 space-y-1 list-disc list-inside">
-                  <li>Your profile and settings</li>
-                  <li>All betting history and statistics</li>
-                  <li>Challenge progress and rewards</li>
-                  <li>Leaderboard rankings</li>
-                  <li>All parlays and predictions</li>
+                  <li>{t.modals.deleteAccount.dataList.profile}</li>
+                  <li>{t.modals.deleteAccount.dataList.history}</li>
+                  <li>{t.modals.deleteAccount.dataList.challenges}</li>
+                  <li>{t.modals.deleteAccount.dataList.leaderboard}</li>
+                  <li>{t.modals.deleteAccount.dataList.parlays}</li>
                 </ul>
               </div>
             </div>
@@ -137,13 +139,13 @@ export function DeleteAccountModal({
 
           <div>
             <label className="block text-sm font-medium text-zinc-300 mb-2">
-              Enter your password to continue
+              {t.modals.deleteAccount.enterPassword}
             </label>
             <Input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Your password"
+              placeholder={t.modals.deleteAccount.passwordPlaceholder}
             />
           </div>
 
@@ -157,31 +159,31 @@ export function DeleteAccountModal({
         <div className="space-y-4">
           <div className="bg-red-900/30 border border-red-700/50 rounded-xl p-4 text-center">
             <div className="text-4xl mb-3">🗑️</div>
-            <h3 className="font-semibold text-red-400 mb-2">Final Step</h3>
+            <h3 className="font-semibold text-red-400 mb-2">{t.modals.deleteAccount.finalStep}</h3>
             <p className="text-sm text-zinc-400">
-              To confirm deletion, type <span className="font-mono text-red-400">DELETE MY ACCOUNT</span> below.
+              {t.modals.deleteAccount.typeToConfirm}
             </p>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-zinc-300 mb-2">
-              Type "DELETE MY ACCOUNT" to confirm
+              {t.modals.deleteAccount.confirmPlaceholder}
             </label>
             <Input
               type="text"
               value={confirmation}
               onChange={(e) => setConfirmation(e.target.value)}
-              placeholder="DELETE MY ACCOUNT"
+              placeholder={t.modals.deleteAccount.confirmText}
               className={confirmation === 'DELETE MY ACCOUNT' ? 'border-red-500' : ''}
             />
             {confirmation && confirmation !== 'DELETE MY ACCOUNT' && (
               <p className="text-xs text-zinc-500 mt-1">
-                Type exactly: DELETE MY ACCOUNT
+                {t.modals.deleteAccount.typeExactly}
               </p>
             )}
             {confirmation === 'DELETE MY ACCOUNT' && (
               <p className="text-xs text-red-400 mt-1">
-                Ready to delete - this cannot be undone
+                {t.modals.deleteAccount.readyToDelete}
               </p>
             )}
           </div>

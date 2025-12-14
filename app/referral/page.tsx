@@ -8,6 +8,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import { useLanguage, LanguageSwitcher } from '@/lib/i18n';
 
 interface ReferralData {
   referralCode: string;
@@ -34,6 +35,7 @@ interface ReferralData {
 }
 
 export default function ReferralPage() {
+  const { t } = useLanguage();
   const { data: session, status } = useSession();
   const router = useRouter();
   const [data, setData] = useState<ReferralData | null>(null);
@@ -59,11 +61,11 @@ export default function ReferralPage() {
         const result = await response.json();
         setData(result);
       } else {
-        setError('Failed to load referral data');
+        setError(t.referral.failedToLoad);
       }
     } catch (err) {
       console.error('Failed to fetch referral data:', err);
-      setError('Failed to load referral data');
+      setError(t.referral.failedToLoad);
     } finally {
       setLoading(false);
     }
@@ -89,7 +91,7 @@ export default function ReferralPage() {
   if (loading || status === 'loading') {
     return (
       <div className="min-h-screen bg-dark flex items-center justify-center">
-        <div className="animate-pulse text-zinc-500">Loading...</div>
+        <div className="animate-pulse text-zinc-500">{t.referral.loading}</div>
       </div>
     );
   }
@@ -97,7 +99,7 @@ export default function ReferralPage() {
   if (status === 'unauthenticated') {
     return (
       <div className="min-h-screen bg-dark flex items-center justify-center">
-        <div className="animate-pulse text-zinc-500">Redirecting to sign in...</div>
+        <div className="animate-pulse text-zinc-500">{t.referral.redirecting}</div>
       </div>
     );
   }
@@ -105,7 +107,7 @@ export default function ReferralPage() {
   if (error || !data) {
     return (
       <div className="min-h-screen bg-dark flex flex-col items-center justify-center gap-4">
-        <div className="text-red-400">{error || 'Failed to load referral data'}</div>
+        <div className="text-red-400">{error || t.referral.failedToLoad}</div>
         <button
           onClick={() => {
             setLoading(true);
@@ -113,10 +115,10 @@ export default function ReferralPage() {
           }}
           className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg"
         >
-          Try Again
+          {t.referral.tryAgain}
         </button>
         <Link href="/" className="text-zinc-400 hover:text-white text-sm">
-          ← Back to Dashboard
+          {t.referral.backToDashboard}
         </Link>
       </div>
     );
@@ -127,12 +129,15 @@ export default function ReferralPage() {
       {/* Header */}
       <div className="bg-surface border-b border-zinc-800">
         <div className="max-w-4xl mx-auto px-4 py-6">
-          <Link href="/" className="text-zinc-400 hover:text-white text-sm mb-2 inline-block">
-            ← Back to Dashboard
-          </Link>
-          <h1 className="text-3xl font-bold text-white">Referral Program</h1>
+          <div className="flex items-center justify-between mb-2">
+            <Link href="/" className="text-zinc-400 hover:text-white text-sm">
+              {t.referral.backToDashboard}
+            </Link>
+            <LanguageSwitcher />
+          </div>
+          <h1 className="text-3xl font-bold text-white">{t.referral.title}</h1>
           <p className="text-zinc-400 mt-1">
-            You both win! You earn 15% and they get 15% off
+            {t.referral.subtitle}
           </p>
         </div>
       </div>
@@ -140,7 +145,7 @@ export default function ReferralPage() {
       <div className="max-w-4xl mx-auto px-4 py-8">
         {/* Referral Link Card */}
         <div className="bg-gradient-to-br from-teal-900/30 to-teal-800/10 border border-teal-500/30 rounded-2xl p-6 mb-8">
-          <h2 className="text-xl font-bold text-white mb-4">Your Referral Link</h2>
+          <h2 className="text-xl font-bold text-white mb-4">{t.referral.yourLink}</h2>
 
           <div className="flex gap-3 mb-4">
             <input
@@ -157,12 +162,12 @@ export default function ReferralPage() {
                   : 'bg-teal-600 hover:bg-teal-700 text-white'
               }`}
             >
-              {copied ? 'Copied!' : 'Copy'}
+              {copied ? t.referral.copied : t.referral.copy}
             </button>
           </div>
 
           <div className="flex items-center gap-4 text-sm">
-            <span className="text-zinc-400">Your code:</span>
+            <span className="text-zinc-400">{t.referral.yourCode}</span>
             <span className="bg-zinc-800 px-3 py-1 rounded-lg font-mono text-teal-400 font-bold">
               {data.referralCode}
             </span>
@@ -170,7 +175,7 @@ export default function ReferralPage() {
               onClick={() => copyToClipboard(data.referralCode)}
               className="text-zinc-400 hover:text-white"
             >
-              Copy code
+              {t.referral.copyCode}
             </button>
           </div>
         </div>
@@ -180,19 +185,19 @@ export default function ReferralPage() {
           <div className="bg-gradient-to-br from-green-900/20 to-green-800/10 border border-green-500/30 rounded-xl p-5">
             <div className="flex items-center gap-3 mb-2">
               <span className="text-2xl">💰</span>
-              <h3 className="font-bold text-white">You Get 15% Cashback</h3>
+              <h3 className="font-bold text-white">{t.referral.youGet}</h3>
             </div>
             <p className="text-sm text-zinc-400">
-              Earn 15% of every friend&apos;s first challenge purchase added to your rewards balance
+              {t.referral.youGetDesc}
             </p>
           </div>
           <div className="bg-gradient-to-br from-purple-900/20 to-purple-800/10 border border-purple-500/30 rounded-xl p-5">
             <div className="flex items-center gap-3 mb-2">
               <span className="text-2xl">🎁</span>
-              <h3 className="font-bold text-white">They Get 15% Off</h3>
+              <h3 className="font-bold text-white">{t.referral.theyGet}</h3>
             </div>
             <p className="text-sm text-zinc-400">
-              Your friends get 15% discount on their first challenge purchase when they sign up with your link
+              {t.referral.theyGetDesc}
             </p>
           </div>
         </div>
@@ -201,60 +206,60 @@ export default function ReferralPage() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           <div className="bg-surface border border-zinc-800 rounded-xl p-4">
             <div className="text-3xl font-bold text-white">{data.stats.totalReferrals}</div>
-            <div className="text-sm text-zinc-400">Total Referrals</div>
+            <div className="text-sm text-zinc-400">{t.referral.stats.totalReferrals}</div>
           </div>
           <div className="bg-surface border border-zinc-800 rounded-xl p-4">
             <div className="text-3xl font-bold text-teal-400">{data.stats.qualifiedReferrals}</div>
-            <div className="text-sm text-zinc-400">Qualified</div>
+            <div className="text-sm text-zinc-400">{t.referral.stats.qualified}</div>
           </div>
           <div className="bg-surface border border-zinc-800 rounded-xl p-4">
             <div className="text-3xl font-bold text-green-400">{formatCurrency(data.stats.totalEarned)}</div>
-            <div className="text-sm text-zinc-400">Total Earned</div>
+            <div className="text-sm text-zinc-400">{t.referral.stats.totalEarned}</div>
           </div>
           <div className="bg-surface border border-zinc-800 rounded-xl p-4">
             <div className="text-3xl font-bold text-yellow-400">{formatCurrency(data.stats.pendingRewards)}</div>
-            <div className="text-sm text-zinc-400">Pending Rewards</div>
+            <div className="text-sm text-zinc-400">{t.referral.stats.pendingRewards}</div>
           </div>
         </div>
 
         {/* How It Works */}
         <div className="bg-surface border border-zinc-800 rounded-2xl p-6 mb-8">
-          <h2 className="text-xl font-bold text-white mb-4">How It Works</h2>
+          <h2 className="text-xl font-bold text-white mb-4">{t.referral.howItWorks}</h2>
           <div className="grid md:grid-cols-4 gap-6">
             <div className="text-center">
               <div className="w-12 h-12 bg-teal-900/30 rounded-full flex items-center justify-center mx-auto mb-3">
                 <span className="text-xl font-bold text-teal-400">1</span>
               </div>
-              <h3 className="font-semibold text-white mb-1">Share Your Link</h3>
+              <h3 className="font-semibold text-white mb-1">{t.referral.steps.step1Title}</h3>
               <p className="text-sm text-zinc-400">
-                Send your unique referral link to friends
+                {t.referral.steps.step1Desc}
               </p>
             </div>
             <div className="text-center">
               <div className="w-12 h-12 bg-teal-900/30 rounded-full flex items-center justify-center mx-auto mb-3">
                 <span className="text-xl font-bold text-teal-400">2</span>
               </div>
-              <h3 className="font-semibold text-white mb-1">They Sign Up</h3>
+              <h3 className="font-semibold text-white mb-1">{t.referral.steps.step2Title}</h3>
               <p className="text-sm text-zinc-400">
-                Friends create account with your link
+                {t.referral.steps.step2Desc}
               </p>
             </div>
             <div className="text-center">
               <div className="w-12 h-12 bg-purple-900/30 rounded-full flex items-center justify-center mx-auto mb-3">
                 <span className="text-xl font-bold text-purple-400">3</span>
               </div>
-              <h3 className="font-semibold text-white mb-1">They Save 15%</h3>
+              <h3 className="font-semibold text-white mb-1">{t.referral.steps.step3Title}</h3>
               <p className="text-sm text-zinc-400">
-                They get 15% off their first challenge
+                {t.referral.steps.step3Desc}
               </p>
             </div>
             <div className="text-center">
               <div className="w-12 h-12 bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-3">
                 <span className="text-xl font-bold text-green-400">4</span>
               </div>
-              <h3 className="font-semibold text-white mb-1">You Earn 15%</h3>
+              <h3 className="font-semibold text-white mb-1">{t.referral.steps.step4Title}</h3>
               <p className="text-sm text-zinc-400">
-                You get 15% of their purchase as reward
+                {t.referral.steps.step4Desc}
               </p>
             </div>
           </div>
@@ -262,14 +267,14 @@ export default function ReferralPage() {
 
         {/* Referrals List */}
         <div className="bg-surface border border-zinc-800 rounded-2xl p-6">
-          <h2 className="text-xl font-bold text-white mb-4">Your Referrals</h2>
+          <h2 className="text-xl font-bold text-white mb-4">{t.referral.yourReferrals}</h2>
 
           {data.referrals.length === 0 ? (
             <div className="text-center py-12">
               <div className="text-4xl mb-4">👥</div>
-              <p className="text-zinc-400">No referrals yet</p>
+              <p className="text-zinc-400">{t.referral.noReferrals}</p>
               <p className="text-sm text-zinc-500 mt-1">
-                Share your link to start earning rewards
+                {t.referral.noReferralsDesc}
               </p>
             </div>
           ) : (
@@ -286,7 +291,7 @@ export default function ReferralPage() {
                         {referral.referred.username}
                       </div>
                       <div className="text-xs text-zinc-500">
-                        Joined {new Date(referral.referred.joinedAt).toLocaleDateString()}
+                        {t.referral.joined} {new Date(referral.referred.joinedAt).toLocaleDateString()}
                       </div>
                     </div>
                   </div>
@@ -296,14 +301,14 @@ export default function ReferralPage() {
                         ? 'text-green-400'
                         : 'text-yellow-400'
                     }`}>
-                      {referral.status === 'pending' && 'Pending'}
+                      {referral.status === 'pending' && t.referral.pending}
                       {referral.status === 'qualified' && `+${formatCurrency(referral.rewardAmount)}`}
-                      {referral.status === 'paid' && `+${formatCurrency(referral.rewardAmount)} (Paid)`}
+                      {referral.status === 'paid' && `+${formatCurrency(referral.rewardAmount)} (${t.referral.paid})`}
                     </div>
                     <div className="text-xs text-zinc-500">
                       {referral.status === 'pending'
-                        ? 'Waiting for first purchase'
-                        : referral.qualifiedAt && `Qualified ${new Date(referral.qualifiedAt).toLocaleDateString()}`
+                        ? t.referral.waitingForPurchase
+                        : referral.qualifiedAt && `${t.referral.qualifiedOn} ${new Date(referral.qualifiedAt).toLocaleDateString()}`
                       }
                     </div>
                   </div>
@@ -321,7 +326,7 @@ export default function ReferralPage() {
             rel="noopener noreferrer"
             className="px-4 py-2 bg-[#1DA1F2] hover:bg-[#1a8cd8] text-white rounded-lg font-medium transition-colors"
           >
-            Share on Twitter
+            {t.referral.shareOn.twitter}
           </a>
           <a
             href={`https://wa.me/?text=Join%20me%20on%20Zalogche%20and%20take%20on%20sports%20betting%20challenges!%20${encodeURIComponent(data.referralLink)}`}
@@ -329,7 +334,7 @@ export default function ReferralPage() {
             rel="noopener noreferrer"
             className="px-4 py-2 bg-[#25D366] hover:bg-[#20bd5a] text-white rounded-lg font-medium transition-colors"
           >
-            Share on WhatsApp
+            {t.referral.shareOn.whatsapp}
           </a>
           <a
             href={`https://t.me/share/url?url=${encodeURIComponent(data.referralLink)}&text=Join%20me%20on%20Zalogche!`}
@@ -337,7 +342,7 @@ export default function ReferralPage() {
             rel="noopener noreferrer"
             className="px-4 py-2 bg-[#0088cc] hover:bg-[#0077b5] text-white rounded-lg font-medium transition-colors"
           >
-            Share on Telegram
+            {t.referral.shareOn.telegram}
           </a>
         </div>
       </div>

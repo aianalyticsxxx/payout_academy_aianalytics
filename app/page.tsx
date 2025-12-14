@@ -211,17 +211,17 @@ export default function LandingPage() {
             </nav>
 
             {/* CTA Buttons */}
-            <div className="flex items-center gap-3">
-              <LanguageSwitcher className="hidden sm:flex" />
+            <div className="flex items-center gap-2 sm:gap-3">
+              <LanguageSwitcher />
               <a
                 href="/login"
-                className="hidden sm:inline-flex px-4 py-2 text-sm font-medium text-zinc-300 hover:text-white transition-colors"
+                className="px-3 sm:px-4 py-2 text-sm font-medium text-zinc-300 hover:text-white transition-colors"
               >
                 {t.nav.login}
               </a>
               <a
                 href="#challenges"
-                className="px-4 py-2 rounded-lg text-sm font-semibold bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-teal-400 transition-all duration-300 shadow-lg shadow-teal-500/20 hover:shadow-teal-500/30"
+                className="hidden sm:inline-flex px-4 py-2 rounded-lg text-sm font-semibold bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-teal-400 transition-all duration-300 shadow-lg shadow-teal-500/20 hover:shadow-teal-500/30"
               >
                 {t.nav.register}
               </a>

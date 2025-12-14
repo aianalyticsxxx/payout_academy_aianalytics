@@ -8,6 +8,7 @@ import React, { useState } from 'react';
 import { Modal } from './ui/Modal';
 import { Input } from './ui/Input';
 import { Button } from './ui/Button';
+import { useLanguage } from '@/lib/i18n';
 
 interface ChangePasswordModalProps {
   isOpen: boolean;
@@ -20,6 +21,7 @@ export function ChangePasswordModal({
   onClose,
   onSuccess,
 }: ChangePasswordModalProps) {
+  const { t } = useLanguage();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -42,16 +44,16 @@ export function ChangePasswordModal({
 
   const validatePassword = (password: string): string | null => {
     if (password.length < 8) {
-      return 'Password must be at least 8 characters';
+      return t.modals.changePassword.errors.minLength;
     }
     if (!/[A-Z]/.test(password)) {
-      return 'Password must contain at least one uppercase letter';
+      return t.modals.changePassword.errors.uppercase;
     }
     if (!/[a-z]/.test(password)) {
-      return 'Password must contain at least one lowercase letter';
+      return t.modals.changePassword.errors.lowercase;
     }
     if (!/[0-9]/.test(password)) {
-      return 'Password must contain at least one number';
+      return t.modals.changePassword.errors.number;
     }
     return null;
   };
@@ -61,7 +63,7 @@ export function ChangePasswordModal({
 
     // Validation
     if (!currentPassword) {
-      setError('Current password is required');
+      setError(t.modals.changePassword.errors.currentRequired);
       return;
     }
 
@@ -72,12 +74,12 @@ export function ChangePasswordModal({
     }
 
     if (newPassword !== confirmPassword) {
-      setError('New passwords do not match');
+      setError(t.modals.changePassword.errors.mismatch);
       return;
     }
 
     if (currentPassword === newPassword) {
-      setError('New password must be different from current password');
+      setError(t.modals.changePassword.errors.sameAsOld);
       return;
     }
 
@@ -122,9 +124,9 @@ export function ChangePasswordModal({
     if (/[0-9]/.test(password)) score++;
     if (/[^A-Za-z0-9]/.test(password)) score++;
 
-    if (score <= 2) return { level: 1, text: 'Weak', color: 'bg-red-500' };
-    if (score <= 4) return { level: 2, text: 'Medium', color: 'bg-yellow-500' };
-    return { level: 3, text: 'Strong', color: 'bg-green-500' };
+    if (score <= 2) return { level: 1, text: t.modals.changePassword.strength.weak, color: 'bg-red-500' };
+    if (score <= 4) return { level: 2, text: t.modals.changePassword.strength.medium, color: 'bg-yellow-500' };
+    return { level: 3, text: t.modals.changePassword.strength.strong, color: 'bg-green-500' };
   };
 
   const strength = getPasswordStrength(newPassword);
@@ -133,16 +135,16 @@ export function ChangePasswordModal({
     <Modal
       isOpen={isOpen}
       onClose={handleClose}
-      title="Change Password"
+      title={t.modals.changePassword.title}
       size="md"
       footer={
         !success && (
           <>
             <Button variant="secondary" onClick={handleClose} disabled={loading}>
-              Cancel
+              {t.modals.changePassword.cancel}
             </Button>
             <Button onClick={handleSubmit} disabled={loading}>
-              {loading ? 'Updating...' : 'Update Password'}
+              {loading ? t.modals.changePassword.updating : t.modals.changePassword.updatePassword}
             </Button>
           </>
         )
@@ -165,34 +167,34 @@ export function ChangePasswordModal({
               />
             </svg>
           </div>
-          <h3 className="text-xl font-semibold text-white mb-2">Password Updated</h3>
-          <p className="text-zinc-400">Your password has been changed successfully.</p>
+          <h3 className="text-xl font-semibold text-white mb-2">{t.modals.changePassword.success}</h3>
+          <p className="text-zinc-400">{t.modals.changePassword.successMessage}</p>
         </div>
       ) : (
         <div className="space-y-5">
           {/* Current Password */}
           <div>
             <label className="block text-sm font-medium text-zinc-300 mb-2">
-              Current Password
+              {t.modals.changePassword.currentPassword}
             </label>
             <Input
               type="password"
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
-              placeholder="Enter current password"
+              placeholder={t.modals.changePassword.currentPasswordPlaceholder}
             />
           </div>
 
           {/* New Password */}
           <div>
             <label className="block text-sm font-medium text-zinc-300 mb-2">
-              New Password
+              {t.modals.changePassword.newPassword}
             </label>
             <Input
               type="password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              placeholder="Enter new password"
+              placeholder={t.modals.changePassword.newPasswordPlaceholder}
             />
             {newPassword && (
               <div className="mt-2">
@@ -226,19 +228,19 @@ export function ChangePasswordModal({
           {/* Confirm Password */}
           <div>
             <label className="block text-sm font-medium text-zinc-300 mb-2">
-              Confirm New Password
+              {t.modals.changePassword.confirmPassword}
             </label>
             <Input
               type="password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Confirm new password"
+              placeholder={t.modals.changePassword.confirmPasswordPlaceholder}
             />
             {confirmPassword && newPassword !== confirmPassword && (
-              <p className="text-xs text-red-400 mt-1">Passwords do not match</p>
+              <p className="text-xs text-red-400 mt-1">{t.modals.changePassword.errors.mismatch}</p>
             )}
             {confirmPassword && newPassword === confirmPassword && (
-              <p className="text-xs text-green-500 mt-1">Passwords match</p>
+              <p className="text-xs text-green-500 mt-1">✓</p>
             )}
           </div>
 

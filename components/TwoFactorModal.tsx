@@ -8,6 +8,7 @@ import React, { useState, useEffect } from 'react';
 import { Modal } from './ui/Modal';
 import { Input } from './ui/Input';
 import { Button } from './ui/Button';
+import { useLanguage } from '@/lib/i18n';
 
 interface TwoFactorModalProps {
   isOpen: boolean;
@@ -24,6 +25,7 @@ export function TwoFactorModal({
   isEnabled,
   onSuccess,
 }: TwoFactorModalProps) {
+  const { t } = useLanguage();
   const [step, setStep] = useState<Step>('initial');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -88,7 +90,7 @@ export function TwoFactorModal({
 
   const handleVerify = async () => {
     if (verifyCode.length !== 6) {
-      setError('Please enter a 6-digit code');
+      setError(t.modals.twoFactor.errors.codeRequired);
       return;
     }
 
@@ -123,11 +125,11 @@ export function TwoFactorModal({
 
   const handleDisable = async () => {
     if (!password) {
-      setError('Please enter your password');
+      setError(t.modals.twoFactor.errors.passwordRequired);
       return;
     }
     if (disableCode.length !== 6 && disableCode.length !== 8) {
-      setError('Please enter a valid code');
+      setError(t.modals.twoFactor.errors.invalidCode);
       return;
     }
 
@@ -175,9 +177,9 @@ export function TwoFactorModal({
                   <div className="flex items-center gap-3">
                     <div className="text-2xl">✅</div>
                     <div>
-                      <h3 className="font-semibold text-green-400">2FA is enabled</h3>
+                      <h3 className="font-semibold text-green-400">{t.modals.twoFactor.enabled}</h3>
                       <p className="text-sm text-zinc-400">
-                        Your account is protected with two-factor authentication.
+                        {t.modals.twoFactor.enabledDescription}
                       </p>
                     </div>
                   </div>
@@ -186,7 +188,7 @@ export function TwoFactorModal({
                   onClick={() => setStep('disable')}
                   className="w-full bg-red-600 hover:bg-red-700"
                 >
-                  Disable 2FA
+                  {t.modals.twoFactor.disable}
                 </Button>
               </>
             ) : (
@@ -195,15 +197,14 @@ export function TwoFactorModal({
                   <div className="flex items-center gap-3">
                     <div className="text-2xl">🔐</div>
                     <div>
-                      <h3 className="font-semibold text-white">Secure your account</h3>
+                      <h3 className="font-semibold text-white">{t.modals.twoFactor.secureAccount}</h3>
                       <p className="text-sm text-zinc-400">
-                        Add an extra layer of security by requiring a code from your authenticator app.
+                        {t.modals.twoFactor.setupDescription}
                       </p>
                     </div>
                   </div>
                 </div>
                 <div className="text-sm text-zinc-400 space-y-2">
-                  <p>You'll need an authenticator app like:</p>
                   <ul className="list-disc list-inside text-zinc-500">
                     <li>Google Authenticator</li>
                     <li>Authy</li>
@@ -212,7 +213,7 @@ export function TwoFactorModal({
                   </ul>
                 </div>
                 <Button onClick={handleStartSetup} disabled={loading} className="w-full">
-                  {loading ? 'Setting up...' : 'Enable 2FA'}
+                  {loading ? '...' : t.modals.twoFactor.enable}
                 </Button>
               </>
             )}
@@ -224,7 +225,7 @@ export function TwoFactorModal({
           <div className="space-y-4">
             <div className="text-center">
               <p className="text-sm text-zinc-400 mb-4">
-                Scan this QR code with your authenticator app
+                {t.modals.twoFactor.scanInstructions}
               </p>
               {qrCode && (
                 <div className="bg-white p-4 rounded-xl inline-block">
@@ -234,7 +235,7 @@ export function TwoFactorModal({
             </div>
 
             <div className="bg-zinc-800/50 rounded-xl p-4">
-              <p className="text-xs text-zinc-500 mb-2">Or enter this code manually:</p>
+              <p className="text-xs text-zinc-500 mb-2">Or:</p>
               <div className="flex items-center gap-2">
                 <code className="flex-1 font-mono text-sm text-teal-400 break-all">
                   {secret}
@@ -252,7 +253,7 @@ export function TwoFactorModal({
             </div>
 
             <Button onClick={() => setStep('verify')} className="w-full">
-              Continue to Verification
+              {t.modals.twoFactor.verify}
             </Button>
           </div>
         );
@@ -261,12 +262,12 @@ export function TwoFactorModal({
         return (
           <div className="space-y-4">
             <p className="text-sm text-zinc-400">
-              Enter the 6-digit code from your authenticator app to verify setup.
+              {t.modals.twoFactor.enterCode}
             </p>
 
             <div>
               <label className="block text-sm font-medium text-zinc-300 mb-2">
-                Verification Code
+                {t.modals.twoFactor.codePlaceholder}
               </label>
               <Input
                 type="text"
@@ -286,14 +287,14 @@ export function TwoFactorModal({
 
             <div className="flex gap-3">
               <Button variant="secondary" onClick={() => setStep('setup')} className="flex-1">
-                Back
+                ←
               </Button>
               <Button
                 onClick={handleVerify}
                 disabled={loading || verifyCode.length !== 6}
                 className="flex-1"
               >
-                {loading ? 'Verifying...' : 'Verify'}
+                {loading ? t.modals.twoFactor.verifying : t.modals.twoFactor.verify}
               </Button>
             </div>
           </div>
@@ -306,9 +307,9 @@ export function TwoFactorModal({
               <div className="flex gap-3">
                 <div className="text-2xl">⚠️</div>
                 <div>
-                  <h3 className="font-semibold text-yellow-400">Save your backup codes</h3>
+                  <h3 className="font-semibold text-yellow-400">{t.modals.twoFactor.backupCodes}</h3>
                   <p className="text-sm text-zinc-400">
-                    Store these codes safely. You can use them to access your account if you lose your authenticator.
+                    {t.modals.twoFactor.backupCodesDescription}
                   </p>
                 </div>
               </div>
@@ -326,12 +327,12 @@ export function TwoFactorModal({
                 onClick={copyBackupCodes}
                 className="w-full mt-3 py-2 text-sm text-teal-400 hover:text-teal-300 transition-colors"
               >
-                Copy all codes
+                {t.modals.twoFactor.copyBackupCodes}
               </button>
             </div>
 
             <Button onClick={handleConfirmBackup} className="w-full">
-              I've saved my backup codes
+              {t.modals.twoFactor.done}
             </Button>
           </div>
         );
@@ -343,9 +344,9 @@ export function TwoFactorModal({
               <div className="flex gap-3">
                 <div className="text-2xl">⚠️</div>
                 <div>
-                  <h3 className="font-semibold text-red-400">Disable 2FA</h3>
+                  <h3 className="font-semibold text-red-400">{t.modals.twoFactor.disableConfirm}</h3>
                   <p className="text-sm text-zinc-400">
-                    This will remove two-factor authentication from your account.
+                    {t.modals.twoFactor.disableWarning}
                   </p>
                 </div>
               </div>
@@ -353,25 +354,25 @@ export function TwoFactorModal({
 
             <div>
               <label className="block text-sm font-medium text-zinc-300 mb-2">
-                Password
+                {t.profile.password || 'Password'}
               </label>
               <Input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter your password"
+                placeholder="..."
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-zinc-300 mb-2">
-                Authenticator Code or Backup Code
+                {t.modals.twoFactor.codePlaceholder}
               </label>
               <Input
                 type="text"
                 value={disableCode}
                 onChange={(e) => setDisableCode(e.target.value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 8))}
-                placeholder="Enter 6-digit code or backup code"
+                placeholder="000000"
               />
             </div>
 
@@ -383,14 +384,14 @@ export function TwoFactorModal({
 
             <div className="flex gap-3">
               <Button variant="secondary" onClick={() => setStep('initial')} className="flex-1">
-                Cancel
+                {t.modals.deleteAccount.cancel}
               </Button>
               <Button
                 onClick={handleDisable}
                 disabled={loading}
                 className="flex-1 bg-red-600 hover:bg-red-700"
               >
-                {loading ? 'Disabling...' : 'Disable 2FA'}
+                {loading ? t.modals.twoFactor.disabling : t.modals.twoFactor.disable}
               </Button>
             </div>
           </div>
@@ -405,15 +406,15 @@ export function TwoFactorModal({
               </svg>
             </div>
             <h3 className="text-xl font-semibold text-white mb-2">
-              {isEnabled ? '2FA Disabled' : '2FA Enabled'}
+              {isEnabled ? t.modals.twoFactor.disable : t.modals.twoFactor.enabled}
             </h3>
             <p className="text-zinc-400 mb-6">
               {isEnabled
-                ? 'Two-factor authentication has been removed from your account.'
-                : 'Your account is now protected with two-factor authentication.'}
+                ? t.modals.twoFactor.disableWarning
+                : t.modals.twoFactor.enabledDescription}
             </p>
             <Button onClick={handleClose} className="w-full">
-              Done
+              {t.modals.twoFactor.done}
             </Button>
           </div>
         );
@@ -423,17 +424,17 @@ export function TwoFactorModal({
   const getTitle = () => {
     switch (step) {
       case 'initial':
-        return 'Two-Factor Authentication';
+        return t.modals.twoFactor.title;
       case 'setup':
-        return 'Scan QR Code';
+        return t.modals.twoFactor.scanQrCode;
       case 'verify':
-        return 'Verify Code';
+        return t.modals.twoFactor.verify;
       case 'backup':
-        return 'Backup Codes';
+        return t.modals.twoFactor.backupCodes;
       case 'disable':
-        return 'Disable 2FA';
+        return t.modals.twoFactor.disable;
       case 'success':
-        return 'Success';
+        return '✓';
     }
   };
 

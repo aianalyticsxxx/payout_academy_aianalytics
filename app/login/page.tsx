@@ -80,12 +80,12 @@ function Sparkle({ style }: { style: React.CSSProperties }) {
 // ANIMATED BACKGROUND COMPONENT
 // ==========================================
 function AnimatedBackground() {
-  // Generate sparkle particles
+  // Generate sparkle particles with deterministic values to avoid hydration mismatch
   const sparkles = Array.from({ length: 30 }, (_, i) => ({
-    left: `${Math.random() * 100}%`,
-    top: `${Math.random() * 100}%`,
-    animationDelay: `${Math.random() * 5}s`,
-    animationDuration: `${2 + Math.random() * 3}s`,
+    left: `${((i * 37 + 13) % 100)}%`,
+    top: `${((i * 53 + 7) % 100)}%`,
+    animationDelay: `${(i % 5)}s`,
+    animationDuration: `${2 + (i % 3)}s`,
   }));
 
   return (

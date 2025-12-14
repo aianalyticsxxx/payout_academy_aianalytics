@@ -13,8 +13,10 @@ import {
   PRO_LEVEL_REQUIREMENTS,
   DIFFICULTY_CONFIG,
 } from '@/lib/challenges/constants';
+import { useLanguage, LanguageSwitcher } from '@/lib/i18n';
 
 export default function HowItWorksPage() {
+  const { t } = useLanguage();
   const [selectedDifficulty, setSelectedDifficulty] = useState<'beginner' | 'pro'>('beginner');
   const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
 
@@ -23,38 +25,14 @@ export default function HowItWorksPage() {
   const config = DIFFICULTY_CONFIG[selectedDifficulty];
 
   const faqs = [
-    {
-      q: "How do the 4 levels work?",
-      a: `Requirements depend on difficulty: Beginner (3, 6, 10, 15 wins with min odds 1.5) or Pro (2, 4, 6, 9 wins with min odds 2.0). You earn rewards at each level!`
-    },
-    {
-      q: "What happens if I lose during a level?",
-      a: "If you lose while attempting a level, your streak resets to zero but you keep any rewards already earned from completed levels. You can continue attempting the current level."
-    },
-    {
-      q: "Do I need to complete all 4 levels?",
-      a: "No! You can cash out your earned rewards at any time. However, completing all 4 levels unlocks the maximum payout for your account size."
-    },
-    {
-      q: "How long do I have to complete all levels?",
-      a: "You have 45 days from your purchase date to complete as many levels as you can. Any rewards earned during this time are yours to keep."
-    },
-    {
-      q: "Can I reset my challenge?",
-      a: "Yes! If your 45 days expire, you can reset at 50% of the original cost. This gives you a fresh 45 days to continue earning rewards."
-    },
-    {
-      q: "What are the minimum odds requirements?",
-      a: `Beginner mode requires minimum odds of 1.5x per bet. Pro mode requires minimum odds of 2.0x per bet. All bets must meet this requirement to count toward your streak.`
-    },
-    {
-      q: "Can I have multiple challenges at once?",
-      a: "Yes! You can have up to 5 active challenges at the same time. This allows you to work on different tiers or difficulties simultaneously."
-    },
-    {
-      q: "When do I receive my rewards?",
-      a: "Rewards are added to your available balance when you claim them after completing a level. You can then request a payout via bank transfer, PayPal, or crypto."
-    },
+    { q: t.howItWorks.faq.q1, a: t.howItWorks.faq.a1 },
+    { q: t.howItWorks.faq.q2, a: t.howItWorks.faq.a2 },
+    { q: t.howItWorks.faq.q3, a: t.howItWorks.faq.a3 },
+    { q: t.howItWorks.faq.q4, a: t.howItWorks.faq.a4 },
+    { q: t.howItWorks.faq.q5, a: t.howItWorks.faq.a5 },
+    { q: t.howItWorks.faq.q6, a: t.howItWorks.faq.a6 },
+    { q: t.howItWorks.faq.q7, a: t.howItWorks.faq.a7 },
+    { q: t.howItWorks.faq.q8, a: t.howItWorks.faq.a8 },
   ];
 
   return (
@@ -64,14 +42,17 @@ export default function HowItWorksPage() {
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
             <span className="text-2xl">🎯</span>
-            <span className="font-bold text-xl text-teal-400">PayoutAcademy</span>
+            <span className="font-bold text-xl text-teal-400">Zalogche</span>
           </Link>
-          <Link
-            href="/"
-            className="px-4 py-2 bg-teal-500/20 text-teal-400 rounded-lg hover:bg-teal-500/30 transition-all text-sm font-medium"
-          >
-            Back to Dashboard
-          </Link>
+          <div className="flex items-center gap-3">
+            <LanguageSwitcher />
+            <Link
+              href="/"
+              className="px-4 py-2 bg-teal-500/20 text-teal-400 rounded-lg hover:bg-teal-500/30 transition-all text-sm font-medium"
+            >
+              {t.howItWorks.backToDashboard}
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -79,10 +60,10 @@ export default function HowItWorksPage() {
         {/* Hero Section */}
         <div className="text-center py-8">
           <h1 className="text-4xl md:text-5xl font-black text-white mb-4">
-            How <span className="text-teal-400">Challenges</span> Work
+            {t.howItWorks.title.split(' ')[0]} <span className="text-teal-400">{t.howItWorks.title.split(' ').slice(1).join(' ')}</span>
           </h1>
           <p className="text-zinc-400 text-lg max-w-2xl mx-auto">
-            Build win streaks, unlock levels, and earn rewards. The more you win, the more you earn!
+            {t.howItWorks.subtitle}
           </p>
         </div>
 
@@ -365,7 +346,7 @@ export default function HowItWorksPage() {
 
         {/* FAQs */}
         <div className="bg-[#1a1a1a] border border-zinc-800/50 rounded-2xl p-6">
-          <h2 className="text-2xl font-bold text-white mb-6">Frequently Asked Questions</h2>
+          <h2 className="text-2xl font-bold text-white mb-6">{t.howItWorks.faq.title}</h2>
           <div className="space-y-3">
             {faqs.map((faq, idx) => (
               <div key={idx} className="border border-zinc-800/50 rounded-xl overflow-hidden">
