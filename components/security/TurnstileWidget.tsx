@@ -120,10 +120,7 @@ export function TurnstileWidget({
   return (
     <div
       ref={containerRef}
-      className={`cf-turnstile ${className}`}
-      data-sitekey={siteKey}
-      data-theme={theme}
-      data-size={size}
+      className={className}
     />
   );
 }
