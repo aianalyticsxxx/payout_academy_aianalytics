@@ -6,7 +6,7 @@
 // Privacy-focused CAPTCHA alternative
 // Docs: https://developers.cloudflare.com/turnstile/
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 
 declare global {
   interface Window {
@@ -48,73 +48,104 @@ export function TurnstileWidget({
 }: TurnstileWidgetProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const widgetIdRef = useRef<string | null>(null);
-  const scriptLoadedRef = useRef(false);
+  const [isClient, setIsClient] = useState(false);
+  const callbacksRef = useRef({ onSuccess, onError, onExpire });
+
+  // Update callbacks ref when they change
+  callbacksRef.current = { onSuccess, onError, onExpire };
 
   const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
-  const renderWidget = useCallback(() => {
-    if (!containerRef.current || !window.turnstile || !siteKey) return;
-
-    // Remove existing widget if any
-    if (widgetIdRef.current) {
-      window.turnstile.remove(widgetIdRef.current);
-    }
-
-    widgetIdRef.current = window.turnstile.render(containerRef.current, {
-      sitekey: siteKey,
-      callback: onSuccess,
-      'error-callback': onError,
-      'expired-callback': onExpire,
-      theme,
-      size,
-    });
-  }, [siteKey, onSuccess, onError, onExpire, theme, size]);
+  // Ensure we're on client
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   useEffect(() => {
+    if (!isClient) return;
+
     // Skip if no site key configured
     if (!siteKey) {
       console.warn('[Turnstile] NEXT_PUBLIC_TURNSTILE_SITE_KEY not configured');
-      // In development, auto-pass with test token
-      if (process.env.NODE_ENV === 'development') {
-        onSuccess('test-token');
-      }
       return;
     }
 
+    let mounted = true;
+
+    const renderWidget = () => {
+      if (!mounted || !containerRef.current || !window.turnstile) return;
+
+      // Remove existing widget if any
+      if (widgetIdRef.current) {
+        try {
+          window.turnstile.remove(widgetIdRef.current);
+        } catch (e) {
+          // Ignore removal errors
+        }
+        widgetIdRef.current = null;
+      }
+
+      // Clear container
+      if (containerRef.current) {
+        containerRef.current.innerHTML = '';
+      }
+
+      widgetIdRef.current = window.turnstile.render(containerRef.current, {
+        sitekey: siteKey,
+        callback: (token: string) => callbacksRef.current.onSuccess(token),
+        'error-callback': () => callbacksRef.current.onError?.(),
+        'expired-callback': () => callbacksRef.current.onExpire?.(),
+        theme,
+        size,
+      });
+    };
+
     // Load Turnstile script if not already loaded
-    if (!scriptLoadedRef.current && !document.querySelector('script[src*="turnstile"]')) {
+    const existingScript = document.querySelector('script[src*="turnstile"]');
+
+    if (!existingScript) {
       const script = document.createElement('script');
       script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onTurnstileLoad';
       script.async = true;
       script.defer = true;
 
       window.onTurnstileLoad = () => {
-        scriptLoadedRef.current = true;
         renderWidget();
       };
 
       document.head.appendChild(script);
     } else if (window.turnstile) {
       renderWidget();
+    } else {
+      // Script exists but not loaded yet, wait for it
+      window.onTurnstileLoad = () => {
+        renderWidget();
+      };
     }
 
     return () => {
+      mounted = false;
       if (widgetIdRef.current && window.turnstile) {
-        window.turnstile.remove(widgetIdRef.current);
+        try {
+          window.turnstile.remove(widgetIdRef.current);
+        } catch (e) {
+          // Ignore removal errors
+        }
       }
     };
-  }, [siteKey, renderWidget, onSuccess]);
+  }, [isClient, siteKey, theme, size]);
 
-  // If no site key, show nothing (or placeholder in dev)
+  // Show placeholder during SSR or if no site key
+  if (!isClient) {
+    return <div className={`h-[65px] ${className}`} />;
+  }
+
   if (!siteKey) {
-    if (process.env.NODE_ENV === 'development') {
-      return (
-        <div className={`p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg text-sm text-yellow-500 ${className}`}>
-          CAPTCHA disabled (dev mode)
-        </div>
-      );
-    }
-    return null;
+    return (
+      <div className={`p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg text-sm text-yellow-500 ${className}`}>
+        CAPTCHA not configured
+      </div>
+    );
   }
 
   return (
@@ -128,8 +159,6 @@ export function TurnstileWidget({
 // ==========================================
 // HOOK FOR CAPTCHA STATE
 // ==========================================
-
-import { useState } from 'react';
 
 export function useTurnstile() {
   const [token, setToken] = useState<string | null>(null);
