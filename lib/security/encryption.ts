@@ -137,21 +137,30 @@ export function decryptJson<T = any>(encryptedValue: string): T {
 // HASH FOR BACKUP CODES (one-way)
 // ==========================================
 
-import { createHash } from 'crypto';
+import { createHash, timingSafeEqual } from 'crypto';
+import bcrypt from 'bcryptjs';
 
 /**
  * Hash a backup code (one-way, for storage)
- * Backup codes should be hashed, not encrypted
+ * SECURITY: Uses bcrypt for resistance to rainbow tables
+ * Cost factor 10 is sufficient for backup codes (not as sensitive as passwords)
  */
 export function hashBackupCode(code: string): string {
-  return createHash('sha256').update(code).digest('hex');
+  // Normalize the code (remove dashes/spaces, uppercase)
+  const normalizedCode = code.replace(/[-\s]/g, '').toUpperCase();
+  return bcrypt.hashSync(normalizedCode, 10);
 }
 
 /**
  * Verify a backup code against a hash
+ * SECURITY: Uses bcrypt's built-in timing-safe comparison
  */
 export function verifyBackupCode(code: string, hash: string): boolean {
-  return hashBackupCode(code) === hash;
+  // Normalize the code (remove dashes/spaces, uppercase)
+  const normalizedCode = code.replace(/[-\s]/g, '').toUpperCase();
+
+  // bcrypt.compareSync is timing-safe
+  return bcrypt.compareSync(normalizedCode, hash);
 }
 
 // ==========================================

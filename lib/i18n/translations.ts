@@ -208,6 +208,7 @@ export const translations = {
         signUp: 'Sign up',
         forgotPassword: 'Forgot password?',
         error: 'Invalid email or password',
+        rememberMe: 'Remember me',
         disclaimer: 'By signing in, you agree that this platform is for entertainment purposes only.',
       },
       register: {
@@ -1203,6 +1204,7 @@ export const translations = {
         signUp: 'Регистрирай се',
         forgotPassword: 'Забравена парола?',
         error: 'Невалиден имейл или парола',
+        rememberMe: 'Запомни ме',
         disclaimer: 'С влизането се съгласявате, че тази платформа е само за развлечение.',
       },
       register: {

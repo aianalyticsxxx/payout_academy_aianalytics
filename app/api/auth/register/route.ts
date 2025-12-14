@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
+import { verifyTurnstileToken, getClientIpForTurnstile } from '@/lib/security/turnstile';
 
 // Strong password validation
 const passwordSchema = z.string()
@@ -25,33 +26,36 @@ const RegisterSchema = z.object({
   firstName: z.string().min(1, 'First name is required').max(50),
   lastName: z.string().min(1, 'Last name is required').max(50),
   phone: z.string().min(1, 'Phone number is required'),
+  turnstileToken: z.string().optional(),
 });
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { email, password, username, firstName, lastName, phone } = RegisterSchema.parse(body);
+    const { email, password, username, firstName, lastName, phone, turnstileToken } = RegisterSchema.parse(body);
 
-    // Check if email exists
-    const existingEmail = await prisma.user.findUnique({
-      where: { email },
-    });
+    // SECURITY: Verify Turnstile CAPTCHA token
+    const clientIp = getClientIpForTurnstile(req.headers);
+    const turnstileResult = await verifyTurnstileToken(turnstileToken || '', clientIp);
 
-    if (existingEmail) {
+    if (!turnstileResult.success) {
       return NextResponse.json(
-        { error: 'Email already registered' },
+        { error: turnstileResult.error || 'CAPTCHA verification failed' },
         { status: 400 }
       );
     }
 
-    // Check if username exists
-    const existingUsername = await prisma.user.findUnique({
-      where: { username },
-    });
+    // SECURITY: Check both email and username, but return generic message
+    // to prevent account enumeration attacks
+    const [existingEmail, existingUsername] = await Promise.all([
+      prisma.user.findUnique({ where: { email } }),
+      prisma.user.findUnique({ where: { username } }),
+    ]);
 
-    if (existingUsername) {
+    if (existingEmail || existingUsername) {
+      // SECURITY: Generic error message prevents attackers from knowing which field exists
       return NextResponse.json(
-        { error: 'Username already taken' },
+        { error: 'Registration failed. Please try different credentials.' },
         { status: 400 }
       );
     }

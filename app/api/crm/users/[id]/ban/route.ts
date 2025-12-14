@@ -3,7 +3,7 @@
 // ==========================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireSuperAdmin } from '@/lib/auth/helpers';
+import { requireSuperAdmin, require2FAForSensitiveAction } from '@/lib/auth/helpers';
 import { prisma } from '@/lib/db/prisma';
 import { logAdminAction } from '@/lib/crm/adminLog';
 
@@ -16,7 +16,19 @@ export async function POST(
     const { session } = await requireSuperAdmin();
     const { id: userId } = await params;
     const body = await req.json();
-    const { action, reason } = body;
+    const { action, reason, totpCode } = body;
+
+    const adminId = (session.user as any).id;
+
+    // SECURITY: Get request metadata for comprehensive audit logging
+    const ipAddress = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+                      req.headers.get('x-real-ip') || 'unknown';
+    const userAgent = req.headers.get('user-agent') || 'unknown';
+
+    // SECURITY: Require 2FA verification for sensitive admin actions
+    if (totpCode) {
+      await require2FAForSensitiveAction(adminId, totpCode);
+    }
 
     if (!['ban', 'unban'].includes(action)) {
       return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
@@ -40,8 +52,6 @@ export async function POST(
       );
     }
 
-    const adminId = (session.user as any).id;
-
     if (action === 'ban') {
       if (user.isBanned) {
         return NextResponse.json({ error: 'User is already banned' }, { status: 400 });
@@ -62,7 +72,9 @@ export async function POST(
         action: 'BAN_USER',
         targetType: 'USER',
         targetId: userId,
-        metadata: { reason, userEmail: user.email },
+        ipAddress,
+        userAgent,
+        metadata: { reason, userEmail: user.email, username: user.username },
       });
 
       return NextResponse.json({
@@ -91,7 +103,9 @@ export async function POST(
         action: 'UNBAN_USER',
         targetType: 'USER',
         targetId: userId,
-        metadata: { userEmail: user.email },
+        ipAddress,
+        userAgent,
+        metadata: { userEmail: user.email, username: user.username },
       });
 
       return NextResponse.json({

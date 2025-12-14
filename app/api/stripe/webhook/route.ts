@@ -47,17 +47,19 @@ export async function POST(req: NextRequest) {
         const difficulty = session.metadata.difficulty;
 
         // SECURITY: Strict validation of all metadata fields
-        if (
-          !userId ||
-          typeof userId !== 'string' ||
-          userId.length < 10 ||
-          isNaN(tier) ||
-          tier < 1 ||
-          tier > 1000 ||
-          !difficulty ||
-          !['beginner', 'pro'].includes(difficulty)
-        ) {
-          console.error('Invalid challenge metadata:', session.metadata);
+        // Valid tiers: 1000, 5000, 10000, 25000, 50000, 100000
+        const VALID_TIERS = [1000, 5000, 10000, 25000, 50000, 100000];
+        // UserId should be a valid cuid format (minimum 20 chars)
+        const isValidUserId = userId && typeof userId === 'string' && userId.length >= 20;
+        const isValidTier = !isNaN(tier) && VALID_TIERS.includes(tier);
+        const isValidDifficulty = difficulty && ['beginner', 'pro'].includes(difficulty);
+
+        if (!isValidUserId || !isValidTier || !isValidDifficulty) {
+          console.error('Invalid challenge metadata:', {
+            userId: isValidUserId ? 'valid' : 'INVALID',
+            tier: isValidTier ? tier : 'INVALID',
+            difficulty: isValidDifficulty ? difficulty : 'INVALID',
+          });
           return NextResponse.json({ error: 'Invalid metadata' }, { status: 400 });
         }
 

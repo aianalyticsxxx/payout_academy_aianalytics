@@ -163,6 +163,9 @@ model User {
   lastFailedLogin     DateTime?
   lockedUntil         DateTime?
 
+  // Session management (token rotation)
+  tokenVersion        Int       @default(0)  // Increment to invalidate all sessions
+
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 

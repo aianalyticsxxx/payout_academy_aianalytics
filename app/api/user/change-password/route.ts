@@ -9,14 +9,16 @@ import { prisma } from '@/lib/db/prisma';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 
+// SECURITY: Password requirements must match registration (12+ chars, special char required)
 const ChangePasswordSchema = z.object({
   currentPassword: z.string().min(1, 'Current password is required'),
   newPassword: z
     .string()
-    .min(8, 'Password must be at least 8 characters')
+    .min(12, 'Password must be at least 12 characters')
     .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
     .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
-    .regex(/[0-9]/, 'Password must contain at least one number'),
+    .regex(/[0-9]/, 'Password must contain at least one number')
+    .regex(/[!@#$%^&*(),.?":{}|<>]/, 'Password must contain at least one special character'),
 });
 
 export async function POST(req: NextRequest) {
@@ -65,10 +67,24 @@ export async function POST(req: NextRequest) {
     const hashedPassword = await bcrypt.hash(data.newPassword, 12);
     await prisma.user.update({
       where: { id: userId },
-      data: { hashedPassword },
+      data: {
+        hashedPassword,
+        // SECURITY: Force re-authentication by updating timestamp
+        // This will invalidate existing JWT tokens on next validation
+        updatedAt: new Date(),
+      },
     });
 
-    return NextResponse.json({ success: true, message: 'Password updated successfully' });
+    // SECURITY: Invalidate all existing sessions for this user
+    await prisma.session.deleteMany({
+      where: { userId },
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: 'Password updated successfully. Please log in again.',
+      requireReauth: true,
+    });
   } catch (error) {
     console.error('Change password error:', error);
 

@@ -4,11 +4,12 @@
 // LOGIN PAGE - Immersive 3D Floating Orbs Design
 // ==========================================
 
-import { useState, Suspense } from 'react';
+import { useState, useEffect, Suspense, useRef } from 'react';
 import { signIn } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useLanguage, LanguageSwitcher } from '@/lib/i18n';
+import { TurnstileWidget } from '@/components/security/TurnstileWidget';
 
 // ==========================================
 // ANIMATED ORB COMPONENT
@@ -172,15 +173,52 @@ function LoginForm() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState(error || '');
+  const turnstileTokenRef = useRef<string | null>(null);
+
+  // SECURITY: Only remember email, NEVER store passwords in localStorage
+  // Storing passwords in localStorage is a critical security vulnerability
+  useEffect(() => {
+    const savedEmail = localStorage.getItem('zalogche_remembered_email');
+    // Clean up any previously stored passwords (security fix)
+    localStorage.removeItem('zalogche_remembered_password');
+    if (savedEmail) {
+      setEmail(savedEmail);
+      setRememberMe(true);
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setErrorMessage('');
 
+    // SECURITY: Verify CAPTCHA before login
+    if (!turnstileTokenRef.current && process.env.NODE_ENV === 'production') {
+      setErrorMessage('Please complete the CAPTCHA verification');
+      setLoading(false);
+      return;
+    }
+
     try {
+      // Pre-verify CAPTCHA on server
+      if (turnstileTokenRef.current) {
+        const captchaRes = await fetch('/api/auth/verify-captcha', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ turnstileToken: turnstileTokenRef.current }),
+        });
+
+        if (!captchaRes.ok) {
+          const data = await captchaRes.json();
+          setErrorMessage(data.error || 'CAPTCHA verification failed');
+          setLoading(false);
+          return;
+        }
+      }
+
       const result = await signIn('credentials', {
         email,
         password,
@@ -191,6 +229,12 @@ function LoginForm() {
       if (result?.error) {
         setErrorMessage(t.auth.login.error);
       } else if (result?.ok) {
+        // SECURITY: Only save email, never password
+        if (rememberMe) {
+          localStorage.setItem('zalogche_remembered_email', email);
+        } else {
+          localStorage.removeItem('zalogche_remembered_email');
+        }
         router.push(callbackUrl);
         router.refresh();
       }
@@ -255,6 +299,37 @@ function LoginForm() {
                 className="w-full bg-zinc-800/50 border border-zinc-700/50 rounded-xl px-4 py-3.5 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500/50 transition-all duration-300 backdrop-blur-sm"
                 placeholder={t.auth.login.passwordPlaceholder}
                 required
+              />
+            </div>
+
+            {/* Remember Me Checkbox */}
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="rememberMe"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="w-4 h-4 rounded border-zinc-600 bg-zinc-800/50 text-teal-500 focus:ring-teal-500/50 focus:ring-offset-0 cursor-pointer"
+              />
+              <label htmlFor="rememberMe" className="ml-2 text-sm text-zinc-400 cursor-pointer select-none">
+                {t.auth.login.rememberMe}
+              </label>
+            </div>
+
+            {/* CAPTCHA */}
+            <div className="flex justify-center">
+              <TurnstileWidget
+                onSuccess={(token) => {
+                  turnstileTokenRef.current = token;
+                }}
+                onExpire={() => {
+                  turnstileTokenRef.current = null;
+                }}
+                onError={() => {
+                  turnstileTokenRef.current = null;
+                  setErrorMessage('CAPTCHA failed. Please refresh and try again.');
+                }}
+                theme="dark"
               />
             </div>
 

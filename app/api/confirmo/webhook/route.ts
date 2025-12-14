@@ -13,10 +13,10 @@ import crypto from 'crypto';
 function verifyWebhookSignature(signature: string | null, body: string): boolean {
   const webhookSecret = process.env.CONFIRMO_WEBHOOK_SECRET;
 
-  // If no secret configured, log warning but allow (for backward compatibility during migration)
+  // SECURITY: If no secret configured, DENY the request (fail-closed)
   if (!webhookSecret) {
-    console.warn('[Confirmo] CONFIRMO_WEBHOOK_SECRET not configured - signature verification skipped');
-    return true;
+    console.error('[Confirmo] CRITICAL: CONFIRMO_WEBHOOK_SECRET not configured - denying request');
+    return false;
   }
 
   // If secret is configured, signature is REQUIRED

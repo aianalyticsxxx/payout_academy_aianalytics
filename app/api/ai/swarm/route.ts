@@ -9,6 +9,7 @@ import { runSwarmAnalysis, streamSwarmAnalysis } from '@/lib/ai/swarm';
 import { saveAIPrediction, getPredictionByEventId } from '@/lib/db/ai-leaderboard';
 import { ratelimit } from '@/lib/redis';
 import { z } from 'zod';
+import { zodErrorResponse } from '@/lib/auth/helpers';
 
 // Request validation schema
 const RequestSchema = z.object({
@@ -103,10 +104,7 @@ export async function POST(req: NextRequest) {
     console.error('Swarm API error:', error);
     
     if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: 'Invalid request', details: error.errors },
-        { status: 400 }
-      );
+      return zodErrorResponse(error, 'Invalid request');
     }
     
     return NextResponse.json(

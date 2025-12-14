@@ -9,6 +9,91 @@ import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 
 // ==========================================
+// IN-MEMORY RATE LIMITER FALLBACK
+// ==========================================
+// Used when Redis is unavailable to maintain protection
+
+interface InMemoryEntry {
+  count: number;
+  windowStart: number;
+}
+
+class InMemoryRateLimiter {
+  private store = new Map<string, InMemoryEntry>();
+  private readonly maxEntries = 10000; // Prevent memory exhaustion
+  private lastCleanup = Date.now();
+  private readonly cleanupInterval = 60000; // 1 minute
+
+  async limit(
+    identifier: string,
+    maxRequests: number,
+    windowMs: number
+  ): Promise<{ success: boolean; remaining: number; reset: number }> {
+    const now = Date.now();
+
+    // Periodic cleanup to prevent memory leaks
+    if (now - this.lastCleanup > this.cleanupInterval) {
+      this.cleanup(windowMs);
+      this.lastCleanup = now;
+    }
+
+    const key = identifier;
+    const entry = this.store.get(key);
+
+    // If no entry or window expired, start fresh
+    if (!entry || now - entry.windowStart >= windowMs) {
+      // Check size limit before adding new entry
+      if (this.store.size >= this.maxEntries) {
+        this.cleanup(windowMs);
+        // If still full after cleanup, remove oldest entries
+        if (this.store.size >= this.maxEntries) {
+          const keysToDelete = Array.from(this.store.keys()).slice(0, 1000);
+          keysToDelete.forEach(k => this.store.delete(k));
+        }
+      }
+
+      this.store.set(key, { count: 1, windowStart: now });
+      return {
+        success: true,
+        remaining: maxRequests - 1,
+        reset: now + windowMs,
+      };
+    }
+
+    // Increment count
+    entry.count++;
+
+    if (entry.count > maxRequests) {
+      return {
+        success: false,
+        remaining: 0,
+        reset: entry.windowStart + windowMs,
+      };
+    }
+
+    return {
+      success: true,
+      remaining: maxRequests - entry.count,
+      reset: entry.windowStart + windowMs,
+    };
+  }
+
+  private cleanup(windowMs: number): void {
+    const now = Date.now();
+    const keysToDelete: string[] = [];
+    this.store.forEach((entry, key) => {
+      if (now - entry.windowStart >= windowMs) {
+        keysToDelete.push(key);
+      }
+    });
+    keysToDelete.forEach(key => this.store.delete(key));
+  }
+}
+
+// Singleton instance for in-memory fallback
+const inMemoryLimiter = new InMemoryRateLimiter();
+
+// ==========================================
 // REDIS CLIENT
 // ==========================================
 
@@ -99,8 +184,26 @@ export interface RateLimitResult {
   reset: number;
 }
 
+// Parse window string to milliseconds
+function parseWindowToMs(window: string): number {
+  const match = window.match(/^(\d+)\s*(s|m|h|d)$/);
+  if (!match) return 60000; // Default 1 minute
+
+  const value = parseInt(match[1], 10);
+  const unit = match[2];
+
+  switch (unit) {
+    case 's': return value * 1000;
+    case 'm': return value * 60 * 1000;
+    case 'h': return value * 60 * 60 * 1000;
+    case 'd': return value * 24 * 60 * 60 * 1000;
+    default: return 60000;
+  }
+}
+
 /**
  * Check rate limit for a request
+ * Uses Redis when available, falls back to in-memory limiter
  * @param identifier - User ID, IP, or other identifier
  * @param tier - Rate limit tier to apply
  * @returns Rate limit result
@@ -110,26 +213,22 @@ export async function checkRateLimit(
   tier: RateLimitTier = 'api'
 ): Promise<RateLimitResult> {
   const limiter = limiters[tier];
+  const tierConfig = RATE_LIMITS[tier];
+  const windowMs = parseWindowToMs(tierConfig.window);
 
-  // SECURITY: Fail-closed behavior
+  // SECURITY: Use in-memory fallback if Redis not configured
   if (!limiter) {
-    // In production, deny if rate limiting is not configured
-    if (process.env.NODE_ENV === 'production') {
-      console.error('[RateLimit] Redis not configured - denying request (fail-closed)');
-      return {
-        success: false,
-        limit: RATE_LIMITS[tier].requests,
-        remaining: 0,
-        reset: Date.now() + 60000,
-      };
-    }
-    // In development, allow with warning
-    console.warn('[RateLimit] Redis not configured - allowing request (dev mode only)');
+    console.warn('[RateLimit] Redis not configured - using in-memory fallback');
+    const result = await inMemoryLimiter.limit(
+      `${tier}:${identifier}`,
+      tierConfig.requests,
+      windowMs
+    );
     return {
-      success: true,
-      limit: RATE_LIMITS[tier].requests,
-      remaining: RATE_LIMITS[tier].requests,
-      reset: Date.now() + 60000,
+      success: result.success,
+      limit: tierConfig.requests,
+      remaining: result.remaining,
+      reset: result.reset,
     };
   }
 
@@ -143,24 +242,110 @@ export async function checkRateLimit(
       reset: result.reset,
     };
   } catch (error) {
-    // SECURITY: Fail-closed on Redis errors in production
-    console.error('[RateLimit] Redis error:', error);
-    if (process.env.NODE_ENV === 'production') {
-      return {
-        success: false,
-        limit: RATE_LIMITS[tier].requests,
-        remaining: 0,
-        reset: Date.now() + 60000,
-      };
-    }
-    // In development, allow with warning
+    // SECURITY: Fall back to in-memory limiter on Redis errors
+    console.error('[RateLimit] Redis error, using in-memory fallback:', error);
+    const result = await inMemoryLimiter.limit(
+      `${tier}:${identifier}`,
+      tierConfig.requests,
+      windowMs
+    );
     return {
-      success: true,
-      limit: RATE_LIMITS[tier].requests,
-      remaining: RATE_LIMITS[tier].requests,
-      reset: Date.now() + 60000,
+      success: result.success,
+      limit: tierConfig.requests,
+      remaining: result.remaining,
+      reset: result.reset,
     };
   }
+}
+
+/**
+ * SECURITY: Validate IPv4 address with octet range checking
+ * Returns true only if each octet is 0-255
+ */
+function isValidIPv4(ip: string): boolean {
+  const parts = ip.split('.');
+  if (parts.length !== 4) return false;
+
+  for (const part of parts) {
+    const num = parseInt(part, 10);
+    if (isNaN(num) || num < 0 || num > 255) return false;
+    // Reject leading zeros (e.g., "01" or "001") to prevent octal interpretation
+    if (part.length > 1 && part.startsWith('0')) return false;
+  }
+  return true;
+}
+
+/**
+ * SECURITY: Validate IPv6 address format
+ * Supports full form, compressed (::), and loopback (::1)
+ */
+function isValidIPv6(ip: string): boolean {
+  // Handle loopback
+  if (ip === '::1') return true;
+
+  // Handle IPv4-mapped IPv6 (::ffff:192.168.1.1)
+  if (ip.toLowerCase().startsWith('::ffff:')) {
+    const ipv4Part = ip.slice(7);
+    return isValidIPv4(ipv4Part);
+  }
+
+  // Count colons and check for double colon
+  const hasDoubleColon = ip.includes('::');
+  const parts = ip.split(':');
+
+  // Full form has exactly 8 parts
+  if (!hasDoubleColon && parts.length !== 8) return false;
+
+  // With ::, can have fewer parts
+  if (hasDoubleColon) {
+    // Only one :: allowed
+    if (ip.split('::').length > 2) return false;
+    // Must have at least 2 parts total when compressed
+    if (parts.length < 2 || parts.length > 8) return false;
+  }
+
+  // Validate each part (hex, 1-4 chars)
+  for (const part of parts) {
+    if (part === '') continue; // Empty parts from :: are ok
+    if (!/^[0-9a-fA-F]{1,4}$/.test(part)) return false;
+  }
+
+  return true;
+}
+
+/**
+ * SECURITY: Extract client IP address from request headers
+ * Uses trusted proxy headers in priority order
+ * Validates IP format to prevent header injection attacks
+ */
+export function getClientIp(req: NextRequest): string {
+  // Priority order: Cloudflare > Vercel > x-real-ip > x-forwarded-for
+  const cfConnecting = req.headers.get('cf-connecting-ip');
+  const vercelForwarded = req.headers.get('x-vercel-forwarded-for');
+  const realIp = req.headers.get('x-real-ip');
+  const forwarded = req.headers.get('x-forwarded-for');
+
+  // Get the first IP from the chain
+  const rawIp = cfConnecting ||
+                vercelForwarded?.split(',')[0]?.trim() ||
+                realIp ||
+                forwarded?.split(',')[0]?.trim() ||
+                'unknown';
+
+  // SECURITY: Validate IP format with proper range checking
+  if (rawIp.includes(':')) {
+    // IPv6
+    if (isValidIPv6(rawIp)) return rawIp;
+  } else if (rawIp.includes('.')) {
+    // IPv4
+    if (isValidIPv4(rawIp)) return rawIp;
+  }
+
+  // If IP doesn't match expected format, return unknown (don't trust it)
+  if (rawIp !== 'unknown') {
+    console.warn(`[Security] Invalid IP format detected: ${rawIp.substring(0, 50)}`);
+  }
+  return 'unknown';
 }
 
 /**
@@ -168,14 +353,7 @@ export async function checkRateLimit(
  */
 export function getIdentifier(req: NextRequest, userId?: string): string {
   if (userId) return `user:${userId}`;
-
-  // Try various headers for IP
-  const forwarded = req.headers.get('x-forwarded-for');
-  const realIp = req.headers.get('x-real-ip');
-  const cfConnecting = req.headers.get('cf-connecting-ip');
-
-  const ip = cfConnecting || realIp || forwarded?.split(',')[0] || 'anonymous';
-  return `ip:${ip}`;
+  return `ip:${getClientIp(req)}`;
 }
 
 /**

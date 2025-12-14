@@ -26,8 +26,19 @@ export const ratelimit = redis
 // Helper functions
 export async function getCached<T>(key: string): Promise<T | null> {
   if (!redis) return null;
-  const cached = await redis.get(key);
-  return cached ? (cached as T) : null;
+  try {
+    const cached = await redis.get(key);
+    if (!cached) return null;
+    // Upstash Redis may return already-parsed object or string depending on config
+    // Handle both cases for safety
+    if (typeof cached === 'string') {
+      return JSON.parse(cached) as T;
+    }
+    return cached as T;
+  } catch (error) {
+    console.error('[Redis] Cache get error:', error);
+    return null;
+  }
 }
 
 export async function setCache(key: string, value: any, ttlSeconds: number = 300): Promise<void> {

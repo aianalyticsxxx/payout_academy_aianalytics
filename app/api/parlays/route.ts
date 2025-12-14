@@ -8,6 +8,7 @@ import { authOptions } from '@/lib/auth/config';
 import { prisma } from '@/lib/db/prisma';
 import { z } from 'zod';
 import { safePagination, paginationMeta } from '@/lib/security/pagination';
+import { zodErrorResponse } from '@/lib/auth/helpers';
 
 // ==========================================
 // VALIDATION SCHEMAS
@@ -213,10 +214,7 @@ export async function POST(req: NextRequest) {
     console.error('Create parlay error:', error);
 
     if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: 'Invalid parlay data', details: error.errors },
-        { status: 400 }
-      );
+      return zodErrorResponse(error, 'Invalid parlay data');
     }
 
     return NextResponse.json({ error: 'Failed to create parlay' }, { status: 500 });

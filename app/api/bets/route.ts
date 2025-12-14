@@ -9,6 +9,7 @@ import { prisma } from '@/lib/db/prisma';
 import { z } from 'zod';
 import { linkBetToChallenge, processChallengeSettlement, getActiveChallenges } from '@/lib/challenges/challenge-service';
 import { safePagination, paginationMeta } from '@/lib/security/pagination';
+import { zodErrorResponse } from '@/lib/auth/helpers';
 
 // ==========================================
 // VALIDATION SCHEMAS
@@ -278,10 +279,7 @@ export async function POST(req: NextRequest) {
     console.error('Create bet error:', error);
     
     if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: 'Invalid bet data', details: error.errors },
-        { status: 400 }
-      );
+      return zodErrorResponse(error, 'Invalid bet data');
     }
     
     return NextResponse.json({ error: 'Failed to create bet' }, { status: 500 });

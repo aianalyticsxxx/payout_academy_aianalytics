@@ -4,10 +4,11 @@
 // REGISTER PAGE - Immersive 3D Floating Orbs Design
 // ==========================================
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useLanguage, LanguageSwitcher } from '@/lib/i18n';
+import { TurnstileWidget } from '@/components/security/TurnstileWidget';
 
 // ==========================================
 // ANIMATED ORB COMPONENT
@@ -143,6 +144,7 @@ export default function RegisterPage() {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const turnstileTokenRef = useRef<string | null>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData(prev => ({
@@ -169,6 +171,13 @@ export default function RegisterPage() {
       return;
     }
 
+    // Validate CAPTCHA
+    if (!turnstileTokenRef.current && process.env.NODE_ENV === 'production') {
+      setError('Please complete the CAPTCHA verification');
+      setLoading(false);
+      return;
+    }
+
     try {
       const res = await fetch('/api/auth/register', {
         method: 'POST',
@@ -180,6 +189,7 @@ export default function RegisterPage() {
           firstName: formData.firstName,
           lastName: formData.lastName,
           phone: formData.phone,
+          turnstileToken: turnstileTokenRef.current,
         }),
       });
 
@@ -325,6 +335,23 @@ export default function RegisterPage() {
                   placeholder={t.auth.register.passwordPlaceholder}
                   minLength={8}
                   required
+                />
+              </div>
+
+              {/* CAPTCHA */}
+              <div className="flex justify-center">
+                <TurnstileWidget
+                  onSuccess={(token) => {
+                    turnstileTokenRef.current = token;
+                  }}
+                  onExpire={() => {
+                    turnstileTokenRef.current = null;
+                  }}
+                  onError={() => {
+                    turnstileTokenRef.current = null;
+                    setError('CAPTCHA failed. Please refresh and try again.');
+                  }}
+                  theme="dark"
                 />
               </div>
 

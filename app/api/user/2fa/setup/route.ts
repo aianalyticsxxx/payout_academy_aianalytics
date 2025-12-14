@@ -52,10 +52,12 @@ export async function POST(req: NextRequest) {
     // Generate QR code as data URL
     const qrCodeDataUrl = await QRCode.toDataURL(otpauthUrl);
 
-    // Generate backup codes using cryptographically secure random bytes
-    const backupCodes = Array.from({ length: 8 }, () =>
-      randomBytes(4).toString('hex').toUpperCase()
-    );
+    // SECURITY: Generate backup codes with higher entropy (6 bytes = 48 bits per code)
+    // Format: XXXX-XXXX-XXXX for user-friendly display
+    const backupCodes = Array.from({ length: 8 }, () => {
+      const bytes = randomBytes(6).toString('hex').toUpperCase();
+      return `${bytes.slice(0, 4)}-${bytes.slice(4, 8)}-${bytes.slice(8, 12)}`;
+    });
 
     // SECURITY: Encrypt the 2FA secret before storing
     const encryptedSecret = encrypt(secret);
@@ -72,10 +74,14 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    // SECURITY: Only return QR code (contains secret embedded) and backup codes
+    // Never expose raw secret in API response - QR code is sufficient for authenticator apps
+    // Backup codes are shown ONCE during setup - user must save them
     return NextResponse.json({
-      secret,
       qrCode: qrCodeDataUrl,
       backupCodes,
+      // IMPORTANT: Instruct user to save backup codes now - they won't be shown again
+      message: 'Scan the QR code with your authenticator app. Save your backup codes securely - they will not be shown again.',
     });
   } catch (error) {
     console.error('2FA setup error:', error);

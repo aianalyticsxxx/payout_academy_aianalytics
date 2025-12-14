@@ -10,20 +10,18 @@ import type { NextRequestWithAuth } from 'next-auth/middleware';
 // SECURITY HEADERS
 // ==========================================
 
-const securityHeaders = {
-  'X-DNS-Prefetch-Control': 'on',
-  'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload',
-  'X-Frame-Options': 'SAMEORIGIN',
-  'X-Content-Type-Options': 'nosniff',
-  'X-XSS-Protection': '1; mode=block',
-  'Referrer-Policy': 'strict-origin-when-cross-origin',
-  'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
-  // Content Security Policy - protects against XSS, clickjacking, code injection
-  // SECURITY: Strengthened CSP with tighter restrictions
-  'Content-Security-Policy': [
+// SECURITY: Build CSP based on environment
+// Production uses stricter CSP, development allows unsafe-inline for hot reload
+const isProduction = process.env.NODE_ENV === 'production';
+
+const buildCsp = (): string => {
+  const directives = [
     "default-src 'self'",
-    // Note: 'unsafe-inline' and 'unsafe-eval' needed for Next.js dev but should be removed with nonces in production
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com https://js.stripe.com",
+    // In production, use strict CSP; in development, allow unsafe-inline for hot reload
+    isProduction
+      ? "script-src 'self' https://challenges.cloudflare.com https://js.stripe.com"
+      : "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com https://js.stripe.com",
+    // Styles need unsafe-inline for styled-jsx and inline styles (unavoidable in Next.js)
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: https: blob:",
     "font-src 'self' data:",
@@ -37,8 +35,55 @@ const securityHeaders = {
     "manifest-src 'self'",
     "upgrade-insecure-requests",
     "block-all-mixed-content",
-  ].join('; '),
+  ];
+  return directives.join('; ');
 };
+
+const securityHeaders = {
+  'X-DNS-Prefetch-Control': 'on',
+  'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload',
+  'X-Frame-Options': 'SAMEORIGIN',
+  'X-Content-Type-Options': 'nosniff',
+  'X-XSS-Protection': '1; mode=block',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+  // SECURITY: Environment-aware CSP
+  'Content-Security-Policy': buildCsp(),
+  // SECURITY: Prevent browsers from sending Referer header for cross-origin requests
+  'Cross-Origin-Opener-Policy': 'same-origin',
+  'Cross-Origin-Embedder-Policy': 'credentialless',
+  // SECURITY: Remove X-Powered-By header (handled by Next.js config, but added here for safety)
+};
+
+// ==========================================
+// REQUEST SIZE LIMITS
+// ==========================================
+
+// SECURITY: Maximum request body size (1MB default, configurable per route)
+const MAX_BODY_SIZE = 1 * 1024 * 1024; // 1MB
+const MAX_BODY_SIZE_SMALL = 64 * 1024; // 64KB for auth/sensitive routes
+
+function checkRequestSize(req: NextRequest, pathname: string): NextResponse | null {
+  const contentLength = req.headers.get('content-length');
+
+  if (!contentLength) return null; // No body or streaming
+
+  const size = parseInt(contentLength, 10);
+  if (isNaN(size)) return null;
+
+  // Stricter limit for auth routes
+  const limit = pathname.startsWith('/api/auth/') ? MAX_BODY_SIZE_SMALL : MAX_BODY_SIZE;
+
+  if (size > limit) {
+    console.warn(`[Security] Request too large: ${size} bytes for ${pathname}`);
+    return NextResponse.json(
+      { error: 'Request body too large', maxSize: limit },
+      { status: 413 }
+    );
+  }
+
+  return null;
+}
 
 // ==========================================
 // HTTPS ENFORCEMENT
@@ -103,8 +148,14 @@ async function checkApiRateLimit(
       );
     }
   } catch (error) {
-    // If rate limiting fails, allow the request (fail open for availability)
+    // SECURITY: Fail-closed in production, fail-open in development
     console.error('[Middleware] Rate limit check failed:', error);
+    if (process.env.NODE_ENV === 'production') {
+      return NextResponse.json(
+        { error: 'Service temporarily unavailable' },
+        { status: 503 }
+      );
+    }
   }
 
   return null;
@@ -177,15 +228,19 @@ export default withAuth(
     const httpsRedirect = enforceHttps(req);
     if (httpsRedirect) return httpsRedirect;
 
-    // 2. CSRF protection for state-changing API requests
+    // 2. Check request body size limits
+    const sizeResponse = checkRequestSize(req, pathname);
+    if (sizeResponse) return sizeResponse;
+
+    // 3. CSRF protection for state-changing API requests
     const csrfResponse = checkCsrf(req, pathname);
     if (csrfResponse) return csrfResponse;
 
-    // 3. Check rate limits for API routes
+    // 4. Check rate limits for API routes
     const rateLimitResponse = await checkApiRateLimit(req, pathname);
     if (rateLimitResponse) return rateLimitResponse;
 
-    // 4. Get response and add security headers
+    // 5. Get response and add security headers
     const response = NextResponse.next();
 
     // Add security headers

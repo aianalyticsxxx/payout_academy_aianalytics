@@ -4,7 +4,7 @@
 // POST - Award free challenge or adjust user credits
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireSuperAdmin } from '@/lib/auth/helpers';
+import { requireSuperAdmin, require2FAForSensitiveAction } from '@/lib/auth/helpers';
 import { prisma } from '@/lib/db/prisma';
 import { logAdminAction } from '@/lib/crm/adminLog';
 
@@ -16,7 +16,25 @@ export async function POST(
     const { session } = await requireSuperAdmin();
     const { id: userId } = await params;
     const body = await req.json();
-    const { action, tier, difficulty, reason } = body;
+    const { action, tier, difficulty, reason, totpCode } = body;
+
+    const adminId = (session.user as any).id;
+
+    // SECURITY: Get request metadata for audit logging
+    const ipAddress = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+                      req.headers.get('x-real-ip') || 'unknown';
+    const userAgent = req.headers.get('user-agent') || 'unknown';
+
+    // SECURITY: Require 2FA verification for all credit/challenge management actions
+    // This is a financial operation that requires step-up authentication
+    if (totpCode) {
+      await require2FAForSensitiveAction(adminId, totpCode);
+    } else if (process.env.NODE_ENV === 'production') {
+      return NextResponse.json(
+        { error: '2FA verification required for this action', requires2FA: true },
+        { status: 403 }
+      );
+    }
 
     // Verify user exists
     const user = await prisma.user.findUnique({
@@ -54,17 +72,20 @@ export async function POST(
         },
       });
 
-      // Log admin action
+      // Log admin action with full audit trail
       await logAdminAction({
-        adminId: (session.user as any).id,
+        adminId,
         action: 'AWARD_FREE_CHALLENGE',
         targetType: 'USER',
         targetId: userId,
+        ipAddress,
+        userAgent,
         metadata: {
           challengeId: challenge.id,
           tier,
           difficulty: difficultyLevel,
           reason,
+          userEmail: user.email,
         },
       });
 
@@ -102,13 +123,15 @@ export async function POST(
         },
       });
 
-      // Log admin action
+      // Log admin action with full audit trail
       await logAdminAction({
-        adminId: (session.user as any).id,
+        adminId,
         action: 'RESET_CHALLENGE_FREE',
         targetType: 'CHALLENGE',
         targetId: challengeId,
-        metadata: { userId, reason },
+        ipAddress,
+        userAgent,
+        metadata: { userId, userEmail: user.email, reason },
       });
 
       return NextResponse.json({
@@ -141,13 +164,15 @@ export async function POST(
         data: { expiresAt: newExpiry },
       });
 
-      // Log admin action
+      // Log admin action with full audit trail
       await logAdminAction({
-        adminId: (session.user as any).id,
+        adminId,
         action: 'EXTEND_CHALLENGE',
         targetType: 'CHALLENGE',
         targetId: challengeId,
-        metadata: { userId, days, reason },
+        ipAddress,
+        userAgent,
+        metadata: { userId, userEmail: user.email, days, reason },
       });
 
       return NextResponse.json({
@@ -184,14 +209,17 @@ export async function POST(
         },
       });
 
-      // Log admin action
+      // Log admin action with full audit trail
       await logAdminAction({
-        adminId: (session.user as any).id,
+        adminId,
         action: 'CANCEL_CHALLENGE',
         targetType: 'CHALLENGE',
         targetId: challengeId,
+        ipAddress,
+        userAgent,
         metadata: {
           userId,
+          userEmail: user.email,
           tier: challenge.tier,
           refundAmount: refundAmount || 0,
           reason

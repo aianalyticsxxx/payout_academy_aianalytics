@@ -2,11 +2,12 @@
 // SECURITY MODULE - MAIN EXPORTS
 // ==========================================
 
-// Rate Limiting
+// Rate Limiting & IP Extraction
 export {
   checkRateLimit,
   withRateLimit,
   getIdentifier,
+  getClientIp,
   getTierForRoute,
   addRateLimitHeaders,
   type RateLimitTier,

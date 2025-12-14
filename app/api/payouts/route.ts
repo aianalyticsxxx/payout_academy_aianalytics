@@ -9,6 +9,7 @@ import { prisma } from '@/lib/db/prisma';
 import { z } from 'zod';
 import { safePagination, paginationMeta } from '@/lib/security/pagination';
 import { encryptJson, decryptJson } from '@/lib/security/encryption';
+import { zodErrorResponse } from '@/lib/auth/helpers';
 
 // ==========================================
 // VALIDATION SCHEMAS
@@ -247,10 +248,7 @@ export async function POST(req: NextRequest) {
     console.error('Create payout error:', error);
 
     if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: 'Invalid request data', details: error.errors },
-        { status: 400 }
-      );
+      return zodErrorResponse(error, 'Invalid request data');
     }
 
     return NextResponse.json({ error: 'Failed to create payout request' }, { status: 500 });
