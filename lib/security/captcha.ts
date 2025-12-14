@@ -24,21 +24,16 @@ export async function verifyCaptcha(
   token: string,
   remoteIp?: string
 ): Promise<CaptchaVerifyResult> {
-  // Skip verification in development if not configured
+  // Require CAPTCHA secret key in all environments
   if (!TURNSTILE_SECRET_KEY) {
-    if (process.env.NODE_ENV === 'development') {
-      console.warn('[CAPTCHA] Skipping verification - TURNSTILE_SECRET_KEY not set');
-      return { success: true };
-    }
-    // In production, require CAPTCHA
     console.error('[CAPTCHA] TURNSTILE_SECRET_KEY not configured');
     return { success: false, errorCodes: ['missing-secret-key'] };
   }
 
-  // Skip for test tokens in development
-  if (process.env.NODE_ENV === 'development' && token === 'test-token') {
-    return { success: true };
-  }
+  // NOTE: For development/testing, use Cloudflare's official test keys:
+  // Site Key: 1x00000000000000000000AA (always passes)
+  // Secret Key: 1x0000000000000000000000000000000AA (always passes)
+  // See: https://developers.cloudflare.com/turnstile/troubleshooting/testing/
 
   try {
     const formData = new URLSearchParams();

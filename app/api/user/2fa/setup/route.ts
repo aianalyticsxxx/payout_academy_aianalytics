@@ -9,6 +9,7 @@ import { prisma } from '@/lib/db/prisma';
 import { authenticator } from 'otplib';
 import QRCode from 'qrcode';
 import { randomBytes } from 'crypto';
+import { encrypt, hashBackupCode } from '@/lib/security/encryption';
 
 // Generate a new 2FA secret and QR code
 export async function POST(req: NextRequest) {
@@ -56,12 +57,18 @@ export async function POST(req: NextRequest) {
       randomBytes(4).toString('hex').toUpperCase()
     );
 
-    // Store secret temporarily (not enabled yet)
+    // SECURITY: Encrypt the 2FA secret before storing
+    const encryptedSecret = encrypt(secret);
+
+    // SECURITY: Hash backup codes (one-way) for storage
+    const hashedBackupCodes = backupCodes.map((code) => hashBackupCode(code));
+
+    // Store encrypted secret and hashed backup codes (not enabled yet)
     await prisma.user.update({
       where: { id: userId },
       data: {
-        twoFactorSecret: secret,
-        twoFactorBackupCodes: JSON.stringify(backupCodes),
+        twoFactorSecret: encryptedSecret,
+        twoFactorBackupCodes: JSON.stringify(hashedBackupCodes),
       },
     });
 

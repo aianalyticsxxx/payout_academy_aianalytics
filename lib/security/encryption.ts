@@ -23,13 +23,14 @@ const KEY_LENGTH = 32; // 256 bits
 function getEncryptionKey(): Buffer {
   const secret = process.env.ENCRYPTION_SECRET;
 
+  // SECURITY: Always require ENCRYPTION_SECRET in all environments
   if (!secret) {
-    // In development, use a deterministic key (NOT for production!)
-    if (process.env.NODE_ENV === 'development') {
-      console.warn('[Encryption] Using development key - NOT SECURE FOR PRODUCTION');
-      return scryptSync('dev-only-key', 'dev-salt', KEY_LENGTH);
-    }
     throw new Error('ENCRYPTION_SECRET environment variable is required');
+  }
+
+  // Validate minimum secret length (32+ chars recommended)
+  if (secret.length < 32) {
+    console.warn('[Encryption] ENCRYPTION_SECRET should be at least 32 characters');
   }
 
   // Derive a key from the secret using scrypt

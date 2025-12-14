@@ -111,8 +111,20 @@ export async function checkRateLimit(
 ): Promise<RateLimitResult> {
   const limiter = limiters[tier];
 
-  // If Redis not configured, allow all (dev mode)
+  // SECURITY: Fail-closed behavior
   if (!limiter) {
+    // In production, deny if rate limiting is not configured
+    if (process.env.NODE_ENV === 'production') {
+      console.error('[RateLimit] Redis not configured - denying request (fail-closed)');
+      return {
+        success: false,
+        limit: RATE_LIMITS[tier].requests,
+        remaining: 0,
+        reset: Date.now() + 60000,
+      };
+    }
+    // In development, allow with warning
+    console.warn('[RateLimit] Redis not configured - allowing request (dev mode only)');
     return {
       success: true,
       limit: RATE_LIMITS[tier].requests,
@@ -121,14 +133,34 @@ export async function checkRateLimit(
     };
   }
 
-  const result = await limiter.limit(identifier);
+  try {
+    const result = await limiter.limit(identifier);
 
-  return {
-    success: result.success,
-    limit: result.limit,
-    remaining: result.remaining,
-    reset: result.reset,
-  };
+    return {
+      success: result.success,
+      limit: result.limit,
+      remaining: result.remaining,
+      reset: result.reset,
+    };
+  } catch (error) {
+    // SECURITY: Fail-closed on Redis errors in production
+    console.error('[RateLimit] Redis error:', error);
+    if (process.env.NODE_ENV === 'production') {
+      return {
+        success: false,
+        limit: RATE_LIMITS[tier].requests,
+        remaining: 0,
+        reset: Date.now() + 60000,
+      };
+    }
+    // In development, allow with warning
+    return {
+      success: true,
+      limit: RATE_LIMITS[tier].requests,
+      remaining: RATE_LIMITS[tier].requests,
+      reset: Date.now() + 60000,
+    };
+  }
 }
 
 /**

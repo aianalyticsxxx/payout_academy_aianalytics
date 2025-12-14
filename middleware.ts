@@ -19,18 +19,24 @@ const securityHeaders = {
   'Referrer-Policy': 'strict-origin-when-cross-origin',
   'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
   // Content Security Policy - protects against XSS, clickjacking, code injection
+  // SECURITY: Strengthened CSP with tighter restrictions
   'Content-Security-Policy': [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com",
+    // Note: 'unsafe-inline' and 'unsafe-eval' needed for Next.js dev but should be removed with nonces in production
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com https://js.stripe.com",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: https: blob:",
     "font-src 'self' data:",
-    "connect-src 'self' https://api.anthropic.com https://api.openai.com https://generativelanguage.googleapis.com https://api.groq.com https://api.perplexity.ai https://api.the-odds-api.com",
-    "frame-src 'self' https://challenges.cloudflare.com",
+    "connect-src 'self' https://api.anthropic.com https://api.openai.com https://generativelanguage.googleapis.com https://api.groq.com https://api.perplexity.ai https://api.the-odds-api.com https://api.stripe.com https://confirmo.net wss://*.pusher.com",
+    "frame-src 'self' https://challenges.cloudflare.com https://js.stripe.com https://hooks.stripe.com",
     "frame-ancestors 'none'",
     "base-uri 'self'",
-    "form-action 'self'",
+    "form-action 'self' https://checkout.stripe.com",
+    "object-src 'none'",
+    "worker-src 'self' blob:",
+    "manifest-src 'self'",
     "upgrade-insecure-requests",
+    "block-all-mixed-content",
   ].join('; '),
 };
 

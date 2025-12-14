@@ -44,16 +44,28 @@ export async function POST(req: NextRequest) {
       if (session.metadata?.type === 'challenge_purchase') {
         const userId = session.metadata.userId;
         const tier = parseInt(session.metadata.tier, 10);
-        const difficulty = session.metadata.difficulty as DifficultyType;
+        const difficulty = session.metadata.difficulty;
 
-        if (!userId || isNaN(tier)) {
+        // SECURITY: Strict validation of all metadata fields
+        if (
+          !userId ||
+          typeof userId !== 'string' ||
+          userId.length < 10 ||
+          isNaN(tier) ||
+          tier < 1 ||
+          tier > 1000 ||
+          !difficulty ||
+          !['beginner', 'pro'].includes(difficulty)
+        ) {
           console.error('Invalid challenge metadata:', session.metadata);
           return NextResponse.json({ error: 'Invalid metadata' }, { status: 400 });
         }
 
+        const validatedDifficulty = difficulty as DifficultyType;
+
         try {
           // Create the challenge now that payment is confirmed
-          const challenge = await createChallenge(userId, tier, difficulty);
+          const challenge = await createChallenge(userId, tier, validatedDifficulty);
           console.log('Challenge created after payment:', challenge.id);
 
           // Process referral reward (10% of purchase to referrer)

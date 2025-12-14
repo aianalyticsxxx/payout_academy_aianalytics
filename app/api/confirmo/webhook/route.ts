@@ -7,14 +7,62 @@ import { verifyConfirmoWebhook, ConfirmoWebhookPayload } from '@/lib/confirmo';
 import { createChallenge } from '@/lib/challenges/challenge-service';
 import { prisma } from '@/lib/db/prisma';
 import { DifficultyType } from '@/lib/challenges/constants';
+import crypto from 'crypto';
+
+// Verify webhook signature using HMAC-SHA256
+function verifyWebhookSignature(signature: string | null, body: string): boolean {
+  const webhookSecret = process.env.CONFIRMO_WEBHOOK_SECRET;
+
+  // If no secret configured, log warning but allow (for backward compatibility during migration)
+  if (!webhookSecret) {
+    console.warn('[Confirmo] CONFIRMO_WEBHOOK_SECRET not configured - signature verification skipped');
+    return true;
+  }
+
+  // If secret is configured, signature is REQUIRED
+  if (!signature) {
+    console.error('[Confirmo] Missing webhook signature');
+    return false;
+  }
+
+  try {
+    const expectedSignature = crypto
+      .createHmac('sha256', webhookSecret)
+      .update(body)
+      .digest('hex');
+
+    // Use timing-safe comparison to prevent timing attacks
+    if (signature.length !== expectedSignature.length) {
+      return false;
+    }
+
+    return crypto.timingSafeEqual(
+      Buffer.from(signature),
+      Buffer.from(expectedSignature)
+    );
+  } catch (error) {
+    console.error('[Confirmo] Signature verification error:', error);
+    return false;
+  }
+}
 
 export async function POST(req: NextRequest) {
   try {
-    const payload: ConfirmoWebhookPayload = await req.json();
+    // Get raw body for signature verification
+    const rawBody = await req.text();
+
+    // Verify signature first (before parsing JSON)
+    const signature = req.headers.get('x-confirmo-signature') || req.headers.get('x-signature');
+    if (!verifyWebhookSignature(signature, rawBody)) {
+      console.error('[Confirmo] Webhook signature verification failed');
+      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
+    }
+
+    const payload: ConfirmoWebhookPayload = JSON.parse(rawBody);
 
     console.log('Confirmo webhook received:', payload.id, payload.status);
 
-    // Verify the webhook by fetching invoice details
+    // Verify the webhook by fetching invoice details (double verification)
     const invoice = await verifyConfirmoWebhook(payload);
 
     if (!invoice) {

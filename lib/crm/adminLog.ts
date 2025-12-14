@@ -11,26 +11,44 @@ export interface AdminLogParams {
   targetId?: string;
   metadata?: Record<string, any>;
   ipAddress?: string;
+  userAgent?: string;
 }
 
 /**
  * Log an admin action for audit trail
+ * SECURITY: All sensitive admin actions MUST be logged for compliance and forensics
  */
 export async function logAdminAction(params: AdminLogParams) {
   try {
+    // SECURITY: Include timestamp in metadata for additional audit trail
+    const enrichedMetadata = {
+      ...params.metadata,
+      _loggedAt: new Date().toISOString(),
+      _userAgent: params.userAgent?.substring(0, 500), // Truncate to prevent abuse
+    };
+
     await prisma.adminLog.create({
       data: {
         adminId: params.adminId,
         action: params.action,
         targetType: params.targetType,
         targetId: params.targetId,
-        metadata: params.metadata,
+        metadata: enrichedMetadata,
         ipAddress: params.ipAddress,
       },
     });
+
+    // SECURITY: Also log to console for additional redundancy
+    console.log(`[ADMIN_AUDIT] ${params.action} by ${params.adminId} on ${params.targetType}:${params.targetId} from ${params.ipAddress}`);
   } catch (error) {
-    // Don't fail the main operation if logging fails
-    console.error('Failed to log admin action:', error);
+    // SECURITY: Even on failure, log to console for forensics
+    console.error('[ADMIN_AUDIT_FAILED] Failed to log admin action:', {
+      action: params.action,
+      adminId: params.adminId,
+      targetType: params.targetType,
+      targetId: params.targetId,
+      error,
+    });
   }
 }
 

@@ -6,7 +6,37 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 
+// Verify cron secret with timing-safe comparison
+function verifyCronSecret(req: NextRequest): boolean {
+  const authHeader = req.headers.get('authorization');
+
+  // DENY by default if no secret configured (security first)
+  if (!process.env.CRON_SECRET) {
+    console.error('[Cron] CRON_SECRET not configured - denying access');
+    return false;
+  }
+
+  // Use timing-safe comparison to prevent timing attacks
+  const expected = `Bearer ${process.env.CRON_SECRET}`;
+  if (!authHeader || authHeader.length !== expected.length) {
+    return false;
+  }
+
+  // Constant-time comparison
+  const { timingSafeEqual } = require('crypto');
+  try {
+    return timingSafeEqual(Buffer.from(authHeader), Buffer.from(expected));
+  } catch {
+    return false;
+  }
+}
+
 export async function GET(req: NextRequest) {
+  // Verify this is a legitimate cron request
+  if (!verifyCronSecret(req)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
     console.log('[Cron] Recalculating leaderboard ranks...');
 

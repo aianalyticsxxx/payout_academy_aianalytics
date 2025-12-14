@@ -9,6 +9,7 @@ import { prisma } from '@/lib/db/prisma';
 import { authenticator } from 'otplib';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
+import { decrypt, verifyBackupCode } from '@/lib/security/encryption';
 
 const DisableSchema = z.object({
   password: z.string().min(1, 'Password is required'),
@@ -64,26 +65,28 @@ export async function POST(req: NextRequest) {
 
     // Check TOTP code first
     if (user.twoFactorSecret) {
+      // SECURITY: Decrypt the stored secret before verification
+      const decryptedSecret = decrypt(user.twoFactorSecret);
       isValidCode = authenticator.verify({
         token: code,
-        secret: user.twoFactorSecret,
+        secret: decryptedSecret,
       });
     }
 
-    // Check backup codes if TOTP failed
+    // Check backup codes if TOTP failed (backup codes are hashed)
     if (!isValidCode && user.twoFactorBackupCodes) {
-      const backupCodes = JSON.parse(user.twoFactorBackupCodes) as string[];
-      const codeIndex = backupCodes.findIndex(
-        (bc) => bc.toUpperCase() === code.toUpperCase()
+      const hashedBackupCodes = JSON.parse(user.twoFactorBackupCodes) as string[];
+      const codeIndex = hashedBackupCodes.findIndex((hashedCode) =>
+        verifyBackupCode(code.toUpperCase(), hashedCode)
       );
 
       if (codeIndex !== -1) {
         isValidCode = true;
         // Remove used backup code
-        backupCodes.splice(codeIndex, 1);
+        hashedBackupCodes.splice(codeIndex, 1);
         await prisma.user.update({
           where: { id: userId },
-          data: { twoFactorBackupCodes: JSON.stringify(backupCodes) },
+          data: { twoFactorBackupCodes: JSON.stringify(hashedBackupCodes) },
         });
       }
     }

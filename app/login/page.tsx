@@ -144,11 +144,30 @@ function AnimatedBackground() {
 // ==========================================
 // LOGIN FORM COMPONENT
 // ==========================================
+// SECURITY: Validate callback URL to prevent open redirect attacks
+function getSafeCallbackUrl(callbackUrl: string | null): string {
+  const defaultUrl = '/dashboard';
+  if (!callbackUrl) return defaultUrl;
+
+  // Only allow relative paths (starting with /)
+  // Reject absolute URLs, protocol-relative URLs, and encoded characters
+  if (
+    !callbackUrl.startsWith('/') ||
+    callbackUrl.startsWith('//') ||
+    callbackUrl.includes(':') ||
+    callbackUrl.includes('%')
+  ) {
+    return defaultUrl;
+  }
+
+  return callbackUrl;
+}
+
 function LoginForm() {
   const { t } = useLanguage();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get('callbackUrl') || '/dashboard';
+  const callbackUrl = getSafeCallbackUrl(searchParams.get('callbackUrl'));
   const error = searchParams.get('error');
 
   const [email, setEmail] = useState('');

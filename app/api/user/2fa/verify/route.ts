@@ -8,6 +8,7 @@ import { authOptions } from '@/lib/auth/config';
 import { prisma } from '@/lib/db/prisma';
 import { authenticator } from 'otplib';
 import { z } from 'zod';
+import { decrypt } from '@/lib/security/encryption';
 
 const VerifySchema = z.object({
   code: z.string().length(6, 'Code must be 6 digits'),
@@ -68,10 +69,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // SECURITY: Decrypt the stored secret before verification
+    const decryptedSecret = decrypt(user.twoFactorSecret);
+
     // Verify the code
     const isValid = authenticator.verify({
       token: code,
-      secret: user.twoFactorSecret,
+      secret: decryptedSecret,
     });
 
     if (!isValid) {

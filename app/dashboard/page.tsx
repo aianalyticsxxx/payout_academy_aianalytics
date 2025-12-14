@@ -3037,9 +3037,11 @@ function DashboardContent() {
                       {t.dashboard.rewardsTab.noPendingRewards}
                     </div>
                   )}
-                  <div className="text-xs text-amber-400/70 text-center mt-2">
-                    {activeChallenges.reduce((sum, c) => sum + (c.pendingRewards?.length || 0), 0)} {t.dashboard.rewardsTab.levelsReadyToClaim}
-                  </div>
+                  {activeChallenges.reduce((sum, c) => sum + (c.pendingRewards?.length || 0), 0) > 0 && (
+                    <div className="text-xs text-amber-400/70 text-center mt-2">
+                      {activeChallenges.reduce((sum, c) => sum + (c.pendingRewards?.length || 0), 0)} {t.dashboard.rewardsTab.levelsReadyToClaim}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
