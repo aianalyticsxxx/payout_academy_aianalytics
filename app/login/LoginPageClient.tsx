@@ -6,7 +6,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { signIn } from 'next-auth/react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useLanguage, LanguageSwitcher } from '@/lib/i18n';
 import { TurnstileWidget } from '@/components/security/TurnstileWidget';
@@ -164,25 +164,22 @@ function getSafeCallbackUrl(callbackUrl: string | null): string {
   return callbackUrl;
 }
 
-function LoginForm() {
+interface LoginFormProps {
+  errorParam?: string;
+  callbackUrlParam?: string;
+}
+
+function LoginForm({ errorParam, callbackUrlParam }: LoginFormProps) {
   const { t } = useLanguage();
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
-  const [callbackUrl, setCallbackUrl] = useState('/dashboard');
+  const [errorMessage, setErrorMessage] = useState(errorParam || '');
+  const [callbackUrl] = useState(getSafeCallbackUrl(callbackUrlParam || null));
   const turnstileTokenRef = useRef<string | null>(null);
-
-  // Handle client-side initialization
-  useEffect(() => {
-    const error = searchParams.get('error');
-    if (error) setErrorMessage(error);
-    setCallbackUrl(getSafeCallbackUrl(searchParams.get('callbackUrl')));
-  }, [searchParams]);
 
   // SECURITY: Only remember email, NEVER store passwords in localStorage
   // Storing passwords in localStorage is a critical security vulnerability
@@ -373,11 +370,16 @@ function LoginForm() {
 // ==========================================
 // MAIN CLIENT COMPONENT
 // ==========================================
-export function LoginPageClient() {
+interface LoginPageClientProps {
+  errorParam?: string;
+  callbackUrlParam?: string;
+}
+
+export function LoginPageClient({ errorParam, callbackUrlParam }: LoginPageClientProps) {
   return (
     <div className="min-h-screen flex items-center justify-center relative">
       <AnimatedBackground />
-      <LoginForm />
+      <LoginForm errorParam={errorParam} callbackUrlParam={callbackUrlParam} />
     </div>
   );
 }
