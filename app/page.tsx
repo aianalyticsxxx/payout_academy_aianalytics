@@ -173,14 +173,14 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0A0A0A] text-white">
+    <div className="min-h-screen bg-dark text-white">
       {/* ==========================================
           FLOATING HEADER
           ========================================== */}
       <header
         className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
           isScrolled
-            ? 'bg-[#0A0A0A]/80 backdrop-blur-xl border-b border-white/5 shadow-lg shadow-black/20'
+            ? 'bg-dark/80 backdrop-blur-xl border-b border-white/5 shadow-lg shadow-black/20'
             : 'bg-transparent'
         }`}
       >
@@ -235,7 +235,7 @@ export default function LandingPage() {
           ========================================== */}
       <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
         {/* Background Gradient */}
-        <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0A] via-[#0D1818] to-[#0A0A0A]" />
+        <div className="absolute inset-0 bg-gradient-to-b from-dark via-teal-950 to-dark" />
 
         {/* Grid Pattern Overlay */}
         <div
@@ -323,7 +323,7 @@ export default function LandingPage() {
       {/* ==========================================
           SOCIAL PROOF STRIP
           ========================================== */}
-      <section className="relative py-6 border-y border-zinc-800/50 bg-[#0D0D0D]">
+      <section className="relative py-6 border-y border-zinc-800/50 bg-zinc-950">
         <div className="max-w-6xl mx-auto px-4">
           <div className="flex flex-wrap justify-center gap-8 md:gap-16">
             {[
@@ -364,7 +364,7 @@ export default function LandingPage() {
               {/* Video Container */}
               <div className="relative aspect-video rounded-2xl overflow-hidden border border-zinc-800/50 bg-zinc-900/50 group">
                 {/* Placeholder/Thumbnail - Replace with actual video */}
-                <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-[#1a1a1a] via-[#151515] to-[#111111]">
+                <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-zinc-900 via-zinc-900 to-surface">
                   {/* Play Button */}
                   <button className="relative z-10 w-20 h-20 md:w-24 md:h-24 rounded-full bg-gradient-to-r from-teal-600 to-teal-500 flex items-center justify-center shadow-xl shadow-teal-500/30 group-hover:scale-110 transition-transform duration-300">
                     <svg className="w-8 h-8 md:w-10 md:h-10 text-white ml-1" fill="currentColor" viewBox="0 0 24 24">
@@ -448,7 +448,7 @@ export default function LandingPage() {
                 {/* Step Number Circle */}
                 <div className="relative w-16 h-16 mx-auto mb-6">
                   <div className="absolute inset-0 rounded-full bg-gradient-to-br from-teal-500 to-teal-600 opacity-20 group-hover:opacity-40 transition-opacity" />
-                  <div className="absolute inset-1 rounded-full bg-[#0A0A0A] flex items-center justify-center">
+                  <div className="absolute inset-1 rounded-full bg-dark flex items-center justify-center">
                     <span className="text-2xl">{item.icon}</span>
                   </div>
                   <div className="absolute -top-2 -right-2 w-8 h-8 rounded-full bg-teal-500 flex items-center justify-center text-xs font-bold">
@@ -457,7 +457,7 @@ export default function LandingPage() {
                 </div>
 
                 {/* Card */}
-                <div className="bg-[#111111] border border-zinc-800/50 rounded-2xl p-6 text-center group-hover:border-teal-500/30 transition-all duration-300">
+                <div className="bg-surface border border-zinc-800/50 rounded-2xl p-6 text-center group-hover:border-teal-500/30 transition-all duration-300">
                   <h3 className="text-xl font-bold mb-3">{item.title}</h3>
                   <p className="text-zinc-400">{item.description}</p>
                 </div>
@@ -470,7 +470,7 @@ export default function LandingPage() {
       {/* ==========================================
           TESTIMONIALS / REVIEWS
           ========================================== */}
-      <section id="reviews" className="py-20 md:py-32 bg-[#0A0A0A]">
+      <section id="reviews" className="py-20 md:py-32 bg-dark">
         <div className="max-w-6xl mx-auto px-4">
           {/* Section Header */}
           <div className="text-center mb-16">
@@ -598,7 +598,7 @@ export default function LandingPage() {
       {/* ==========================================
           CHALLENGE TIERS SHOWCASE
           ========================================== */}
-      <section id="challenges" className="py-20 md:py-32 bg-gradient-to-b from-[#0A0A0A] via-[#0D1212] to-[#0A0A0A]">
+      <section id="challenges" className="py-20 md:py-32 bg-gradient-to-b from-dark via-zinc-950 to-dark">
         <div className="max-w-6xl mx-auto px-4">
           {/* Section Header */}
           <div className="text-center mb-12">
@@ -649,7 +649,7 @@ export default function LandingPage() {
               return (
                 <div
                   key={tier.size}
-                  className={`bg-gradient-to-br from-[#1a1a1a] via-[#151515] to-[#111111] border rounded-2xl p-6 relative overflow-hidden group transition-all hover:border-teal-600/50 ${
+                  className={`bg-gradient-to-br from-zinc-900 via-zinc-900 to-surface border rounded-2xl p-6 relative overflow-hidden group transition-all hover:border-teal-600/50 ${
                     isPopular || isBestValue ? 'border-amber-500/50' : 'border-zinc-800/50'
                   }`}
                 >
@@ -743,7 +743,7 @@ export default function LandingPage() {
             {/* Center Hub */}
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 md:w-40 md:h-40">
               <div className="absolute inset-0 rounded-full bg-gradient-to-br from-teal-500/20 to-emerald-500/20 animate-pulse" />
-              <div className="absolute inset-2 rounded-full bg-[#0A0A0A] flex items-center justify-center flex-col">
+              <div className="absolute inset-2 rounded-full bg-dark flex items-center justify-center flex-col">
                 <span className="text-3xl mb-1">🧠</span>
                 <span className="text-xs font-bold text-teal-400">{t.landing.aiSwarm.swarm}</span>
                 <span className="text-xs text-zinc-500">{t.landing.aiSwarm.consensus}</span>
@@ -821,7 +821,7 @@ export default function LandingPage() {
       {/* ==========================================
           KEY BENEFITS GRID
           ========================================== */}
-      <section id="benefits" className="py-20 md:py-32 bg-[#0D0D0D]">
+      <section id="benefits" className="py-20 md:py-32 bg-zinc-950">
         <div className="max-w-6xl mx-auto px-4">
           {/* Section Header */}
           <div className="text-center mb-16">
@@ -869,7 +869,7 @@ export default function LandingPage() {
             ].map((benefit, i) => (
               <div
                 key={i}
-                className="group p-6 rounded-2xl bg-[#111111] border border-zinc-800/50 hover:border-teal-500/30 transition-all duration-300"
+                className="group p-6 rounded-2xl bg-surface border border-zinc-800/50 hover:border-teal-500/30 transition-all duration-300"
               >
                 <div className="text-4xl mb-4">{benefit.icon}</div>
                 <h3 className="text-xl font-bold mb-2 group-hover:text-teal-400 transition-colors">
@@ -897,7 +897,7 @@ export default function LandingPage() {
           {/* Comparison Table */}
           <div className="overflow-hidden rounded-2xl border border-zinc-800/50">
             {/* Header */}
-            <div className="grid grid-cols-3 bg-[#111111]">
+            <div className="grid grid-cols-3 bg-surface">
               <div className="p-4 text-zinc-400 font-medium">{t.landing.comparison.feature}</div>
               <div className="p-4 text-center font-bold text-teal-400 bg-teal-500/10 border-x border-teal-500/20">
                 {t.landing.comparison.zalogche}
@@ -914,7 +914,7 @@ export default function LandingPage() {
               { feature: t.landing.comparison.transparentEarnings, zalogche: true, regular: false },
               { feature: t.landing.comparison.challengeWindow, zalogche: true, regular: t.landing.comparison.na },
             ].map((row, i) => (
-              <div key={i} className={`grid grid-cols-3 ${i % 2 === 0 ? 'bg-[#0D0D0D]' : 'bg-[#111111]'}`}>
+              <div key={i} className={`grid grid-cols-3 ${i % 2 === 0 ? 'bg-zinc-950' : 'bg-surface'}`}>
                 <div className="p-4 text-zinc-300">{row.feature}</div>
                 <div className="p-4 text-center bg-teal-500/5 border-x border-teal-500/10">
                   {row.zalogche === true ? (
@@ -943,7 +943,7 @@ export default function LandingPage() {
           ========================================== */}
       <section className="py-20 md:py-32 relative overflow-hidden">
         {/* Background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-teal-900/20 via-[#0A0A0A] to-amber-900/20" />
+        <div className="absolute inset-0 bg-gradient-to-br from-teal-900/20 via-dark to-amber-900/20" />
         <div className="absolute inset-0" style={{
           background: 'radial-gradient(ellipse at 30% 50%, rgba(20, 184, 166, 0.15) 0%, transparent 50%), radial-gradient(ellipse at 70% 50%, rgba(245, 158, 11, 0.15) 0%, transparent 50%)',
         }} />
@@ -1005,9 +1005,9 @@ export default function LandingPage() {
           />
 
           {/* Modal */}
-          <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-[#111111] border border-zinc-800 rounded-t-3xl sm:rounded-3xl animate-slide-up">
+          <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-surface border border-zinc-800 rounded-t-3xl sm:rounded-3xl animate-slide-up">
             {/* Header */}
-            <div className="sticky top-0 bg-[#111111] border-b border-zinc-800 p-4 flex items-center justify-between z-10">
+            <div className="sticky top-0 bg-surface border-b border-zinc-800 p-4 flex items-center justify-between z-10">
               <div className="flex items-center gap-3">
                 {purchaseStep === 'checkout' && (
                   <button
