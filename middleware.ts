@@ -17,10 +17,9 @@ const isProduction = process.env.NODE_ENV === 'production';
 const buildCsp = (): string => {
   const directives = [
     "default-src 'self'",
-    // In production, use strict CSP; in development, allow unsafe-inline for hot reload
-    isProduction
-      ? "script-src 'self' https://challenges.cloudflare.com https://js.stripe.com"
-      : "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com https://js.stripe.com",
+    // Next.js requires 'unsafe-inline' for hydration scripts
+    // TODO: Implement nonce-based CSP for stricter security
+    "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com https://js.stripe.com",
     // Styles need unsafe-inline for styled-jsx and inline styles (unavoidable in Next.js)
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: https: blob:",
