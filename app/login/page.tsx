@@ -396,76 +396,11 @@ function LoginFormFallback() {
 // ==========================================
 export default function LoginPage() {
   return (
-    <>
-      {/* Custom CSS animations */}
-      <style jsx global>{`
-        @keyframes float {
-          0%, 100% {
-            transform: translateY(0) translateX(0) scale(1);
-          }
-          25% {
-            transform: translateY(-40px) translateX(20px) scale(1.05);
-          }
-          50% {
-            transform: translateY(-20px) translateX(-15px) scale(0.95);
-          }
-          75% {
-            transform: translateY(-50px) translateX(25px) scale(1.02);
-          }
-        }
-
-        @keyframes sparkle {
-          0%, 100% {
-            opacity: 0;
-            transform: scale(0);
-          }
-          50% {
-            opacity: 1;
-            transform: scale(1);
-          }
-        }
-
-        @keyframes shimmer {
-          0% {
-            background-position: 200% 0;
-          }
-          100% {
-            background-position: -200% 0;
-          }
-        }
-
-        @keyframes border-glow {
-          0%, 100% {
-            opacity: 0.5;
-          }
-          50% {
-            opacity: 0.8;
-          }
-        }
-
-        .animate-float {
-          animation: float ease-in-out infinite;
-        }
-
-        .animate-sparkle {
-          animation: sparkle ease-in-out infinite;
-        }
-
-        .animate-shimmer {
-          animation: shimmer 3s ease-in-out infinite;
-        }
-
-        .animate-border-glow {
-          animation: border-glow 3s ease-in-out infinite;
-        }
-      `}</style>
-
-      <div className="min-h-screen flex items-center justify-center relative">
-        <AnimatedBackground />
-        <Suspense fallback={<LoginFormFallback />}>
-          <LoginForm />
-        </Suspense>
-      </div>
-    </>
+    <div className="min-h-screen flex items-center justify-center relative">
+      <AnimatedBackground />
+      <Suspense fallback={<LoginFormFallback />}>
+        <LoginForm />
+      </Suspense>
+    </div>
   );
 }
